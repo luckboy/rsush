@@ -129,6 +129,8 @@ pub enum Token
 
 pub enum ArithmeticToken
 {
+    LParen,
+    RParen,
     Tylda,
     Excl,
     Star,
