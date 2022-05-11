@@ -21,7 +21,7 @@ use crate::io::*;
 use crate::parser::*;
 
 #[derive(Clone, PartialEq)]
-enum Mode
+enum State
 {
     Initial,
     InParameterExpansion,
@@ -176,8 +176,8 @@ pub struct Lexer<'a>
     pushed_chars: Vec<char>,
     pushed_tokens: Vec<Token>,
     pushed_arith_tokens: Vec<ArithmeticToken>,
-    mode_stack: Vec<Mode>,
-    current_mode: Mode,
+    state_stack: Vec<State>,
+    current_state: State,
     position: Position,
 }
 
@@ -190,8 +190,8 @@ impl<'a> Lexer<'a>
             pushed_chars: Vec::new(),
             pushed_tokens: Vec::new(),
             pushed_arith_tokens: Vec::new(),
-            mode_stack: Vec::new(),
-            current_mode: Mode::Initial,
+            state_stack: Vec::new(),
+            current_state: State::Initial,
             position: Position::new(path, 1, 1),
         }
     }
