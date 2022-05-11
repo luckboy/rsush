@@ -91,10 +91,10 @@ pub enum Token
 {
     Newline,
     Semi,
-    Amp,
-    Bar,
     Less(Option<i32>),
     Greater(Option<i32>),
+    Amp,
+    Bar,
     LessLess,
     LessLessMinus,
     LessGreater(Option<i32>),
