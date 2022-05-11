@@ -30,6 +30,8 @@ enum State
     InHereDocument(String),
     InFirstWord,
     InThirdWord,
+    InArithmeticExpression,
+    InArithmeticExpressionAndParentheses,
 }
 
 #[derive(Copy, Clone, PartialEq)]
