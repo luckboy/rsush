@@ -95,6 +95,7 @@ pub enum Token
     Greater(Option<i32>),
     Amp,
     Bar,
+    SemiSemi,
     LessLess,
     LessLessMinus,
     LessGreater(Option<i32>),
