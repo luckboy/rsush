@@ -20,10 +20,12 @@ use std::io::*;
 use std::rc::*;
 use std::result;
 use crate::lexer::*;
+use crate::settings::*;
 
 #[derive(Clone)]
 pub struct Word
 {
+    pub path: String,
     pub pos: Position,
     pub word_elems: Vec<WordElement>,
 }
@@ -31,6 +33,14 @@ pub struct Word
 #[derive(Clone)]
 pub struct Command
 {
+    pub path: String,
+    pub pos: Position,
+}
+
+#[derive(Clone)]
+pub struct ArithmeticExpression
+{
+    pub path: String,
     pub pos: Position,
 }
 
@@ -42,31 +52,33 @@ impl Parser
     pub fn new() -> Parser
     { Parser {} }
     
-    pub fn parse_words<'a>(&mut self, lexer: &mut Lexer<'a>) -> ParserResult<Vec<Rc<Word>>>
+    pub fn parse_words<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Word>>>
     { Ok(Vec::new()) }
 
-    pub fn parse_commands<'a>(&mut self, lexer: &mut Lexer<'a>) -> ParserResult<Vec<Rc<Command>>>
+    pub fn parse_commands<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Command>>>
     { Ok(Vec::new()) }
+
+    pub fn parse_arith_expr<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    { Ok(ArithmeticExpression { path: lexer.path().clone(), pos: lexer.pos(), }) }
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct Position
 {
-    pub path: String,
     pub line: u64,
     pub column: u64,
 }
 
 impl Position
 {
-    pub fn new(path: &str, line: u64, column: u64) -> Position
-    { Position { path: String::from(path), line, column, } }
+    pub fn new(line: u64, column: u64) -> Position
+    { Position { line, column, } }
 }
 
 impl fmt::Display for Position
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
-    { write!(f, "{}: {}.{}", self.path, self.line, self.column) }
+    { write!(f, "{}.{}", self.line, self.column) }
 }
 
 pub type ParserResult<T> = result::Result<T, ParserError>;
@@ -74,16 +86,16 @@ pub type ParserResult<T> = result::Result<T, ParserError>;
 pub enum ParserError
 {
     IO(String, Error),
-    Syntax(Position, String, bool),
+    Syntax(String, Position, String, bool),
 }
 
 impl ParserError
 {
-    pub fn is_cont(&self) -> bool
+    pub fn has_cont(&self) -> bool
     {
          match self {
-             ParserError::IO(path, err) => false,
-             ParserError::Syntax(_, _, is_cont) => *is_cont,
+             ParserError::IO(path, _) => false,
+             ParserError::Syntax(_, _, _, is_cont) => *is_cont,
          }
     }
 }
@@ -94,7 +106,7 @@ impl fmt::Display for ParserError
     {
          match self {
              ParserError::IO(path, err) => write!(f, "{}: {}", path, err),
-             ParserError::Syntax(pos, msg, _) => write!(f, "{}: {}", pos, msg),
+             ParserError::Syntax(path, pos, msg, _) => write!(f, "{}: {}: {}", path, pos, msg),
          }
     }
 }

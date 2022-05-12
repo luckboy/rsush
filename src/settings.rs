@@ -15,16 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-#[allow(dead_code)]
-mod io;
-#[allow(dead_code)]
-mod lexer;
-#[allow(dead_code)]
-mod parser;
-#[allow(dead_code)]
-mod settings;
-
-fn main()
+#[derive(Clone)]
+pub struct Settings
 {
-    println!("Hello, world!");
+    pub allexport_flag: bool,
+    pub errexit_flag: bool,
+    pub ignoreeof_flag: bool,
+    pub monitor_flag: bool,
+    pub noclobber_flag: bool,
+    pub noglob_flag: bool,
+    pub nolog_flag: bool,
+    pub notify_flag: bool,
+    pub nounset_flag: bool,
+    pub verbose_flag: bool,
+    pub vi_flag: bool,
+    pub emacs_flag: bool,
+    pub xtrace_flag: bool,
 }

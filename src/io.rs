@@ -72,3 +72,15 @@ impl<R: BufRead> Read for CharReader<R>
     fn read(&mut self, buf: &mut [u8]) -> Result<usize>
     { self.reader.read(buf) }
 }
+
+impl<R: BufRead> BufRead for CharReader<R>
+{
+    fn fill_buf(&mut self) -> Result<&[u8]>
+    { self.reader.fill_buf() }
+
+    fn consume(&mut self, amt: usize)
+    { self.reader.consume(amt); }
+}
+
+impl<R: BufRead> CharRead for CharReader<R>
+{}
