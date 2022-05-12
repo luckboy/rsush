@@ -934,7 +934,7 @@ impl<'a> Lexer<'a>
     pub fn next_arith_token(&mut self, settings: &Settings) -> ParserResult<(ArithmeticToken, Position)>
     { Err(ParserError::Syntax(self.path.clone(), self.pos, String::from("not implemented"), false)) }
 
-    pub fn undo_airth_token(&mut self, arith_token: &ArithmeticToken, pos: &Position)
+    pub fn undo_arith_token(&mut self, arith_token: &ArithmeticToken, pos: &Position)
     { self.pushed_arith_tokens.push((arith_token.clone(), *pos)); }
 }
 
