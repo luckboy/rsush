@@ -751,6 +751,14 @@ impl<'a> Lexer<'a>
                     let word_elem = self.get_doubly_quoted_word_elem(settings)?;
                     word_elems.push(word_elem);
                 },
+                (Some(c @ ('<' | '>' | '&' | '|' | '(' | ')' | '#')), pos) => {
+                    self.unget_char(c, &pos, settings);
+                    break;
+                },
+                (Some(c), pos) if c.is_whitespace() => {
+                    self.unget_char(c, &pos, settings);
+                    break;
+                },                
                 (Some(c), pos) => {
                     self.unget_char(c, &pos, settings);
                     let (word_elem, _) = self.get_string_word_elem(settings)?;
