@@ -620,6 +620,7 @@ impl<'a> Lexer<'a>
                             s.push('\\');
                             break;
                         },
+                        (Some('\n'), _) => (),
                         (Some(c2 @ ('?' | '*' | '[' | ']' | ':' | '!' | '^' | '~')), _) => {
                             s.push('\\');
                             s.push(c2);
@@ -653,6 +654,7 @@ impl<'a> Lexer<'a>
                             s.push('\\');
                             break;
                         },
+                        (Some('\n'), _) => (),
                         (Some(c2), _) => s.push(c2),
                     }
                 },
