@@ -594,9 +594,9 @@ impl<'a> Lexer<'a>
                     match self.get_char(settings)? {
                         (None, pos2) => return Err(ParserError::Syntax(self.path.clone(), pos2, String::from("unexpected end of file"), true)),
                         (Some('`'), _) => s.push('`'),
-                        (Some(c2), _) => {
+                        (Some(c2), pos2) => {
+                            self.unget_char(c2, &pos2, settings);
                             s.push(c);
-                            s.push(c2);
                         },
                     }
                 },
