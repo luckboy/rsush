@@ -187,6 +187,7 @@ pub struct Lexer<'a>
     current_state: State,
     path: String,
     pos: Position,
+    backquote_column_inc: u64,
     content_for_verbose: String,
     has_ignored_eof: bool,
     first_keywords: HashMap<String, Token>,
@@ -195,7 +196,7 @@ pub struct Lexer<'a>
 
 impl<'a> Lexer<'a>
 {
-    pub fn new(path: &str, reader: &'a mut dyn CharRead, is_ignored_eof: bool) -> Lexer<'a>
+    pub fn new(path: &str, pos: &Position, reader: &'a mut dyn CharRead, backquote_column_inc: u64, is_ignored_eof: bool) -> Lexer<'a>
     {
         let mut first_keywords: HashMap<String, Token> = HashMap::new();
         first_keywords.insert(String::from("!"), Token::Excl);
@@ -223,7 +224,8 @@ impl<'a> Lexer<'a>
             state_stack: Vec::new(),
             current_state: State::Initial,
             path: String::from(path),
-            pos: Position::new(1, 1),
+            pos: *pos,
+            backquote_column_inc,
             content_for_verbose: String::new(),
             has_ignored_eof: is_ignored_eof,
             first_keywords,
@@ -288,6 +290,9 @@ impl<'a> Lexer<'a>
                     self.pos.column = 1;
                 } else {
                     self.pos.column += 1;
+                    if c == '`' {
+                        self.pos.column += self.backquote_column_inc;
+                    }
                 }
                 if settings.verbose_flag {
                     self.content_for_verbose.push(c);
@@ -581,6 +586,7 @@ impl<'a> Lexer<'a>
     fn get_backquote_simple_word_elem(&mut self, settings: &Settings) -> ParserResult<SimpleWordElement>
     {
         let mut s = String::new();
+        let simple_word_elem_pos = self.pos;
         loop {
             match self.get_char(settings)? {
                 (None, pos) => return Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
@@ -600,7 +606,7 @@ impl<'a> Lexer<'a>
         }
         let mut cursor = Cursor::new(s.as_bytes());
         let mut cr = CharReader::new(&mut cursor);
-        let mut lexer = Lexer::new(&format!("{}: {}", self.path, self.pos), &mut cr, false);
+        let mut lexer = Lexer::new(self.path.as_str(), &simple_word_elem_pos, &mut cr, self.backquote_column_inc + 1, false);
         let mut parser = Parser::new();
         let commands = parser.parse_commands(&mut lexer, settings)?;
         Ok(SimpleWordElement::Command(commands))
