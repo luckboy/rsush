@@ -239,6 +239,9 @@ impl<'a> Lexer<'a>
     pub fn pos(&self) -> Position
     { self.pos }
 
+    pub fn push_initial(&mut self)
+    { self.push_state(State::Initial); }
+
     pub fn push_here_doc_word(&mut self)
     { self.push_state(State::HereDocumentWord); }
 
