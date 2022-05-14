@@ -130,7 +130,7 @@ pub enum Token
     While,
     Word(Vec<WordElement>),
     HereDocWord(String),
-    HereDoc(Vec<WordElement>, bool),
+    HereDoc(Vec<SimpleWordElement>, bool),
     EOF,
 }
 
@@ -240,18 +240,18 @@ impl<'a> Lexer<'a>
     { self.pos }
 
     pub fn push_here_doc_word(&mut self)
-    { self.push_state(&State::HereDocumentWord); }
+    { self.push_state(State::HereDocumentWord); }
 
     pub fn push_in_here_doc(&mut self, s: &str, is_minus: bool)
-    { self.push_state(&State::InHereDocument(String::from(s), is_minus)); }
+    { self.push_state(State::InHereDocument(String::from(s), is_minus)); }
 
     pub fn push_first_word(&mut self)
-    { self.push_state(&State::FirstWord); }    
+    { self.push_state(State::FirstWord); }    
 
     pub fn push_third_word(&mut self)
-    { self.push_state(&State::ThirdWord); }    
+    { self.push_state(State::ThirdWord); }    
 
-    fn push_state(&mut self, state: &State)
+    fn push_state(&mut self, state: State)
     {
         self.state_stack.push(self.current_state.clone());
         self.current_state = state.clone();
@@ -312,13 +312,15 @@ impl<'a> Lexer<'a>
         }
     }
     
-    fn skip_comment(&mut self, settings: &Settings) -> ParserResult<()>
+    fn skip_comment(&mut self, is_arith_expr: bool, settings: &Settings) -> ParserResult<()>
     {
         loop {
             match self.get_char(settings)? {
                 (None, _) => break,
                 (Some(c @ '\n'), pos) => {
-                    self.unget_char(c, &pos, settings);
+                    if !is_arith_expr {
+                        self.unget_char(c, &pos, settings);
+                    }
                     break;
                 },
                 (Some(_), _) => (),
@@ -327,7 +329,7 @@ impl<'a> Lexer<'a>
         Ok(())
     }
     
-    fn skip_spaces(&mut self, settings: &Settings) -> ParserResult<()>
+    fn skip_spaces(&mut self, is_arith_expr: bool, settings: &Settings) -> ParserResult<()>
     {
         loop {
             match self.get_char(settings)? {
@@ -343,8 +345,8 @@ impl<'a> Lexer<'a>
                         },
                     }
                 },
-                (Some('#'), _) => self.skip_comment(settings)?,
-                (Some(c @ '\n'), pos) => {
+                (Some('#'), _) => self.skip_comment(is_arith_expr, settings)?,
+                (Some(c @ '\n'), pos) if !is_arith_expr => {
                     self.unget_char(c, &pos, settings);
                     break;
                 },
@@ -408,6 +410,140 @@ impl<'a> Lexer<'a>
         }
     }
     
+    fn read_string_word(&mut self, s: &mut String, is_simple_word: bool, settings: &Settings) -> ParserResult<bool>
+    {
+        let mut can_be_keyword = true;
+        loop {
+            match self.get_char(settings)? {
+                (None, _) => break,
+                (Some('\\'), _) => {
+                    can_be_keyword = false;
+                    match self.get_char(settings)? {
+                        (None, _) => {
+                            s.push('\\');
+                            break;
+                        },
+                        (Some('\n'), _) => (),
+                        (Some(c2), _) => {
+                            if is_simple_word {
+                                match c2 {
+                                    '?' | '*' | '[' | ']' | ':' | '!' | '^' | '~' => s.push('\\'),
+                                    _ => (),
+                                }
+                            }
+                            s.push(c2);
+                        },
+                    }
+                },
+                (Some(c @ (';' | '<' | '>' | '&' | '|' | '(' | ')' | '\'' | '"' | '#')), pos) => {
+                    self.unget_char(c, &pos, settings);
+                    break;
+                },
+                (Some(c), pos) if c.is_whitespace() => {
+                    self.unget_char(c, &pos, settings);
+                    break;
+                },
+                (Some(c), pos) => {
+                    if is_simple_word {
+                        if c == '$' || c == '`' {
+                            self.unget_char(c, &pos, settings);
+                            break;
+                        }
+                    }
+                    s.push(c)
+                },
+            }
+        }
+        Ok(can_be_keyword)
+    }
+    
+    fn read_singly_quoted_word(&mut self, s: &mut String, settings: &Settings) -> ParserResult<()>
+    {
+        loop {
+            match self.get_char(settings)? {
+                (None, pos) => return Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)), 
+                (Some('\''), _) => break,
+                (Some(c), _) => s.push(c),
+            }
+        }
+        Ok(())
+    }
+    
+    fn read_doubly_quoted_word(&mut self, s: &mut String, is_simple_word: bool, settings: &Settings) -> ParserResult<()>
+    {
+        loop {
+            match self.get_char(settings)? {
+                (None, pos) => return Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
+                (Some('\\'), _) => {
+                    match self.get_char(settings)? {
+                        (None, _) => {
+                            s.push('\\');
+                            break;
+                        },
+                        (Some('\n'), _) => (),
+                        (Some(c2), _) => s.push(c2),
+                    }
+                },
+                (Some(c @ '"'), pos) => {
+                    self.unget_char(c, &pos, settings);
+                    break;
+                },
+                (Some(c), pos) => {
+                    if is_simple_word {
+                        if c == '$' || c == '`' {
+                            self.unget_char(c, &pos, settings);
+                            break;
+                        }
+                    }
+                    s.push(c);
+                },
+            }
+        }
+        Ok(())
+    }
+    
+    fn get_here_doc_word(&mut self, token_pos: &Position, settings: &Settings) -> ParserResult<(Token, Position)>
+    {
+        let mut s = String::new();
+        loop {
+            match self.get_char(settings)? {
+                (None, _) => break,
+                (Some('\''), _) => self.read_singly_quoted_word(&mut s, settings)?,
+                (Some('"'), _) => self.read_doubly_quoted_word(&mut s, false, settings)?, 
+                (Some(c @ (';' | '<' | '>' | '&' | '|' | '(' | ')' | '#')), pos) => {
+                    self.unget_char(c, &pos, settings);
+                    break;
+                },
+                (Some(c), pos) if c.is_whitespace() => {
+                    self.unget_char(c, &pos, settings);
+                    break;
+                },
+                (Some(c), pos) => {
+                    self.unget_char(c, &pos, settings);
+                    self.read_string_word(&mut s, false, settings)?;
+                },
+            }
+        }
+        Ok((Token::HereDocWord(s), *token_pos))
+    }
+    
+    fn get_var_name(&mut self, c: char, settings: &Settings) -> ParserResult<ParameterName>
+    {
+        let mut s = String::new();
+        s.push(c);
+        loop {
+            match self.get_char(settings)? {
+                (None, _) => break,
+                (Some(c2), _) if c2.is_alphanumeric() || c == '_' => s.push(c2),
+                (Some(c2), pos2) => {
+                    self.unget_char(c2, &pos2, settings);
+                    break;
+                },
+            }
+        }
+        Ok(ParameterName::Variable(s))
+    }
+    
     fn get_param_name(&mut self, settings: &Settings) -> ParserResult<Option<ParameterName>>
     {
         let param_name_pos = self.pos;
@@ -439,19 +575,8 @@ impl<'a> Lexer<'a>
                 }
             },
             (Some(c), _) if c.is_alphabetic() || c == '_' => {
-                let mut s = String::new();
-                s.push(c);
-                loop {
-                    match self.get_char(settings)? {
-                        (None, _) => break,
-                        (Some(c2), _) if c2.is_alphanumeric() || c == '_' => s.push(c2),
-                        (Some(c2), pos2) => {
-                            self.unget_char(c2, &pos2, settings);
-                            break;
-                        },
-                    }
-                }
-                Ok(Some(ParameterName::Variable(s)))
+                let param_name = self.get_var_name(c, settings)?;
+                Ok(Some(param_name))
             },
             (Some(c), pos) => {
                 self.unget_char(c, &pos, settings);
@@ -533,7 +658,7 @@ impl<'a> Lexer<'a>
                                 match self.get_param_modifier(settings)? {
                                     Some(modifier) => {
                                         let mut parser = Parser::new();
-                                        self.push_state(&State::InParameterExpansion);
+                                        self.push_state(State::InParameterExpansion);
                                         let words = parser.parse_words(self, settings)?;
                                         self.pop_state();
                                         Ok(SimpleWordElement::Parameter(param_name, Some((modifier, words))))
@@ -557,7 +682,7 @@ impl<'a> Lexer<'a>
                     (None, pos2) => Err(ParserError::Syntax(self.path.clone(), pos2, String::from("unexpected end of file"), true)),
                     (Some('('), _) => {
                         let mut parser = Parser::new();
-                        self.push_state(&State::InParameterExpansion);
+                        self.push_state(State::InParameterExpansion);
                         let arith_expr = parser.parse_arith_expr(self, settings)?;
                         self.pop_state();
                         Ok(SimpleWordElement::ArithmeticExpression(arith_expr))
@@ -565,7 +690,7 @@ impl<'a> Lexer<'a>
                     (Some(c2), pos2) => {
                         self.unget_char(c2, &pos2, settings);
                         let mut parser = Parser::new();
-                        self.push_state(&State::InParameterExpansion);
+                        self.push_state(State::InParameterExpansion);
                         let commands = parser.parse_commands(self, settings)?;
                         self.pop_state();
                         Ok(SimpleWordElement::Command(commands))
@@ -615,62 +740,14 @@ impl<'a> Lexer<'a>
     fn get_string_simple_word_elem_for_word_elem(&mut self, settings: &Settings) -> ParserResult<(SimpleWordElement, bool)>
     {
         let mut s = String::new();
-        let mut can_be_keyword = true;
-        loop {
-            match self.get_char(settings)? {
-                (None, _) => break,
-                (Some('\\'), _) => {
-                    can_be_keyword = false;
-                    match self.get_char(settings)? {
-                        (None, _) => {
-                            s.push('\\');
-                            break;
-                        },
-                        (Some('\n'), _) => (),
-                        (Some(c2 @ ('?' | '*' | '[' | ']' | ':' | '!' | '^' | '~')), _) => {
-                            s.push('\\');
-                            s.push(c2);
-                        },
-                        (Some(c2), _) => s.push(c2),
-                    }
-                },
-                (Some(c @ (';' | '<' | '>' | '&' | '|' | '(' | ')' | '$' | '`' | '\'' | '"' | '#')), pos) => {
-                    self.unget_char(c, &pos, settings);
-                    break;
-                },
-                (Some(c), pos) if c.is_whitespace() => {
-                    self.unget_char(c, &pos, settings);
-                    break;
-                },
-                (Some(c), _) => s.push(c),
-            }
-        }
+        let can_be_keyword = self.read_string_word(&mut s, true, settings)?;
         Ok((SimpleWordElement::String(s), can_be_keyword))
     }
     
     fn get_string_simple_word_elem_for_doubly_quoted(&mut self, settings: &Settings) -> ParserResult<SimpleWordElement>
     {
         let mut s = String::new();
-        loop {
-            match self.get_char(settings)? {
-                (None, pos) => return Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
-                (Some('\\'), _) => {
-                    match self.get_char(settings)? {
-                        (None, _) => {
-                            s.push('\\');
-                            break;
-                        },
-                        (Some('\n'), _) => (),
-                        (Some(c2), _) => s.push(c2),
-                    }
-                },
-                (Some(c @ ('$' | '`' | '"')), pos) => {
-                    self.unget_char(c, &pos, settings);
-                    break;
-                },
-                (Some(c), _) => s.push(c),
-            }
-        }
+        self.read_doubly_quoted_word(&mut s, true, settings)?;
         Ok(SimpleWordElement::String(s))
     }
     
@@ -719,13 +796,7 @@ impl<'a> Lexer<'a>
     fn get_singly_quoted_word_elem(&mut self, settings: &Settings) -> ParserResult<WordElement>
     {
         let mut s = String::new();
-        loop {
-            match self.get_char(settings)? {
-                (None, pos) => return Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)), 
-                (Some('\''), _) => break,
-                (Some(c), _) => s.push(c),
-            }
-        }
+        self.read_singly_quoted_word(&mut s, settings)?;
         Ok(WordElement::SinglyQuoted(s))
     }
 
@@ -757,14 +828,14 @@ impl<'a> Lexer<'a>
                     let word_elem = self.get_doubly_quoted_word_elem(settings)?;
                     word_elems.push(word_elem);
                 },
-                (Some(c @ ('<' | '>' | '&' | '|' | '(' | ')' | '#')), pos) => {
+                (Some(c @ (';' | '<' | '>' | '&' | '|' | '(' | ')' | '#')), pos) => {
                     self.unget_char(c, &pos, settings);
                     break;
                 },
                 (Some(c), pos) if c.is_whitespace() => {
                     self.unget_char(c, &pos, settings);
                     break;
-                },                
+                },
                 (Some(c), pos) => {
                     self.unget_char(c, &pos, settings);
                     let (word_elem, _) = self.get_string_word_elem(settings)?;
@@ -773,6 +844,111 @@ impl<'a> Lexer<'a>
             }
         }
         Ok(())
+    }
+    
+    fn get_string_simple_word_elem_for_here_doc(&mut self, settings: &Settings) -> ParserResult<(SimpleWordElement, bool)>
+    {
+        let mut s = String::new();
+        let mut is_newline = false;
+        loop {
+            match self.get_char(settings)? {
+                (None, pos) => return Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
+                (Some('\\'), _) => {
+                    match self.get_char(settings)? {
+                        (None, _) => {
+                            s.push('\\');
+                            break;
+                        },
+                        (Some('\n'), _) => (),
+                        (Some(c2), _) => s.push(c2),
+                    }
+                },
+                (Some('\n'), _) => {
+                    s.push('\n');
+                    is_newline = true;
+                    break;
+                },
+                (Some(c @ ('$' | '`')), pos) => {
+                    self.unget_char(c, &pos, settings);
+                    break;
+                },
+                (Some(c), pos) => s.push(c),
+            }
+        }
+        Ok((SimpleWordElement::String(s), is_newline))
+    }
+    
+    fn read_simple_word_elems_for_here_doc(&mut self, simple_word_elems: &mut Vec<SimpleWordElement>, settings: &Settings) -> ParserResult<()>
+    {
+        loop {
+            match self.get_char(settings)? {
+                (None, pos) => return Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
+                (Some('$'), _) => {
+                    let simple_word_elem = self.get_dolar_simple_word_elem(settings)?;
+                    simple_word_elems.push(simple_word_elem);
+                }
+                (Some('`'), _) => {
+                    let simple_word_elem = self.get_backquote_simple_word_elem(settings)?;
+                    simple_word_elems.push(simple_word_elem);
+                }
+                (Some(c), pos) => {
+                    self.unget_char(c, &pos, settings);
+                    let (simple_word_elem, is_newline) = self.get_string_simple_word_elem_for_here_doc(settings)?;
+                    simple_word_elems.push(simple_word_elem);
+                    if is_newline {
+                        break;
+                    }
+                },
+            }
+        }
+        Ok(())
+    }
+    
+    fn get_here_doc(&mut self, delim: &str, is_minus: bool, token_pos: &Position, settings: &Settings) -> ParserResult<(Token, Position)>
+    {
+        let mut simple_word_elems: Vec<SimpleWordElement> = Vec::new();
+        loop {
+            if is_minus {
+                loop {
+                    match self.get_char(settings)? {
+                        (None, _) => break,
+                        (Some('\t'), _) => (),
+                        (Some(c), pos) => {
+                            self.unget_char(c, &pos, settings);
+                            break;
+                        },
+                    }
+                }
+            }
+            let mut line = String::new();
+            let mut chars_with_poses: Vec<(char, Position)> = Vec::new();
+            let mut is_eof = false;
+            loop {
+                match self.get_char(settings)? {
+                    (None, _) => {
+                        is_eof = true;
+                        break;
+                    },
+                    (Some('\n'), pos) => {
+                        chars_with_poses.push(('\n', pos));
+                        break;
+                    },
+                    (Some(c), pos) => {
+                        line.push(c);
+                        chars_with_poses.push((c, pos));
+                    },
+                }
+            }
+            if line == String::from(delim) || is_eof {
+                break;
+            }
+            chars_with_poses.reverse();
+            for (c, pos) in &chars_with_poses {
+                self.unget_char(*c, pos, settings);
+            }
+            self.read_simple_word_elems_for_here_doc(&mut simple_word_elems, settings)?;
+        }
+        Ok((Token::HereDoc(simple_word_elems, is_minus), *token_pos))
     }
     
     pub fn next_token(&mut self, settings: &Settings) -> ParserResult<(Token, Position)>
@@ -788,13 +964,27 @@ impl<'a> Lexer<'a>
                         panic!("current state is in arithmetic expression and parentheses");
                     },
                     State::HereDocumentWord => {
-                        Err(ParserError::Syntax(self.path.clone(), self.pos, String::from("not implemented"), false))                        
+                        self.skip_spaces(false, settings)?;
+                        let token_pos = self.pos;
+                        match self.get_char(settings)? {
+                            (None, pos) => Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
+                            (Some(c @ (';' | '<' | '>' | '&' | '|' | '(' | ')' | '#')), pos) => {
+                                Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected character"), false))
+                            },
+                            (Some(c), pos) => {
+                                self.unget_char(c, &pos, settings);
+                                self.get_here_doc_word(&token_pos, settings)
+                            },
+                        }
                     },
-                    State::InHereDocument(_, _) => {
-                        Err(ParserError::Syntax(self.path.clone(), self.pos, String::from("not implemented"), false))
+                    State::InHereDocument(delim_r, is_minus_r) => {
+                        let token_pos = self.pos;
+                        let delim = delim_r.clone();
+                        let is_minus = *is_minus_r;
+                        self.get_here_doc(delim.as_str(), is_minus, &token_pos, settings)
                     },
                     _ => {
-                        self.skip_spaces(settings)?;
+                        self.skip_spaces(false, settings)?;
                         let token_pos = self.pos;
                         match self.get_char(settings)? {
                             (None, pos) => {
@@ -938,7 +1128,259 @@ impl<'a> Lexer<'a>
     { self.pushed_tokens.push((token.clone(), *pos)); }
     
     pub fn next_arith_token(&mut self, settings: &Settings) -> ParserResult<(ArithmeticToken, Position)>
-    { Err(ParserError::Syntax(self.path.clone(), self.pos, String::from("not implemented"), false)) }
+    {
+        match self.pushed_arith_tokens.pop() {
+            Some((arith_token, pos)) => Ok((arith_token, pos)),
+            None => {
+                match &self.current_state {
+                    State::InArithmeticExpression | State::InArithmeticExpressionAndParentheses => {
+                        self.skip_spaces(true, settings)?;
+                        let arith_token_pos = self.pos;
+                        match self.get_char(settings)? {
+                            (None, pos) => Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
+                            (Some('('), _) => Ok((ArithmeticToken::LParen, arith_token_pos)),
+                            (Some(')'), _) => {
+                                if self.current_state == State::InArithmeticExpression {
+                                    match self.get_char(settings)? {
+                                        (None, pos2) => Err(ParserError::Syntax(self.path.clone(), pos2, String::from("unexpected end of file"), true)),
+                                        (Some(')'), _) => Ok((ArithmeticToken::RParen, arith_token_pos)),
+                                        (Some(_), pos2) => Err(ParserError::Syntax(self.path.clone(), pos2, String::from("unexpected character"), false)),
+                                    }
+                                } else {
+                                    Ok((ArithmeticToken::RParen, arith_token_pos))
+                                }
+                            },
+                            (Some('~'), _) => Ok((ArithmeticToken::Tylda, arith_token_pos)),
+                            (Some('!'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Excl, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::ExclEqual, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Excl, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('*'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Star, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::StarEqual, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Star, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('/'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Slash, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::SlashEqual, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Slash, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('%'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Perc, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::PercEqual, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Perc, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('+'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Plus, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::PlusEqual, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Plus, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('-'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Minus, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::MinusEqual, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Minus, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('<'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Less, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::LessEqual, arith_token_pos)),
+                                    (Some('<'), _) => {
+                                        match self.get_char(settings)? {
+                                            (None, _) => Ok((ArithmeticToken::LessLess, arith_token_pos)),
+                                            (Some('='), _) => Ok((ArithmeticToken::LessLessEqual, arith_token_pos)),
+                                            (Some(c3), pos3) => {
+                                                self.unget_char(c3, &pos3, settings);
+                                                Ok((ArithmeticToken::LessLess, arith_token_pos))
+                                            },
+                                        }
+                                    },
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Less, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('>'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Greater, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::GreaterEqual, arith_token_pos)),
+                                    (Some('>'), _) => {
+                                        match self.get_char(settings)? {
+                                            (None, _) => Ok((ArithmeticToken::GreaterGreater, arith_token_pos)),
+                                            (Some('='), _) => Ok((ArithmeticToken::GreaterGreaterEqual, arith_token_pos)),
+                                            (Some(c3), pos3) => {
+                                                self.unget_char(c3, &pos3, settings);
+                                                Ok((ArithmeticToken::GreaterGreater, arith_token_pos))
+                                            },
+                                        }
+                                    },
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Greater, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('='), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Equal, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::EqualEqual, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Equal, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('&'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Amp, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::AmpEqual, arith_token_pos)),
+                                    (Some('&'), _) => Ok((ArithmeticToken::AmpAmp, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Amp, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('^'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Caret, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::CaretEqual, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Caret, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('|'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Bar, arith_token_pos)),
+                                    (Some('='), _) => Ok((ArithmeticToken::BarEqual, arith_token_pos)),
+                                    (Some('|'), _) => Ok((ArithmeticToken::BarBar, arith_token_pos)),
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Bar, arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some('?'), _) => Ok((ArithmeticToken::Ques, arith_token_pos)),
+                            (Some(':'), _) => Ok((ArithmeticToken::Colon, arith_token_pos)),
+                            (Some('0'), _) => {
+                                match self.get_char(settings)? {
+                                    (None, _) => Ok((ArithmeticToken::Number(0), arith_token_pos)),
+                                    (Some('X' | 'x'), _) => {
+                                        let mut s = String::new();
+                                        loop {
+                                            match self.get_char(settings)? {
+                                                (None, _) => break,
+                                                (Some(c3 @ (('0'..='9') | ('A'..='F') | ('a'..='f'))), _) => s.push(c3),
+                                                (Some(c3), pos3) => {
+                                                    self.unget_char(c3, &pos3, settings);
+                                                    break;
+                                                },
+                                            }
+                                        }
+                                        if !s.is_empty() {
+                                            match i64::from_str_radix(s.as_str(), 16) {
+                                                Ok(n) => Ok((ArithmeticToken::Number(n), arith_token_pos)),
+                                                Err(_) => Err(ParserError::Syntax(self.path.clone(), arith_token_pos, String::from("too large number"), false)),
+                                            }
+                                        } else {
+                                            Err(ParserError::Syntax(self.path.clone(), arith_token_pos, String::from("no hexadecimal digits"), false))
+                                        }
+                                    },
+                                    (Some(c2 @ ('0'..='7')), _) => {
+                                        let mut s = String::new();
+                                        s.push(c2);
+                                        loop {
+                                            match self.get_char(settings)? {
+                                                (None, _) => break,
+                                                (Some(c3 @ ('0'..='7')), _) => s.push(c3),
+                                                (Some(c3), pos3) => {
+                                                    self.unget_char(c3, &pos3, settings);
+                                                    break;
+                                                },
+                                            }
+                                        }
+                                        match i64::from_str_radix(s.as_str(), 8) {
+                                            Ok(n) => Ok((ArithmeticToken::Number(n), arith_token_pos)),
+                                            Err(_) => Err(ParserError::Syntax(self.path.clone(), arith_token_pos, String::from("too large number"), false)),
+                                        }
+                                    },
+                                    (Some(c2), pos2) => {
+                                        self.unget_char(c2, &pos2, settings);
+                                        Ok((ArithmeticToken::Number(0), arith_token_pos))
+                                    },
+                                }
+                            },
+                            (Some(c @ ('1'..='9')), _) => {
+                                let mut s = String::new();
+                                s.push(c);
+                                loop {
+                                    match self.get_char(settings)? {
+                                        (None, _) => break,
+                                        (Some(c2 @ ('0'..='9')), _) => s.push(c2),
+                                        (Some(c2), pos2) => {
+                                            self.unget_char(c2, &pos2, settings);
+                                            break;
+                                        },
+                                    }
+                                }
+                                match s.parse::<i64>() {
+                                    Ok(n) => Ok((ArithmeticToken::Number(n), arith_token_pos)),
+                                    Err(_) => Err(ParserError::Syntax(self.path.clone(), arith_token_pos, String::from("too large number"), false)),
+                                }
+                            },
+                            (Some('$'), _) => {
+                                match self.get_param_name(settings)? {
+                                    Some(param_name) => Ok((ArithmeticToken::Parameter(param_name), arith_token_pos)),
+                                    None => Err(ParserError::Syntax(self.path.clone(), arith_token_pos, String::from("no parameter name"), false)),
+                                }
+                            },
+                            (Some(c), _) if c.is_alphabetic() || c == '_' => {
+                                let param_name = self.get_var_name(c, settings)?;
+                                Ok((ArithmeticToken::Parameter(param_name), arith_token_pos))
+                            },
+                            (Some(_), pos) => Err(ParserError::Syntax(self.path.clone(), pos, String::from("invalid character"), false)),
+                        }
+                    },
+                    _ => {
+                        panic!("current state isn't in arithmetic expression or in arithmetic expression and parentheses");
+                    },
+                }
+            },
+        }
+    }
 
     pub fn undo_arith_token(&mut self, arith_token: &ArithmeticToken, pos: &Position)
     { self.pushed_arith_tokens.push((arith_token.clone(), *pos)); }
