@@ -101,8 +101,8 @@ pub enum Token
     Amp,
     Bar,
     SemiSemi,
-    LessLess,
-    LessLessMinus,
+    LessLess(Option<i32>),
+    LessLessMinus(Option<i32>),
     LessGreater(Option<i32>),
     LessAmp(Option<i32>),
     GreaterGreater(Option<i32>),
@@ -364,11 +364,11 @@ impl<'a> Lexer<'a>
             (None, _) => Ok((Token::Less(n), *token_pos)),
             (Some('<'), _) => {
                 match self.get_char(settings)? {
-                    (None, _) => Ok((Token::LessLess, *token_pos)),
-                    (Some('-'), _) => Ok((Token::LessLessMinus, *token_pos)),
+                    (None, _) => Ok((Token::LessLess(n), *token_pos)),
+                    (Some('-'), _) => Ok((Token::LessLessMinus(n), *token_pos)),
                     (Some(c2), pos2) => {
                         self.unget_char(c2, &pos2, settings);
-                        Ok((Token::LessLess, *token_pos))
+                        Ok((Token::LessLess(n), *token_pos))
                     },
                 }
             },
@@ -877,11 +877,6 @@ impl<'a> Lexer<'a>
                                         match s.parse::<i32>() {
                                             Ok(n) => {
                                                 match self.get_less_or_greater_token(Some(n), &token_pos, settings)? {
-                                                    Some((tmp_token @ (Token::LessLess | Token::LessLessMinus), tmp_pos)) => {
-                                                        self.undo_token(&tmp_token, &tmp_pos);
-                                                        let word_elems = vec![WordElement::Simple(SimpleWordElement::String(s))];
-                                                        Ok((Token::Word(word_elems), token_pos))
-                                                    },
                                                     Some((tmp_token, _)) => {
                                                         Ok((tmp_token, token_pos))
                                                     },
@@ -894,11 +889,6 @@ impl<'a> Lexer<'a>
                                             },
                                             Err(_) => {
                                                 match self.get_less_or_greater_token(None, &token_pos, settings)? {
-                                                    Some((tmp_token @ (Token::LessLess | Token::LessLessMinus), tmp_pos)) => {
-                                                        self.undo_token(&tmp_token, &tmp_pos);
-                                                        let word_elems = vec![WordElement::Simple(SimpleWordElement::String(s))];
-                                                        Ok((Token::Word(word_elems), token_pos))
-                                                    },
                                                     Some((_, _)) => {
                                                         Err(ParserError::Syntax(self.path.clone(), token_pos, String::from("too large I/O number"), false))
                                                     },
