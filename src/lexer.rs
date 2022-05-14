@@ -258,7 +258,12 @@ impl<'a> Lexer<'a>
     }
 
     pub fn pop_state(&mut self)
-    { self.current_state = self.state_stack.pop().unwrap(); }
+    {
+        match self.state_stack.pop() {
+            Some(state) => self.current_state = state,
+            None        => (),
+        }
+    }
     
     fn get_char(&mut self, settings: &Settings) -> ParserResult<(Option<char>, Position)>
     {
