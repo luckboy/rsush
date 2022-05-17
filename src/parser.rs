@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 use std::fmt;
+use std::cell::*;
 use std::io::*;
 use std::rc::*;
 use std::result;
@@ -31,10 +32,82 @@ pub struct Word
 }
 
 #[derive(Clone)]
-pub struct Command
+pub enum Redirect
+{
+    Input(String, Position, Rc<Word>),
+    Output(String, Position, Rc<Word>, bool),
+    InputAndOuput(String, Position, Rc<Word>),
+    Appending(String, Position, Rc<Word>),
+    InputDuplicating(String, Position, Rc<Word>),
+    OutputDuplicating(String, Position, Rc<Word>),
+    HereDocument(String, Position, Rc<RefCell<Vec<SimpleWordElement>>>),
+}
+
+#[derive(Clone)]
+pub struct SimpleCommand
+{
+    words: Vec<Rc<Word>>,
+    redirects: Vec<Rc<Redirect>>,
+}
+
+#[derive(Clone)]
+pub struct Case
+{
+    pub pattern: Vec<Rc<Word>>,
+    pub commands: Vec<Rc<LogicalCommand>>,
+}
+
+#[derive(Clone)]
+pub enum CompoundCommand
+{
+    BraceGroup(Vec<Rc<LogicalCommand>>),
+    Subshell(Vec<Rc<LogicalCommand>>),
+    For(Rc<Word>, Vec<Rc<Word>>, Vec<Rc<LogicalCommand>>),
+    Case(Rc<Word>, Vec<Case>),
+    If(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>, Vec<(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>)>, Option<Vec<Rc<LogicalCommand>>>),
+    While(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>),
+    Until(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>),
+}
+
+#[derive(Clone)]
+pub enum Command
+{
+    Simple(String, Position, SimpleCommand),
+    Compound(String, Position, CompoundCommand, Option<Vec<Rc<Redirect>>>),
+    FunctionDefinition(String, Position, Rc<Word>, CompoundCommand, Option<Vec<Rc<Redirect>>>),
+}
+
+#[derive(Clone)]
+pub struct PipeCommand
 {
     pub path: String,
     pub pos: Position,
+    pub is_negative: bool,
+    pub commands: Vec<Rc<Command>>,
+}
+
+#[derive(Copy, Clone)]
+pub enum LogicalOperator
+{
+    And,
+    Or,
+}
+
+#[derive(Clone)]
+pub struct LogicalPair
+{
+    pub op: LogicalOperator,
+    pub command: Rc<PipeCommand>,
+}
+
+#[derive(Clone)]
+pub struct LogicalCommand
+{
+    pub path: String,
+    pub pos: Position,
+    pub first: Rc<PipeCommand>,
+    pub pairs: Vec<LogicalPair>,
+    pub is_background: bool,
 }
 
 #[derive(Clone)]
@@ -55,7 +128,7 @@ impl Parser
     pub fn parse_words<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Word>>>
     { Ok(Vec::new()) }
 
-    pub fn parse_commands<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Command>>>
+    pub fn parse_logical_commands<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<LogicalCommand>>>
     { Ok(Vec::new()) }
 
     pub fn parse_arith_expr<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
@@ -94,7 +167,7 @@ impl ParserError
     pub fn has_cont(&self) -> bool
     {
          match self {
-             ParserError::IO(path, _) => false,
+             ParserError::IO(_, _) => false,
              ParserError::Syntax(_, _, _, is_cont) => *is_cont,
          }
     }

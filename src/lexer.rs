@@ -79,7 +79,7 @@ pub enum SimpleWordElement
     String(String),
     Parameter(ParameterName, Option<(ParameterModifier, Vec<Rc<Word>>)>),
     ParameterLength(ParameterName),
-    Command(Vec<Rc<Command>>),
+    Command(Vec<Rc<LogicalCommand>>),
     ArithmeticExpression(ArithmeticExpression),
 }
 
@@ -699,7 +699,7 @@ impl<'a> Lexer<'a>
                         self.unget_char(c2, &pos2, settings);
                         let mut parser = Parser::new();
                         self.push_state(State::InParameterExpansion);
-                        let commands = parser.parse_commands(self, settings)?;
+                        let commands = parser.parse_logical_commands(self, settings)?;
                         self.pop_state();
                         Ok(SimpleWordElement::Command(commands))
                     },
@@ -741,7 +741,7 @@ impl<'a> Lexer<'a>
         let mut cr = CharReader::new(&mut cursor);
         let mut lexer = Lexer::new(self.path.as_str(), &simple_word_elem_pos, &mut cr, self.backquote_column_inc + 1, false);
         let mut parser = Parser::new();
-        let commands = parser.parse_commands(&mut lexer, settings)?;
+        let commands = parser.parse_logical_commands(&mut lexer, settings)?;
         Ok(SimpleWordElement::Command(commands))
     }
     
