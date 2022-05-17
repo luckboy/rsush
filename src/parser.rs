@@ -58,13 +58,20 @@ pub struct Case
 }
 
 #[derive(Clone)]
+pub struct ElifPair
+{
+    cond_commands: Vec<Rc<LogicalCommand>>,
+    commands: Vec<Rc<LogicalCommand>>,
+}
+
+#[derive(Clone)]
 pub enum CompoundCommand
 {
     BraceGroup(Vec<Rc<LogicalCommand>>),
     Subshell(Vec<Rc<LogicalCommand>>),
     For(Rc<Word>, Vec<Rc<Word>>, Vec<Rc<LogicalCommand>>),
     Case(Rc<Word>, Vec<Case>),
-    If(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>, Vec<(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>)>, Option<Vec<Rc<LogicalCommand>>>),
+    If(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>, Vec<ElifPair>, Option<Vec<Rc<LogicalCommand>>>),
     While(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>),
     Until(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>),
 }
