@@ -120,7 +120,6 @@ pub struct LogicalCommand
 #[derive(Copy, Clone)]
 pub enum UnaryOperator
 {
-    Plus,
     Negate,
     Not,
     LogicalNot,
