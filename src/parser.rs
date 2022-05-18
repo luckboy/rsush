@@ -114,7 +114,7 @@ pub struct LogicalCommand
     pub pos: Position,
     pub first: Rc<PipeCommand>,
     pub pairs: Vec<LogicalPair>,
-    pub is_background: bool,
+    pub is_in_background: bool,
 }
 
 #[derive(Copy, Clone)]
