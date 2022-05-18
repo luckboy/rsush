@@ -930,13 +930,9 @@ impl<'a> Lexer<'a>
             }
             let mut line = String::new();
             let mut chars_with_poses: Vec<(char, Position)> = Vec::new();
-            let mut is_eof = false;
             loop {
                 match self.get_char(settings)? {
-                    (None, _) => {
-                        is_eof = true;
-                        break;
-                    },
+                    (None, pos) => return Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
                     (Some('\n'), pos) => {
                         chars_with_poses.push(('\n', pos));
                         break;
@@ -947,7 +943,7 @@ impl<'a> Lexer<'a>
                     },
                 }
             }
-            if line == String::from(delim) || is_eof {
+            if line == String::from(delim) {
                 break;
             }
             chars_with_poses.reverse();
