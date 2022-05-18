@@ -880,7 +880,7 @@ impl<'a> Lexer<'a>
                     self.unget_char(c, &pos, settings);
                     break;
                 },
-                (Some(c), pos) => s.push(c),
+                (Some(c), _) => s.push(c),
             }
         }
         Ok((SimpleWordElement::String(s), is_newline))
@@ -976,7 +976,7 @@ impl<'a> Lexer<'a>
                         let token_pos = self.pos;
                         match self.get_char(settings)? {
                             (None, pos) => Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
-                            (Some(c @ (';' | '<' | '>' | '&' | '|' | '(' | ')' | '#')), pos) => {
+                            (Some(';' | '<' | '>' | '&' | '|' | '(' | ')' | '#'), pos) => {
                                 Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected character"), false))
                             },
                             (Some(c), pos) => {
