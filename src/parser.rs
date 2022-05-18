@@ -117,11 +117,57 @@ pub struct LogicalCommand
     pub is_background: bool,
 }
 
-#[derive(Clone)]
-pub struct ArithmeticExpression
+#[derive(Copy, Clone)]
+pub enum UnaryOperator
 {
-    pub path: String,
-    pub pos: Position,
+    Plus,
+    Negate,
+    Not,
+    LogicalNot,
+}
+
+#[derive(Copy, Clone)]
+pub enum BinaryOperator
+{
+    Multiply,
+    Divide,
+    Module,
+    Add,
+    Substract,
+    ShiftLeft,
+    ShiftRight,
+    LessThan,
+    GreaterEqual,
+    GreaterThan,
+    LessEqual,
+    Equal,
+    NotEqual,
+    And,
+    ExlusiveOr,
+    Or,
+    LogicalAnd,
+    LogicalOr,
+    Assign,
+    MultiplyAssign,
+    DivideAssign,
+    ModuleAssign,
+    AddAssign,
+    SubstractAssign,
+    ShiftLeftAssign,
+    ShiftRightAssign,
+    AndAssign,
+    ExlusiveOrAssign,
+    OrAssign,
+}
+
+#[derive(Clone)]
+pub enum ArithmeticExpression
+{
+    Number(String, Position, i64),
+    Parameter(String, Position, ParameterName),
+    Unary(String, Position, UnaryOperator, Rc<ArithmeticExpression>),
+    Binary(String, Position, Rc<ArithmeticExpression>, BinaryOperator, Rc<ArithmeticExpression>),
+    Conditional(String, Position, Rc<ArithmeticExpression>, Rc<ArithmeticExpression>, Rc<ArithmeticExpression>),
 }
 
 pub struct Parser
@@ -139,7 +185,7 @@ impl Parser
     { Ok(Vec::new()) }
 
     pub fn parse_arith_expr<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
-    { Ok(ArithmeticExpression { path: lexer.path().clone(), pos: lexer.pos(), }) }
+    { Ok(ArithmeticExpression::Number(lexer.path().clone(), lexer.pos(), 0)) }
 }
 
 #[derive(Copy, Clone)]
