@@ -77,11 +77,20 @@ pub enum CompoundCommand
 }
 
 #[derive(Clone)]
+pub struct FunctionBody
+{
+    path: String,
+    pos: Position,
+    command: CompoundCommand,
+    redirects: Vec<Rc<Redirect>>,
+}
+
+#[derive(Clone)]
 pub enum Command
 {
     Simple(String, Position, SimpleCommand),
-    Compound(String, Position, CompoundCommand, Option<Vec<Rc<Redirect>>>),
-    FunctionDefinition(String, Position, Rc<Word>, CompoundCommand, Option<Vec<Rc<Redirect>>>),
+    Compound(String, Position, CompoundCommand, Vec<Rc<Redirect>>),
+    FunctionDefinition(String, Position, Rc<Word>, Rc<FunctionBody>),
 }
 
 #[derive(Clone)]
