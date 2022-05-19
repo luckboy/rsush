@@ -179,17 +179,22 @@ pub enum ArithmeticExpression
 }
 
 pub struct Parser
-{}
+{
+    here_docs: Vec<Rc<RefCell<Vec<SimpleWordElement>>>>,
+}
 
 impl Parser
 {
     pub fn new() -> Parser
-    { Parser {} }
+    { Parser { here_docs: Vec::new(), } }
     
     pub fn parse_words<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Word>>>
     { Ok(Vec::new()) }
 
     pub fn parse_logical_commands<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<LogicalCommand>>>
+    { Ok(Vec::new()) }
+
+    pub fn parse_logical_commands_for_line<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<LogicalCommand>>>
     { Ok(Vec::new()) }
 
     pub fn parse_arith_expr<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
