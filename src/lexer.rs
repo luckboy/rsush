@@ -215,6 +215,7 @@ impl<'a> Lexer<'a>
         first_keywords.insert(String::from("until"), Token::Until);
         first_keywords.insert(String::from("while"), Token::While);
         let mut second_keywords: HashMap<String, Token> = HashMap::new();
+        second_keywords.insert(String::from("do"), Token::Do);
         second_keywords.insert(String::from("in"), Token::In);
         Lexer {
             reader,
