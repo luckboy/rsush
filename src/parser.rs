@@ -34,13 +34,13 @@ pub struct Word
 #[derive(Clone)]
 pub enum Redirect
 {
-    Input(String, Position, Rc<Word>),
-    Output(String, Position, Rc<Word>, bool),
-    InputAndOuput(String, Position, Rc<Word>),
-    Appending(String, Position, Rc<Word>),
-    InputDuplicating(String, Position, Rc<Word>),
-    OutputDuplicating(String, Position, Rc<Word>),
-    HereDocument(String, Position, Rc<RefCell<Vec<SimpleWordElement>>>),
+    Input(String, Position, Option<i32>, Rc<Word>),
+    Output(String, Position, Option<i32>, Rc<Word>, bool),
+    InputAndOuput(String, Position, Option<i32>, Rc<Word>),
+    Appending(String, Position, Option<i32>, Rc<Word>),
+    InputDuplicating(String, Position, Option<i32>, Rc<Word>),
+    OutputDuplicating(String, Position, Option<i32>, Rc<Word>),
+    HereDocument(String, Position, Option<i32>, Rc<RefCell<Vec<SimpleWordElement>>>),
 }
 
 #[derive(Clone)]
