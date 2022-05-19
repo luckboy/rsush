@@ -32,6 +32,15 @@ pub struct Word
 }
 
 #[derive(Clone)]
+pub struct HereDocument
+{
+    pub delim: String,
+    pub has_minus: bool,
+    pub simple_word_elems: Vec<SimpleWordElement>,
+    
+}
+
+#[derive(Clone)]
 pub enum Redirect
 {
     Input(String, Position, Option<i32>, Rc<Word>),
@@ -40,7 +49,7 @@ pub enum Redirect
     Appending(String, Position, Option<i32>, Rc<Word>),
     InputDuplicating(String, Position, Option<i32>, Rc<Word>),
     OutputDuplicating(String, Position, Option<i32>, Rc<Word>),
-    HereDocument(String, Position, Option<i32>, Rc<RefCell<Vec<SimpleWordElement>>>),
+    HereDocument(String, Position, Option<i32>, Rc<RefCell<HereDocument>>),
 }
 
 #[derive(Clone)]
@@ -180,7 +189,7 @@ pub enum ArithmeticExpression
 
 pub struct Parser
 {
-    here_docs: Vec<Rc<RefCell<Vec<SimpleWordElement>>>>,
+    here_docs: Vec<Rc<RefCell<HereDocument>>>,
 }
 
 impl Parser
