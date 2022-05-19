@@ -1002,7 +1002,7 @@ impl<'a> Lexer<'a>
                             (Some('}'), _) if self.current_state == State::InParameterExpansion => {
                                 Ok((Token::EOF, token_pos))
                             },
-                            (Some(')'), _) if self.current_state == State::InCommandSubstitution => {
+                            (Some(')'), _) if self.current_state == State::InCommandSubstitution || ((self.current_state == State::FirstWord || self.current_state == State::ThirdWord) && self.state_stack.last().map(|s| s == &State::InCommandSubstitution).unwrap_or(false)) => {
                                 Ok((Token::EOF, token_pos))
                             },
                             (Some('\n'), _) => Ok((Token::Newline, token_pos)),
