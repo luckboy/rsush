@@ -585,7 +585,11 @@ impl Parser
                         self.has_first_word_or_third_word = false;
                         let words = self.parse_words_for_for_clause(lexer, settings)?;
                         match lexer.next_token(settings)? {
-                            (Token::Newline | Token::Semi, _) => {
+                            (token @ (Token::Newline | Token::Semi), _) => {
+                                match token {
+                                    Token::Newline => self.parse_here_docs(lexer, settings)?,
+                                    _ => (),
+                                }
                                 lexer.push_first_word();
                                 self.has_first_word_or_third_word = true;
                                 self.skip_newlines(lexer, settings)?;
@@ -600,7 +604,11 @@ impl Parser
                         let commands = self.parse_do_clause(lexer, true, settings)?;
                         Ok(CompoundCommand::For(Rc::new(word), Vec::new(), commands))
                     },
-                    (Token::Newline | Token::Semi, _) => {
+                    (token @ (Token::Newline | Token::Semi), _) => {
+                        match token {
+                            Token::Newline => self.parse_here_docs(lexer, settings)?,
+                            _ => (),
+                        }
                         lexer.pop_state();
                         self.has_first_word_or_third_word = false;
                         lexer.push_first_word();
@@ -666,7 +674,6 @@ impl Parser
                                     }
                                 },
                             }
-                            lexer.push_initial();
                             lexer.push_first_word();
                             self.has_first_word_or_third_word = true;
                             let commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
@@ -676,7 +683,6 @@ impl Parser
                                         lexer.pop_state();
                                         self.has_first_word_or_third_word = false;
                                     }
-                                    lexer.pop_state();
                                 },
                                 (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
                                 (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
@@ -931,6 +937,8 @@ impl Parser
             None => {
                 match lexer.next_token(settings)? {
                     (Token::Word(word_elems), pos) => {
+                        lexer.pop_state();
+                        self.has_first_word_or_third_word = false;
                         let word = Word {
                             path: lexer.path().clone(),
                             pos,
@@ -940,8 +948,6 @@ impl Parser
                             (Token::LParen, pos2) => {
                                 match lexer.next_token(settings)? {
                                     (Token::RParen, _) => {
-                                        lexer.pop_state();
-                                        self.has_first_word_or_third_word = false;
                                         lexer.push_first_word();
                                         self.has_first_word_or_third_word = true;
                                         self.skip_newlines(lexer, settings)?;
@@ -961,6 +967,8 @@ impl Parser
                                         lexer.undo_token(&token3, &pos3);
                                         lexer.undo_token(&Token::LParen, &pos2);
                                         lexer.undo_token(&Token::Word(word_elems), &pos);
+                                        lexer.push_first_word();
+                                        self.has_first_word_or_third_word = true;
                                         match self.parse_simple_command(lexer, settings)? {
                                             Some((simple_command, first_pos)) => Ok(Some(Command::Simple(lexer.path().clone(), first_pos, simple_command))),
                                             None => Ok(None),
@@ -971,6 +979,8 @@ impl Parser
                             (token2, pos2) => {
                                 lexer.undo_token(&token2, &pos2);
                                 lexer.undo_token(&Token::Word(word_elems.clone()), &pos);
+                                lexer.push_first_word();
+                                self.has_first_word_or_third_word = true;
                                 match self.parse_simple_command(lexer, settings)? {
                                     Some((simple_command, first_pos)) => Ok(Some(Command::Simple(lexer.path().clone(), first_pos, simple_command))),
                                     None => Ok(None),
