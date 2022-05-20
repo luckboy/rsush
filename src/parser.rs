@@ -1137,7 +1137,6 @@ impl Parser
             lexer.pop_state();
             self.has_first_word_or_third_word = false;
         }
-        lexer.pop_state();
         Ok(commands)
     }
 
