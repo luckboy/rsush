@@ -210,7 +210,7 @@ pub enum BinaryOperator
     Equal,
     NotEqual,
     And,
-    ExlusiveOr,
+    ExclusiveOr,
     Or,
     LogicalAnd,
     LogicalOr,
@@ -223,7 +223,7 @@ pub enum BinaryOperator
     ShiftLeftAssign,
     ShiftRightAssign,
     AndAssign,
-    ExlusiveOrAssign,
+    ExclusiveOrAssign,
     OrAssign,
 }
 
@@ -235,6 +235,31 @@ pub enum ArithmeticExpression
     Unary(String, Position, UnaryOperator, Rc<ArithmeticExpression>),
     Binary(String, Position, Rc<ArithmeticExpression>, BinaryOperator, Rc<ArithmeticExpression>),
     Conditional(String, Position, Rc<ArithmeticExpression>, Rc<ArithmeticExpression>, Rc<ArithmeticExpression>),
+}
+
+impl ArithmeticExpression
+{
+    pub fn path(&self) -> String
+    {
+        match self {
+            ArithmeticExpression::Number(path, _, _) => path.clone(),
+            ArithmeticExpression::Parameter(path, _, _) => path.clone(),
+            ArithmeticExpression::Unary(path, _, _, _) => path.clone(),
+            ArithmeticExpression::Binary(path, _, _, _, _) => path.clone(),
+            ArithmeticExpression::Conditional(path, _, _, _, _) => path.clone(),
+        }
+    }
+
+    pub fn pos(&self) -> Position
+    {
+        match self {
+            ArithmeticExpression::Number(_, pos, _) => *pos,
+            ArithmeticExpression::Parameter(_, pos, _) => *pos,
+            ArithmeticExpression::Unary(_, pos, _, _) => *pos,
+            ArithmeticExpression::Binary(_, pos, _, _, _) => *pos,
+            ArithmeticExpression::Conditional(_, pos, _, _, _) => *pos,
+        }
+    }
 }
 
 pub struct Parser
@@ -1214,8 +1239,334 @@ impl Parser
         }
     }
 
+    fn parse_arith_expr12<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        match lexer.next_arith_token(settings)? {
+            (ArithmeticToken::Number(n), pos) => Ok(ArithmeticExpression::Number(lexer.path().clone(), pos, n)),
+            (ArithmeticToken::Parameter(param_name), pos) => Ok(ArithmeticExpression::Parameter(lexer.path().clone(), pos, param_name)),
+            (ArithmeticToken::Tylda, pos) => {
+                let expr = self.parse_arith_expr12(lexer, settings)?;
+                Ok(ArithmeticExpression::Unary(lexer.path().clone(), pos, UnaryOperator::Not, Rc::new(expr)))
+            },
+            (ArithmeticToken::Excl, pos) => {
+                let expr = self.parse_arith_expr12(lexer, settings)?;
+                Ok(ArithmeticExpression::Unary(lexer.path().clone(), pos, UnaryOperator::LogicalNot, Rc::new(expr)))
+            },
+            (ArithmeticToken::Plus, _) => {
+                let expr = self.parse_arith_expr12(lexer, settings)?;
+                Ok(expr)
+            },
+            (ArithmeticToken::Minus, pos) => {
+                let expr = self.parse_arith_expr12(lexer, settings)?;
+                Ok(ArithmeticExpression::Unary(lexer.path().clone(), pos, UnaryOperator::Negate, Rc::new(expr)))
+            },
+            (ArithmeticToken::LParen, _) => {
+                let expr = self.parse_arith_expr1(lexer, settings)?;
+                match lexer.next_arith_token(settings)? {
+                    (ArithmeticToken::RParen, _) => Ok(expr),
+                    (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
+                }
+            },
+            (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("syntax error"), false)),
+        }
+    }
+
+    fn parse_arith_expr11<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr12(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::Star, _) => {
+                    let expr2 = self.parse_arith_expr12(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::Multiply, Rc::new(expr2))
+                },
+                (ArithmeticToken::Slash, _) => {
+                    let expr2 = self.parse_arith_expr12(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::Divide, Rc::new(expr2))
+                },
+                (ArithmeticToken::Perc, _) => {
+                    let expr2 = self.parse_arith_expr12(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::Module, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+    
+    fn parse_arith_expr10<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr11(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::Plus, _) => {
+                    let expr2 = self.parse_arith_expr11(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::Add, Rc::new(expr2))
+                },
+                (ArithmeticToken::Minus, _) => {
+                    let expr2 = self.parse_arith_expr11(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::Substract, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+
+    fn parse_arith_expr9<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr10(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::LessLess, _) => {
+                    let expr2 = self.parse_arith_expr10(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::ShiftLeft, Rc::new(expr2))
+                },
+                (ArithmeticToken::GreaterGreater, _) => {
+                    let expr2 = self.parse_arith_expr10(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::ShiftRight, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+    
+    fn parse_arith_expr8<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr9(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::Less, _) => {
+                    let expr2 = self.parse_arith_expr9(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::LessThan, Rc::new(expr2))
+                },
+                (ArithmeticToken::GreaterEqual, _) => {
+                    let expr2 = self.parse_arith_expr9(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::GreaterEqual, Rc::new(expr2))
+                },
+                (ArithmeticToken::Greater, _) => {
+                    let expr2 = self.parse_arith_expr9(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::GreaterThan, Rc::new(expr2))
+                },
+                (ArithmeticToken::LessEqual, _) => {
+                    let expr2 = self.parse_arith_expr9(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::LessEqual, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+
+    fn parse_arith_expr7<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr8(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::EqualEqual, _) => {
+                    let expr2 = self.parse_arith_expr8(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::Equal, Rc::new(expr2))
+                },
+                (ArithmeticToken::ExclEqual, _) => {
+                    let expr2 = self.parse_arith_expr8(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::NotEqual, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+
+    fn parse_arith_expr6<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr7(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::Amp, _) => {
+                    let expr2 = self.parse_arith_expr7(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::And, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+
+    fn parse_arith_expr5<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr6(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::Caret, _) => {
+                    let expr2 = self.parse_arith_expr6(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::ExclusiveOr, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+
+    fn parse_arith_expr4<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr5(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::Bar, _) => {
+                    let expr2 = self.parse_arith_expr5(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::Or, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+
+    fn parse_arith_expr3<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr4(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::AmpAmp, _) => {
+                    let expr2 = self.parse_arith_expr4(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::LogicalAnd, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+
+    fn parse_arith_expr2<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let mut expr1 = self.parse_arith_expr3(lexer, settings)?;
+        let first_pos = expr1.pos();
+        loop {
+            match lexer.next_arith_token(settings)? {
+                (ArithmeticToken::BarBar, _) => {
+                    let expr2 = self.parse_arith_expr3(lexer, settings)?;
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::LogicalOr, Rc::new(expr2))
+                },
+                (token, pos) => {
+                    lexer.undo_arith_token(&token, &pos);
+                    break;
+                },
+            }
+        }
+        Ok(expr1)
+    }
+
+    fn parse_arith_expr1<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
+    {
+        let expr1 = self.parse_arith_expr2(lexer, settings)?;
+        match lexer.next_arith_token(settings)? {
+            (ArithmeticToken::Equal, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::Assign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::StarEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::MultiplyAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::SlashEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::DivideAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::PercEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::ModuleAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::PlusEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::AddAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::MinusEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::SubstractAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::LessLessEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::ShiftLeftAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::GreaterGreaterEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::ShiftRightAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::AmpEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::AndAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::CaretEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::ExclusiveOrAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::BarEqual, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::OrAssign, Rc::new(expr2)))
+            },
+            (ArithmeticToken::Ques, _) => {
+                let expr2 = self.parse_arith_expr1(lexer, settings)?;
+                match lexer.next_arith_token(settings)? {
+                    (ArithmeticToken::Colon, _) => {
+                        let expr3 = self.parse_arith_expr1(lexer, settings)?;
+                        Ok(ArithmeticExpression::Conditional(lexer.path().clone(), expr1.pos(), Rc::new(expr1), Rc::new(expr2), Rc::new(expr3)))
+                    },
+                    (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
+                }
+            },
+            (token, pos) => {
+                lexer.undo_arith_token(&token, &pos);
+                Ok(expr1)
+            },
+        }
+    }
+
     pub fn parse_arith_expr<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
-    { Ok(ArithmeticExpression::Number(lexer.path().clone(), lexer.pos(), 0)) }
+    {
+        let expr = self.parse_arith_expr1(lexer, settings)?;
+        match lexer.next_arith_token(settings)? {
+            (ArithmeticToken::EOF, _) => (),
+            (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
+        }
+        Ok(expr)
+    }
 }
 
 #[derive(Copy, Clone)]
