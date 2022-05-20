@@ -384,7 +384,9 @@ impl Parser
                     has_minus: false,
                     simple_word_elems: Vec::new(),
                 };
-                Ok(Some(Redirect::HereDocument(lexer.path().clone(), pos, n, Rc::new(RefCell::new(here_doc)))))
+                let here_doc = Rc::new(RefCell::new(here_doc));
+                self.here_docs.push(here_doc.clone());
+                Ok(Some(Redirect::HereDocument(lexer.path().clone(), pos, n, here_doc.clone())))
             },
             (Token::LessLessMinus(n), pos) => {
                 if self.has_first_word_or_third_word {
@@ -397,7 +399,9 @@ impl Parser
                     has_minus: true,
                     simple_word_elems: Vec::new(),
                 };
-                Ok(Some(Redirect::HereDocument(lexer.path().clone(), pos, n, Rc::new(RefCell::new(here_doc)))))
+                let here_doc = Rc::new(RefCell::new(here_doc));
+                self.here_docs.push(here_doc.clone());
+                Ok(Some(Redirect::HereDocument(lexer.path().clone(), pos, n, here_doc.clone())))
             },
             (Token::LessGreater(n), pos) => {
                 if self.has_first_word_or_third_word {
