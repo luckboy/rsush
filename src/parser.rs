@@ -248,27 +248,7 @@ impl Parser
     pub fn new() -> Parser
     { Parser { here_docs: Vec::new(), has_first_word_or_third_word: false } }
 
-    pub fn parse_words<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Word>>>
-    {
-        let mut words: Vec<Rc<Word>> = Vec::new();
-        loop {
-            match lexer.next_token(settings)? {
-                (Token::Word(word_elems), pos) => {
-                    let word = Word {
-                        path: lexer.path().clone(),
-                        pos,
-                        word_elems,
-                    };
-                    words.push(Rc::new(word));
-                },
-                (Token::EOF, _) => break,
-                (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
-            }
-        }
-        Ok(words)
-    }
-
-    fn parse_words_for_for_clause<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Word>>>
+    fn parse_words_without_last_token<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Word>>>
     {
         let mut words: Vec<Rc<Word>> = Vec::new();
         loop {
@@ -289,6 +269,16 @@ impl Parser
         }
         Ok(words)
     }    
+
+    pub fn parse_words<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Word>>>
+    {
+        let words = self.parse_words_without_last_token(lexer, settings)?;
+        match lexer.next_token(settings)? {
+            (Token::EOF, _) => (),
+            (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
+        }
+        Ok(words)
+    }
     
     fn parse_here_docs<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<()>
     {
@@ -471,6 +461,10 @@ impl Parser
                 (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
             }
         }
+        lexer.pop_state();
+        self.has_first_word_or_third_word = false;
+        lexer.push_first_word();
+        self.has_first_word_or_third_word = true;
         let commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
         match lexer.next_token(settings)? {
             (Token::Done, _) => {
@@ -583,7 +577,7 @@ impl Parser
                     (Token::In, _) => {
                         lexer.pop_state();
                         self.has_first_word_or_third_word = false;
-                        let words = self.parse_words_for_for_clause(lexer, settings)?;
+                        let words = self.parse_words_without_last_token(lexer, settings)?;
                         match lexer.next_token(settings)? {
                             (token @ (Token::Newline | Token::Semi), _) => {
                                 match token {
@@ -762,14 +756,8 @@ impl Parser
         lexer.push_first_word();
         self.has_first_word_or_third_word = true;
         let cond_commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
-        match lexer.next_token(settings)? {
-            (Token::Do, _) => {
-                let commands = self.parse_do_clause(lexer, true, settings)?;
-                Ok(CompoundCommand::While(cond_commands, commands))
-            },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
-            (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
-        }
+        let commands = self.parse_do_clause(lexer, false, settings)?;
+        Ok(CompoundCommand::While(cond_commands, commands))
     }
 
     fn parse_until_clause<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<CompoundCommand>
@@ -777,14 +765,8 @@ impl Parser
         lexer.push_first_word();
         self.has_first_word_or_third_word = true;
         let cond_commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
-        match lexer.next_token(settings)? {
-            (Token::Do, _) => {
-                let commands = self.parse_do_clause(lexer, true, settings)?;
-                Ok(CompoundCommand::Until(cond_commands, commands))
-            },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
-            (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
-        }
+        let commands = self.parse_do_clause(lexer, false, settings)?;
+        Ok(CompoundCommand::Until(cond_commands, commands))
     }
 
     fn parse_compound_command<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Option<(CompoundCommand, Position)>>
@@ -1155,7 +1137,7 @@ impl Parser
         Ok(commands)
     }
 
-    pub fn parse_logical_commands_for_line<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<LogicalCommand>>>
+    pub fn parse_logical_commands_for_line<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Option<Vec<Rc<LogicalCommand>>>>
     {
         let mut commands: Vec<Rc<LogicalCommand>> = Vec::new();
         loop {
@@ -1166,6 +1148,10 @@ impl Parser
             match lexer.next_token(settings)? {
                 (Token::Newline, _) => {
                     self.parse_here_docs(lexer, settings)?;
+                    break;
+                },
+                (token @ Token::EOF, pos) => {
+                    lexer.undo_token(&token, &pos);
                     break;
                 },
                 (token, pos) => lexer.undo_token(&token, &pos),
@@ -1191,11 +1177,26 @@ impl Parser
                 None => break,
             }
         }
+        let are_commands = if commands.is_empty() {
+            match lexer.next_token(settings)? {
+                (Token::EOF, _) => false,
+                (token, pos) => {
+                    lexer.undo_token(&token, &pos);
+                    true
+                },
+            }
+        } else {
+            true
+        };
         if self.has_first_word_or_third_word {
             lexer.pop_state();
             self.has_first_word_or_third_word = false;
         }
-        Ok(commands)
+        if are_commands {
+            Ok(Some(commands))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn parse_arith_expr<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<ArithmeticExpression>
