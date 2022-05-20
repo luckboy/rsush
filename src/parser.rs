@@ -41,7 +41,7 @@ pub struct HereDocument
 }
 
 #[derive(Clone)]
-pub enum Redirect
+pub enum Redirection
 {
     Input(String, Position, Option<i32>, Rc<Word>),
     Output(String, Position, Option<i32>, Rc<Word>, bool),
@@ -52,31 +52,31 @@ pub enum Redirect
     HereDocument(String, Position, Option<i32>, Rc<RefCell<HereDocument>>),
 }
 
-impl Redirect
+impl Redirection
 {
     pub fn path(&self) -> String
     {
         match self {
-            Redirect::Input(path, _, _, _) => path.clone(),
-            Redirect::Output(path, _, _, _, _) => path.clone(),
-            Redirect::InputAndOutput(path, _, _, _) => path.clone(),
-            Redirect::Appending(path, _, _, _) => path.clone(),
-            Redirect::InputDuplicating(path, _, _, _) => path.clone(),
-            Redirect::OutputDuplicating(path, _, _, _) => path.clone(),
-            Redirect::HereDocument(path, _, _, _) => path.clone(),
+            Redirection::Input(path, _, _, _) => path.clone(),
+            Redirection::Output(path, _, _, _, _) => path.clone(),
+            Redirection::InputAndOutput(path, _, _, _) => path.clone(),
+            Redirection::Appending(path, _, _, _) => path.clone(),
+            Redirection::InputDuplicating(path, _, _, _) => path.clone(),
+            Redirection::OutputDuplicating(path, _, _, _) => path.clone(),
+            Redirection::HereDocument(path, _, _, _) => path.clone(),
         }
     }
 
     pub fn pos(&self) -> Position
     {
         match self {
-            Redirect::Input(_, pos, _, _) => *pos,
-            Redirect::Output(_, pos, _, _, _) => *pos,
-            Redirect::InputAndOutput(_, pos, _, _) => *pos,
-            Redirect::Appending(_, pos, _, _) => *pos,
-            Redirect::InputDuplicating(_, pos, _, _) => *pos,
-            Redirect::OutputDuplicating(_, pos, _, _) => *pos,
-            Redirect::HereDocument(_, pos, _, _) => *pos,
+            Redirection::Input(_, pos, _, _) => *pos,
+            Redirection::Output(_, pos, _, _, _) => *pos,
+            Redirection::InputAndOutput(_, pos, _, _) => *pos,
+            Redirection::Appending(_, pos, _, _) => *pos,
+            Redirection::InputDuplicating(_, pos, _, _) => *pos,
+            Redirection::OutputDuplicating(_, pos, _, _) => *pos,
+            Redirection::HereDocument(_, pos, _, _) => *pos,
         }
     }
 }
@@ -85,7 +85,7 @@ impl Redirect
 pub struct SimpleCommand
 {
     words: Vec<Rc<Word>>,
-    redirects: Vec<Rc<Redirect>>,
+    redirects: Vec<Rc<Redirection>>,
 }
 
 #[derive(Clone)]
@@ -120,14 +120,14 @@ pub struct FunctionBody
     path: String,
     pos: Position,
     command: CompoundCommand,
-    redirects: Vec<Rc<Redirect>>,
+    redirects: Vec<Rc<Redirection>>,
 }
 
 #[derive(Clone)]
 pub enum Command
 {
     Simple(String, Position, SimpleCommand),
-    Compound(String, Position, CompoundCommand, Vec<Rc<Redirect>>),
+    Compound(String, Position, CompoundCommand, Vec<Rc<Redirection>>),
     FunctionDefinition(String, Position, Rc<Word>, Rc<FunctionBody>),
 }
 
@@ -369,7 +369,7 @@ impl Parser
         }
     }
     
-    fn parse_redirect<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Option<Redirect>>
+    fn parse_redirect<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Option<Redirection>>
     {
         match lexer.next_token(settings)? {
             (Token::Less(n), pos) => {
@@ -378,7 +378,7 @@ impl Parser
                     self.has_first_word_or_third_word = false;
                 }
                 let word = self.parse_redirect_word(lexer, settings)?;
-                Ok(Some(Redirect::Input(lexer.path().clone(), pos, n, Rc::new(word))))
+                Ok(Some(Redirection::Input(lexer.path().clone(), pos, n, Rc::new(word))))
             },
             (Token::Greater(n), pos) => {
                 if self.has_first_word_or_third_word {
@@ -386,7 +386,7 @@ impl Parser
                     self.has_first_word_or_third_word = false;
                 }
                 let word = self.parse_redirect_word(lexer, settings)?;
-                Ok(Some(Redirect::Output(lexer.path().clone(), pos, n, Rc::new(word), false)))
+                Ok(Some(Redirection::Output(lexer.path().clone(), pos, n, Rc::new(word), false)))
             },
             (Token::LessLess(n), pos) => {
                 if self.has_first_word_or_third_word {
@@ -401,7 +401,7 @@ impl Parser
                 };
                 let here_doc = Rc::new(RefCell::new(here_doc));
                 self.here_docs.push(here_doc.clone());
-                Ok(Some(Redirect::HereDocument(lexer.path().clone(), pos, n, here_doc.clone())))
+                Ok(Some(Redirection::HereDocument(lexer.path().clone(), pos, n, here_doc.clone())))
             },
             (Token::LessLessMinus(n), pos) => {
                 if self.has_first_word_or_third_word {
@@ -416,7 +416,7 @@ impl Parser
                 };
                 let here_doc = Rc::new(RefCell::new(here_doc));
                 self.here_docs.push(here_doc.clone());
-                Ok(Some(Redirect::HereDocument(lexer.path().clone(), pos, n, here_doc.clone())))
+                Ok(Some(Redirection::HereDocument(lexer.path().clone(), pos, n, here_doc.clone())))
             },
             (Token::LessGreater(n), pos) => {
                 if self.has_first_word_or_third_word {
@@ -424,7 +424,7 @@ impl Parser
                     self.has_first_word_or_third_word = false;
                 }
                 let word = self.parse_redirect_word(lexer, settings)?;
-                Ok(Some(Redirect::InputAndOutput(lexer.path().clone(), pos, n, Rc::new(word))))
+                Ok(Some(Redirection::InputAndOutput(lexer.path().clone(), pos, n, Rc::new(word))))
             },
             (Token::LessAmp(n), pos) => {
                 if self.has_first_word_or_third_word {
@@ -432,7 +432,7 @@ impl Parser
                     self.has_first_word_or_third_word = false;
                 }
                 let word = self.parse_redirect_word(lexer, settings)?;
-                Ok(Some(Redirect::InputDuplicating(lexer.path().clone(), pos, n, Rc::new(word))))
+                Ok(Some(Redirection::InputDuplicating(lexer.path().clone(), pos, n, Rc::new(word))))
             },
             (Token::GreaterGreater(n), pos) => {
                 if self.has_first_word_or_third_word {
@@ -440,7 +440,7 @@ impl Parser
                     self.has_first_word_or_third_word = false;
                 }
                 let word = self.parse_redirect_word(lexer, settings)?;
-                Ok(Some(Redirect::Appending(lexer.path().clone(), pos, n, Rc::new(word))))
+                Ok(Some(Redirection::Appending(lexer.path().clone(), pos, n, Rc::new(word))))
             },
             (Token::GreaterAmp(n), pos) => {
                 if self.has_first_word_or_third_word {
@@ -448,7 +448,7 @@ impl Parser
                     self.has_first_word_or_third_word = false;
                 }
                 let word = self.parse_redirect_word(lexer, settings)?;
-                Ok(Some(Redirect::OutputDuplicating(lexer.path().clone(), pos, n, Rc::new(word))))
+                Ok(Some(Redirection::OutputDuplicating(lexer.path().clone(), pos, n, Rc::new(word))))
             },
             (Token::GreaterBar(n), pos) => {
                 if self.has_first_word_or_third_word {
@@ -456,7 +456,7 @@ impl Parser
                     self.has_first_word_or_third_word = false;
                 }
                 let word = self.parse_redirect_word(lexer, settings)?;
-                Ok(Some(Redirect::Output(lexer.path().clone(), pos, n, Rc::new(word), true)))
+                Ok(Some(Redirection::Output(lexer.path().clone(), pos, n, Rc::new(word), true)))
             },
             (token, pos) => {
                 lexer.undo_token(&token, &pos);
@@ -465,9 +465,9 @@ impl Parser
         }
     }
 
-    fn parse_redirects<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Redirect>>>
+    fn parse_redirects<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Redirection>>>
     {
-        let mut redirects: Vec<Rc<Redirect>> = Vec::new();
+        let mut redirects: Vec<Rc<Redirection>> = Vec::new();
         loop {
             match self.parse_redirect(lexer, settings)? {
                 Some(redirect) => redirects.push(Rc::new(redirect.clone())),
@@ -846,7 +846,7 @@ impl Parser
         }
     }
     
-    fn parse_compound_command_and_redirects<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Option<(CompoundCommand, Vec<Rc<Redirect>>, Position)>>
+    fn parse_compound_command_and_redirects<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Option<(CompoundCommand, Vec<Rc<Redirection>>, Position)>>
     {
         match self.parse_compound_command(lexer, settings)? {
             Some((compound_command, pos)) => {
@@ -860,7 +860,7 @@ impl Parser
     fn parse_simple_command<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Option<(SimpleCommand, Position)>>
     {
         let mut words: Vec<Rc<Word>> = Vec::new();
-        let mut redirects: Vec<Rc<Redirect>> = Vec::new();
+        let mut redirects: Vec<Rc<Redirection>> = Vec::new();
         let mut is_first = true;
         let mut first_pos = lexer.pos();
         loop {
