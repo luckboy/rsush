@@ -1261,9 +1261,13 @@ impl Parser
                 Ok(ArithmeticExpression::Unary(lexer.path().clone(), pos, UnaryOperator::Negate, Rc::new(expr)))
             },
             (ArithmeticToken::LParen, _) => {
+                lexer.push_in_arith_expr_and_paren();
                 let expr = self.parse_arith_expr1(lexer, settings)?;
                 match lexer.next_arith_token(settings)? {
-                    (ArithmeticToken::RParen, _) => Ok(expr),
+                    (ArithmeticToken::RParen, _) => {
+                        lexer.pop_state();
+                        Ok(expr)
+                    },
                     (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                 }
             },
