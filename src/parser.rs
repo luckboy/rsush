@@ -1140,6 +1140,7 @@ impl Parser
     pub fn parse_logical_commands_for_line<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Option<Vec<Rc<LogicalCommand>>>>
     {
         let mut commands: Vec<Rc<LogicalCommand>> = Vec::new();
+        let mut is_eof = false;
         loop {
             if !self.has_first_word_or_third_word {
                 lexer.push_first_word();
@@ -1150,8 +1151,8 @@ impl Parser
                     self.parse_here_docs(lexer, settings)?;
                     break;
                 },
-                (token @ Token::EOF, pos) => {
-                    lexer.undo_token(&token, &pos);
+                (Token::EOF, _) => {
+                    is_eof = true;
                     break;
                 },
                 (token, pos) => lexer.undo_token(&token, &pos),
@@ -1171,28 +1172,30 @@ impl Parser
                             command.is_in_background = true;
                             commands.push(Rc::new(command));
                         },
+                        (Token::EOF, _) => {
+                            commands.push(Rc::new(command));
+                            is_eof = true;
+                            break;
+                        },
                         (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                     }
                 },
-                None => break,
-            }
-        }
-        let are_commands = if commands.is_empty() {
-            match lexer.next_token(settings)? {
-                (Token::EOF, _) => false,
-                (token, pos) => {
-                    lexer.undo_token(&token, &pos);
-                    true
+                None => {
+                    match lexer.next_token(settings)? {
+                        (Token::EOF, _) => {
+                            is_eof = true;
+                            break;
+                        },
+                        (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
+                    }
                 },
             }
-        } else {
-            true
-        };
+        }
         if self.has_first_word_or_third_word {
             lexer.pop_state();
             self.has_first_word_or_third_word = false;
         }
-        if are_commands {
+        if !commands.is_empty() || !is_eof {
             Ok(Some(commands))
         } else {
             Ok(None)
