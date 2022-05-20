@@ -697,9 +697,15 @@ impl Parser
                             };
                             pairs.push(pair);
                         }
+                        
+                        lexer.push_third_word();
+                        self.has_first_word_or_third_word = true;
                         self.skip_newlines(lexer, settings)?;
                         match lexer.next_token(settings)? {
-                            (Token::Esac, _) => (),
+                            (Token::Esac, _) => {
+                                lexer.pop_state();
+                                self.has_first_word_or_third_word = false;
+                            },
                             (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
                             (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                         }
