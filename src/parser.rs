@@ -1126,7 +1126,11 @@ impl Parser
     {
         let commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
         match lexer.next_token(settings)? {
-            (Token::EOF, _) => (),
+            (Token::EOF, pos) => {
+                if !self.here_docs.is_empty() {
+                    return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), true))
+                }
+            },
             (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
         if self.has_first_word_or_third_word {
@@ -1151,7 +1155,10 @@ impl Parser
                     self.parse_here_docs(lexer, settings)?;
                     break;
                 },
-                (Token::EOF, _) => {
+                (Token::EOF, pos) => {
+                    if !self.here_docs.is_empty() {
+                        return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), true))
+                    }
                     is_eof = true;
                     break;
                 },
@@ -1172,7 +1179,10 @@ impl Parser
                             command.is_in_background = true;
                             commands.push(Rc::new(command));
                         },
-                        (Token::EOF, _) => {
+                        (Token::EOF, pos) => {
+                            if !self.here_docs.is_empty() {
+                                return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), true))
+                            }
                             commands.push(Rc::new(command));
                             is_eof = true;
                             break;
@@ -1182,7 +1192,10 @@ impl Parser
                 },
                 None => {
                     match lexer.next_token(settings)? {
-                        (Token::EOF, _) => {
+                        (Token::EOF, pos) => {
+                            if !self.here_docs.is_empty() {
+                                return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), true))
+                            }
                             is_eof = true;
                             break;
                         },
