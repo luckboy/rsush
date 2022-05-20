@@ -496,6 +496,10 @@ impl Parser
                     word_elems: word_elems.clone(),
                 };
                 words.push(Rc::new(first_word));
+                if self.has_first_word_or_third_word {
+                    lexer.pop_state();
+                    self.has_first_word_or_third_word = false;
+                }
                 loop {
                     match lexer.next_token(settings)? {
                         (Token::Bar, _) => (),
@@ -519,10 +523,8 @@ impl Parser
                 }
                 Ok(words)
             },
-            (token, pos) => {
-                lexer.undo_token(&token, &pos);
-                Ok(Vec::new())
-            },
+            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
     }
     
@@ -643,34 +645,27 @@ impl Parser
                         let mut pairs: Vec<CasePair> = Vec::new();
                         loop {
                             self.skip_newlines(lexer, settings)?;
-                            let mut is_lparen = false;
+                            lexer.push_first_word();
+                            self.has_first_word_or_third_word = true;
                             match lexer.next_token(settings)? {
-                                (Token::LParen, _) => is_lparen = true,
+                                (Token::LParen, _) => {
+                                    lexer.pop_state();
+                                    self.has_first_word_or_third_word = false;
+                                },
+                                (Token::Esac, _) => {
+                                    lexer.pop_state();
+                                    self.has_first_word_or_third_word = false;
+                                    break;
+                                },
                                 (token, pos) => {
                                     lexer.undo_token(&token, &pos);
                                 },
                             }
                             let pattern_words = self.parse_pattern_words(lexer, settings)?;
                             match lexer.next_token(settings)? {
-                                (Token::RParen, _) => {
-                                    if pattern_words.is_empty() {
-                                        return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false));
-                                    }
-                                },
-                                (Token::EOF, pos) => {
-                                    if is_lparen || !pattern_words.is_empty() {
-                                        return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true));
-                                    } else {
-                                        break;
-                                    }
-                                },
-                                (_, pos) => {
-                                    if is_lparen || !pattern_words.is_empty() {
-                                        return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false))
-                                    } else {
-                                        break;
-                                    }
-                                },
+                                (Token::RParen, _) => (),
+                                (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                                (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                             }
                             lexer.push_first_word();
                             self.has_first_word_or_third_word = true;
@@ -690,18 +685,6 @@ impl Parser
                                 commands,
                             };
                             pairs.push(pair);
-                        }
-                        
-                        lexer.push_third_word();
-                        self.has_first_word_or_third_word = true;
-                        self.skip_newlines(lexer, settings)?;
-                        match lexer.next_token(settings)? {
-                            (Token::Esac, _) => {
-                                lexer.pop_state();
-                                self.has_first_word_or_third_word = false;
-                            },
-                            (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
-                            (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                         }
                         lexer.pop_state();
                         Ok(CompoundCommand::Case(Rc::new(word), pairs))
