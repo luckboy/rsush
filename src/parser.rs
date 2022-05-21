@@ -161,7 +161,7 @@ pub struct PipeCommand
     pub commands: Vec<Rc<Command>>,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum LogicalOperator
 {
     And,
@@ -185,7 +185,7 @@ pub struct LogicalCommand
     pub is_in_background: bool,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum UnaryOperator
 {
     Negate,
@@ -193,7 +193,7 @@ pub enum UnaryOperator
     LogicalNot,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum BinaryOperator
 {
     Multiply,
