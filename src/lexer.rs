@@ -22,7 +22,7 @@ use crate::io::*;
 use crate::parser::*;
 use crate::settings::*;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum State
 {
     Initial,
@@ -36,7 +36,7 @@ enum State
     InArithmeticExpressionAndParentheses,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum SpecialParameterName
 {
     At,
@@ -48,7 +48,7 @@ pub enum SpecialParameterName
     Excl,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ParameterModifier
 {
     ColonMinus,
@@ -65,7 +65,7 @@ pub enum ParameterModifier
     HashHash,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ParameterName
 {
     Variable(String),
