@@ -1602,12 +1602,20 @@ pub enum ParserError
 
 impl ParserError
 {
+    pub fn path(&self) -> String
+    {
+        match self {
+            ParserError::IO(path, _) => path.clone(),
+            ParserError::Syntax(path, _, _, _) => path.clone(),
+        }
+    }
+
     pub fn has_cont(&self) -> bool
     {
-         match self {
-             ParserError::IO(_, _) => false,
-             ParserError::Syntax(_, _, _, is_cont) => *is_cont,
-         }
+        match self {
+            ParserError::IO(_, _) => false,
+            ParserError::Syntax(_, _, _, is_cont) => *is_cont,
+        }
     }
 }
 
@@ -1615,9 +1623,9 @@ impl fmt::Display for ParserError
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
-         match self {
-             ParserError::IO(path, err) => write!(f, "{}: {}", path, err),
-             ParserError::Syntax(path, pos, msg, _) => write!(f, "{}: {}: {}", path, pos, msg),
-         }
+        match self {
+            ParserError::IO(path, err) => write!(f, "{}: {}", path, err),
+            ParserError::Syntax(path, pos, msg, _) => write!(f, "{}: {}: {}", path, pos, msg),
+        }
     }
 }
