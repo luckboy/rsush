@@ -32,3 +32,25 @@ pub struct Settings
     pub emacs_flag: bool,
     pub xtrace_flag: bool,
 }
+
+impl Settings
+{
+    pub fn new() -> Settings
+    {
+        Settings {
+            allexport_flag: false,
+            errexit_flag: false,
+            ignoreeof_flag: false,
+            monitor_flag: true,
+            noclobber_flag: false,
+            noglob_flag: false,
+            nolog_flag: false,
+            notify_flag: false,
+            nounset_flag: false,
+            verbose_flag: false,
+            vi_flag: false,
+            emacs_flag: false,
+            xtrace_flag: false,
+        }
+    }
+}
