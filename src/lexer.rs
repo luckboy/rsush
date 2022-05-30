@@ -239,6 +239,12 @@ impl<'a> Lexer<'a>
 
     pub fn pos(&self) -> Position
     { self.pos }
+    
+    pub fn content_for_verbose(&self) -> String
+    { self.content_for_verbose.clone() }
+
+    pub fn clear_content_for_verbose(&mut self)
+    { self.content_for_verbose.clear(); }
 
     pub fn push_initial(&mut self)
     { self.push_state(State::Initial); }
