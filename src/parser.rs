@@ -1641,7 +1641,7 @@ mod tests
     use crate::io::*;
 
     #[test]
-    fn test_parser_parse_words_returns_words()
+    fn test_parser_parse_words_parses_words()
     {
         let s = "abc def ghi";
         let mut cursor = Cursor::new(s.as_bytes());
@@ -1685,10 +1685,11 @@ mod tests
             },
             _ => assert!(false),
         }
+        assert_eq!(true, parser.here_docs.is_empty());
     }
     
     #[test]
-    fn test_parser_parse_logical_commands_returns_logical_commands()
+    fn test_parser_parse_logical_commands_parses_command()
     {
         let s = "echo abc def";
         let mut cursor = Cursor::new(s.as_bytes());
@@ -1702,10 +1703,12 @@ mod tests
                 assert_eq!(String::from("test.sh"), logical_commands[0].path);
                 assert_eq!(1, logical_commands[0].pos.line);
                 assert_eq!(1, logical_commands[0].pos.column);
+                assert_eq!(false, logical_commands[0].is_in_background);
                 assert_eq!(true, logical_commands[0].pairs.is_empty());
                 assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
                 assert_eq!(1, logical_commands[0].first_command.pos.line);
                 assert_eq!(1, logical_commands[0].first_command.pos.column);
+                assert_eq!(false, logical_commands[0].first_command.is_negative);
                 assert_eq!(1, logical_commands[0].first_command.commands.len());
                 match &(*logical_commands[0].first_command.commands[0]) {
                     Command::Simple(path, pos, simple_command) => {
@@ -1750,5 +1753,6 @@ mod tests
             },
             _ => assert!(false),
         }
+        assert_eq!(true, parser.here_docs.is_empty());
     }
 }

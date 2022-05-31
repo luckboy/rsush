@@ -3612,10 +3612,12 @@ EOT";
                         assert_eq!(String::from("test.sh"), logical_commands[0].path);
                         assert_eq!(1, logical_commands[0].pos.line);
                         assert_eq!(3, logical_commands[0].pos.column);
+                        assert_eq!(false, logical_commands[0].is_in_background);
                         assert_eq!(true, logical_commands[0].pairs.is_empty());
                         assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
                         assert_eq!(1, logical_commands[0].first_command.pos.line);
                         assert_eq!(3, logical_commands[0].first_command.pos.column);
+                        assert_eq!(false, logical_commands[0].first_command.is_negative);
                         assert_eq!(1, logical_commands[0].first_command.commands.len());
                         match &(*logical_commands[0].first_command.commands[0]) {
                             Command::Simple(path, pos, simple_command) => {
@@ -3685,10 +3687,12 @@ EOT";
                         assert_eq!(String::from("test.sh"), logical_commands[0].path);
                         assert_eq!(1, logical_commands[0].pos.line);
                         assert_eq!(3, logical_commands[0].pos.column);
+                        assert_eq!(false, logical_commands[0].is_in_background);
                         assert_eq!(true, logical_commands[0].pairs.is_empty());
                         assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
                         assert_eq!(1, logical_commands[0].first_command.pos.line);
                         assert_eq!(3, logical_commands[0].first_command.pos.column);
+                        assert_eq!(false, logical_commands[0].first_command.is_negative);
                         assert_eq!(1, logical_commands[0].first_command.commands.len());
                         match &(*logical_commands[0].first_command.commands[0]) {
                             Command::Simple(path, pos, simple_command) => {
@@ -3726,10 +3730,12 @@ EOT";
                                         assert_eq!(String::from("test.sh"), logical_commands2[0].path);
                                         assert_eq!(1, logical_commands2[0].pos.line);
                                         assert_eq!(14, logical_commands2[0].pos.column);
+                                        assert_eq!(false, logical_commands2[0].is_in_background);
                                         assert_eq!(true, logical_commands2[0].pairs.is_empty());
                                         assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
                                         assert_eq!(1, logical_commands2[0].first_command.pos.line);
                                         assert_eq!(14, logical_commands2[0].first_command.pos.column);
+                                        assert_eq!(false, logical_commands2[0].first_command.is_negative);
                                         assert_eq!(1, logical_commands2[0].first_command.commands.len());
                                         match &(*logical_commands2[0].first_command.commands[0]) {
                                             Command::Simple(path, pos, simple_command2) => {
@@ -3796,6 +3802,7 @@ EOT";
                         assert_eq!(String::from("test.sh"), logical_commands[0].path);
                         assert_eq!(1, logical_commands[0].pos.line);
                         assert_eq!(2, logical_commands[0].pos.column);
+                        assert_eq!(false, logical_commands[0].is_in_background);
                         assert_eq!(true, logical_commands[0].pairs.is_empty());
                         assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
                         assert_eq!(1, logical_commands[0].first_command.pos.line);
@@ -3810,6 +3817,7 @@ EOT";
                                 assert_eq!(String::from("test.sh"), simple_command.words[0].path);
                                 assert_eq!(1, simple_command.words[0].pos.line);
                                 assert_eq!(2, simple_command.words[0].pos.column);
+                                assert_eq!(false, logical_commands[0].first_command.is_negative);
                                 assert_eq!(1, simple_command.words[0].word_elems.len());
                                 match &simple_command.words[0].word_elems[0] {
                                     WordElement::Simple(SimpleWordElement::String(s)) => {
@@ -3869,10 +3877,12 @@ EOT";
                         assert_eq!(String::from("test.sh"), logical_commands[0].path);
                         assert_eq!(1, logical_commands[0].pos.line);
                         assert_eq!(2, logical_commands[0].pos.column);
+                        assert_eq!(false, logical_commands[0].is_in_background);
                         assert_eq!(true, logical_commands[0].pairs.is_empty());
                         assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
                         assert_eq!(1, logical_commands[0].first_command.pos.line);
                         assert_eq!(2, logical_commands[0].first_command.pos.column);
+                        assert_eq!(false, logical_commands[0].first_command.is_negative);
                         assert_eq!(1, logical_commands[0].first_command.commands.len());
                         match &(*logical_commands[0].first_command.commands[0]) {
                             Command::Simple(path, pos, simple_command) => {
@@ -3910,10 +3920,12 @@ EOT";
                                         assert_eq!(String::from("test.sh"), logical_commands2[0].path);
                                         assert_eq!(1, logical_commands2[0].pos.line);
                                         assert_eq!(13, logical_commands2[0].pos.column);
+                                        assert_eq!(false, logical_commands2[0].is_in_background);
                                         assert_eq!(true, logical_commands2[0].pairs.is_empty());
                                         assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
                                         assert_eq!(1, logical_commands2[0].first_command.pos.line);
                                         assert_eq!(13, logical_commands2[0].first_command.pos.column);
+                                        assert_eq!(false, logical_commands2[0].first_command.is_negative);
                                         assert_eq!(1, logical_commands2[0].first_command.commands.len());
                                         match &(*logical_commands2[0].first_command.commands[0]) {
                                             Command::Simple(path, pos, simple_command2) => {
