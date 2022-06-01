@@ -995,20 +995,24 @@ impl Parser
     
     fn parse_pipe_command<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Option<PipeCommand>>
     {
-        let first_pos: Position;
+        let mut first_pos = lexer.pos();
+        let mut is_first_pos = false;
         let is_negative = match lexer.next_token(settings)? {
             (Token::Excl, pos) => {
                 first_pos = pos;
+                is_first_pos = true;
                 true
             },
             (token, pos) => {
                 lexer.undo_token(&token, &pos);
-                first_pos = pos;
                 false
             },
         };
         match self.parse_command(lexer, settings)? {
             Some(first_command) => {
+                if !is_first_pos {
+                    first_pos = first_command.pos();
+                }
                 let mut commands: Vec<Rc<Command>> = Vec::new();
                 commands.push(Rc::new(first_command.clone()));
                 loop {
