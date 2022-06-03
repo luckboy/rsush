@@ -4191,15 +4191,15 @@ done
                             assert_eq!(2, pos.line);
                             assert_eq!(5, pos.column);
                             assert_eq!(2, logical_commands3.len());
-                            assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].path);
                             assert_eq!(2, logical_commands3[0].pos.line);
                             assert_eq!(7, logical_commands3[0].pos.column);
                             assert_eq!(false, logical_commands3[0].is_in_background);
                             assert_eq!(true, logical_commands3[0].pairs.is_empty());
-                            assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].first_command.path);
                             assert_eq!(2, logical_commands3[0].first_command.pos.line);
                             assert_eq!(7, logical_commands3[0].first_command.pos.column);
-                            assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                            assert_eq!(false, logical_commands3[0].first_command.is_negative);
                             assert_eq!(1, logical_commands3[0].first_command.commands.len());
                             match &(*logical_commands3[0].first_command.commands[0]) {
                                 Command::Simple(path, pos, simple_command) => {
