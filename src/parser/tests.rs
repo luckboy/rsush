@@ -4462,3 +4462,2528 @@ esac
     }
     assert_eq!(true, parser.here_docs.is_empty());
 }
+
+#[test]
+fn test_parser_parse_logical_commands_parses_case_clause_with_nested_compound_command()
+{
+    let s = "
+case abc in
+    abc)
+        { echo abc; echo def; }
+        ;;
+esac
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::Case(word, pairs), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(String::from("test.sh"), word.path);
+                    assert_eq!(1, word.pos.line);
+                    assert_eq!(6, word.pos.column);
+                    assert_eq!(1, word.word_elems.len());
+                    match &word.word_elems[0] {
+                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                            assert_eq!(&String::from("abc"), s);
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(1, pairs.len());
+                    assert_eq!(1, pairs[0].pattern_words.len());
+                    assert_eq!(String::from("test.sh"), pairs[0].pattern_words[0].path);
+                    assert_eq!(2, pairs[0].pattern_words[0].pos.line);
+                    assert_eq!(5, pairs[0].pattern_words[0].pos.column);
+                    assert_eq!(1, pairs[0].pattern_words[0].word_elems.len());
+                    match &pairs[0].pattern_words[0].word_elems[0] {
+                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                            assert_eq!(&String::from("abc"), s);
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(1, pairs[0].commands.len());
+                    assert_eq!(String::from("test.sh"), pairs[0].commands[0].path);
+                    assert_eq!(3, pairs[0].commands[0].pos.line);
+                    assert_eq!(9, pairs[0].commands[0].pos.column);
+                    assert_eq!(false, pairs[0].commands[0].is_in_background);
+                    assert_eq!(true, pairs[0].commands[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), pairs[0].commands[0].first_command.path);
+                    assert_eq!(3, pairs[0].commands[0].first_command.pos.line);
+                    assert_eq!(9, pairs[0].commands[0].first_command.pos.column);
+                    assert_eq!(false, pairs[0].commands[0].first_command.is_negative);
+                    assert_eq!(1, pairs[0].commands[0].first_command.commands.len());
+                    match &(*pairs[0].commands[0].first_command.commands[0]) {
+                        Command::Compound(path, pos, CompoundCommand::BraceGroup(logical_commands2), redirects) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(3, pos.line);
+                            assert_eq!(9, pos.column);
+                            assert_eq!(2, logical_commands2.len());
+                            assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                            assert_eq!(3, logical_commands2[0].pos.line);
+                            assert_eq!(11, logical_commands2[0].pos.column);
+                            assert_eq!(false, logical_commands2[0].is_in_background);
+                            assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                            assert_eq!(3, logical_commands2[0].first_command.pos.line);
+                            assert_eq!(11, logical_commands2[0].first_command.pos.column);
+                            assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                            assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                            match &(*logical_commands2[0].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(3, pos.line);
+                                    assert_eq!(11, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(3, simple_command.words[0].pos.line);
+                                    assert_eq!(11, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(3, simple_command.words[1].pos.line);
+                                    assert_eq!(16, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("abc"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), logical_commands2[1].path);
+                            assert_eq!(3, logical_commands2[1].pos.line);
+                            assert_eq!(21, logical_commands2[1].pos.column);
+                            assert_eq!(false, logical_commands2[1].is_in_background);
+                            assert_eq!(true, logical_commands2[1].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands2[1].first_command.path);
+                            assert_eq!(3, logical_commands2[1].first_command.pos.line);
+                            assert_eq!(21, logical_commands2[1].first_command.pos.column);
+                            assert_eq!(false, logical_commands2[1].first_command.is_negative);
+                            assert_eq!(1, logical_commands2[1].first_command.commands.len());
+                            match &(*logical_commands2[1].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(3, pos.line);
+                                    assert_eq!(21, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(3, simple_command.words[0].pos.line);
+                                    assert_eq!(21, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(3, simple_command.words[1].pos.line);
+                                    assert_eq!(26, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("def"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }                    
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_if_clause()
+{
+    let s = "
+if
+    echo abc
+    true; then
+    echo def
+    echo ghi
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::If(cond_logical_commands2, logical_commands21, pairs, None), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(2, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(2, cond_logical_commands2[0].pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(2, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(2, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(2, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("abc"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].path);
+                    assert_eq!(3, cond_logical_commands2[1].pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].first_command.path);
+                    assert_eq!(3, cond_logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[1].first_command.commands.len());
+                    match &(*cond_logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(3, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(3, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("true"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(2, logical_commands21.len());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].path);
+                    assert_eq!(4, logical_commands21[0].pos.line);
+                    assert_eq!(5, logical_commands21[0].pos.column);
+                    assert_eq!(false, logical_commands21[0].is_in_background);
+                    assert_eq!(true, logical_commands21[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].first_command.path);
+                    assert_eq!(4, logical_commands21[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands21[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands21[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands21[0].first_command.commands.len());
+                    match &(*logical_commands21[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(4, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(4, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(4, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("def"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), logical_commands21[1].path);
+                    assert_eq!(5, logical_commands21[1].pos.line);
+                    assert_eq!(5, logical_commands21[1].pos.column);
+                    assert_eq!(false, logical_commands21[1].is_in_background);
+                    assert_eq!(true, logical_commands21[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands21[1].first_command.path);
+                    assert_eq!(5, logical_commands21[1].first_command.pos.line);
+                    assert_eq!(5, logical_commands21[1].first_command.pos.column);
+                    assert_eq!(false, logical_commands21[1].first_command.is_negative);
+                    assert_eq!(1, logical_commands21[1].first_command.commands.len());
+                    match &(*logical_commands21[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(5, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("ghi"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, pairs.is_empty());
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_if_clause_with_newline()
+{
+    let s = "
+if
+    echo abc
+    true
+then
+    echo def
+    echo ghi
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::If(cond_logical_commands2, logical_commands21, pairs, None), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(2, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(2, cond_logical_commands2[0].pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(2, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(2, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(2, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("abc"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].path);
+                    assert_eq!(3, cond_logical_commands2[1].pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].first_command.path);
+                    assert_eq!(3, cond_logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[1].first_command.commands.len());
+                    match &(*cond_logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(3, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(3, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("true"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(2, logical_commands21.len());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].path);
+                    assert_eq!(5, logical_commands21[0].pos.line);
+                    assert_eq!(5, logical_commands21[0].pos.column);
+                    assert_eq!(false, logical_commands21[0].is_in_background);
+                    assert_eq!(true, logical_commands21[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].first_command.path);
+                    assert_eq!(5, logical_commands21[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands21[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands21[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands21[0].first_command.commands.len());
+                    match &(*logical_commands21[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(5, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(5, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("def"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), logical_commands21[1].path);
+                    assert_eq!(6, logical_commands21[1].pos.line);
+                    assert_eq!(5, logical_commands21[1].pos.column);
+                    assert_eq!(false, logical_commands21[1].is_in_background);
+                    assert_eq!(true, logical_commands21[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands21[1].first_command.path);
+                    assert_eq!(6, logical_commands21[1].first_command.pos.line);
+                    assert_eq!(5, logical_commands21[1].first_command.pos.column);
+                    assert_eq!(false, logical_commands21[1].first_command.is_negative);
+                    assert_eq!(1, logical_commands21[1].first_command.commands.len());
+                    match &(*logical_commands21[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(6, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(6, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(6, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("ghi"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, pairs.is_empty());
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_if_clause_with_elif_keywords()
+{
+    let s = "
+if true; then
+    echo abc
+elif false; then
+    echo def
+elif true; then
+    echo ghi
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::If(cond_logical_commands2, logical_commands21, pairs, None), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(1, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(1, cond_logical_commands2[0].pos.line);
+                    assert_eq!(4, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(4, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(1, pos.line);
+                            assert_eq!(4, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(1, simple_command.words[0].pos.line);
+                            assert_eq!(4, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("true"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(1, logical_commands21.len());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].path);
+                    assert_eq!(2, logical_commands21[0].pos.line);
+                    assert_eq!(5, logical_commands21[0].pos.column);
+                    assert_eq!(false, logical_commands21[0].is_in_background);
+                    assert_eq!(true, logical_commands21[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].first_command.path);
+                    assert_eq!(2, logical_commands21[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands21[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands21[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands21[0].first_command.commands.len());
+                    match &(*logical_commands21[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(2, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(2, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("abc"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(2, pairs.len());
+                    assert_eq!(1, pairs[0].cond_commands.len());
+                    assert_eq!(String::from("test.sh"), pairs[0].cond_commands[0].path);
+                    assert_eq!(3, pairs[0].cond_commands[0].pos.line);
+                    assert_eq!(6, pairs[0].cond_commands[0].pos.column);
+                    assert_eq!(false, pairs[0].cond_commands[0].is_in_background);
+                    assert_eq!(true, pairs[0].cond_commands[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), pairs[0].cond_commands[0].first_command.path);
+                    assert_eq!(3, pairs[0].cond_commands[0].first_command.pos.line);
+                    assert_eq!(6, pairs[0].cond_commands[0].first_command.pos.column);
+                    assert_eq!(false, pairs[0].cond_commands[0].first_command.is_negative);
+                    assert_eq!(1, pairs[0].cond_commands[0].first_command.commands.len());
+                    match &(*pairs[0].cond_commands[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(3, pos.line);
+                            assert_eq!(6, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(3, simple_command.words[0].pos.line);
+                            assert_eq!(6, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("false"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(1, pairs[0].commands.len());
+                    assert_eq!(String::from("test.sh"), pairs[0].commands[0].path);
+                    assert_eq!(4, pairs[0].commands[0].pos.line);
+                    assert_eq!(5, pairs[0].commands[0].pos.column);
+                    assert_eq!(false, pairs[0].commands[0].is_in_background);
+                    assert_eq!(true, pairs[0].commands[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), pairs[0].commands[0].first_command.path);
+                    assert_eq!(4, pairs[0].commands[0].first_command.pos.line);
+                    assert_eq!(5, pairs[0].commands[0].first_command.pos.column);
+                    assert_eq!(false, pairs[0].commands[0].first_command.is_negative);
+                    assert_eq!(1, pairs[0].commands[0].first_command.commands.len());
+                    match &(*pairs[0].commands[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(4, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(4, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(4, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("def"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(1, pairs[1].cond_commands.len());
+                    assert_eq!(String::from("test.sh"), pairs[1].cond_commands[0].path);
+                    assert_eq!(5, pairs[1].cond_commands[0].pos.line);
+                    assert_eq!(6, pairs[1].cond_commands[0].pos.column);
+                    assert_eq!(false, pairs[1].cond_commands[0].is_in_background);
+                    assert_eq!(true, pairs[1].cond_commands[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), pairs[1].cond_commands[0].first_command.path);
+                    assert_eq!(5, pairs[1].cond_commands[0].first_command.pos.line);
+                    assert_eq!(6, pairs[1].cond_commands[0].first_command.pos.column);
+                    assert_eq!(false, pairs[1].cond_commands[0].first_command.is_negative);
+                    assert_eq!(1, pairs[1].cond_commands[0].first_command.commands.len());
+                    match &(*pairs[1].cond_commands[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(5, pos.line);
+                            assert_eq!(6, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[0].pos.line);
+                            assert_eq!(6, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("true"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(1, pairs[1].commands.len());
+                    assert_eq!(String::from("test.sh"), pairs[1].commands[0].path);
+                    assert_eq!(6, pairs[1].commands[0].pos.line);
+                    assert_eq!(5, pairs[1].commands[0].pos.column);
+                    assert_eq!(false, pairs[1].commands[0].is_in_background);
+                    assert_eq!(true, pairs[1].commands[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), pairs[0].commands[0].first_command.path);
+                    assert_eq!(6, pairs[1].commands[0].first_command.pos.line);
+                    assert_eq!(5, pairs[1].commands[0].first_command.pos.column);
+                    assert_eq!(false, pairs[1].commands[0].first_command.is_negative);
+                    assert_eq!(1, pairs[1].commands[0].first_command.commands.len());
+                    match &(*pairs[1].commands[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(6, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(6, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(6, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("ghi"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_if_clause_with_else_keyword()
+{
+    let s = "
+if
+    echo abc
+    true; then
+    echo def
+    echo ghi
+else
+    echo jkl
+    echo mno
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::If(cond_logical_commands2, logical_commands21, pairs, Some(logical_commands22)), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(2, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(2, cond_logical_commands2[0].pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(2, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(2, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(2, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("abc"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].path);
+                    assert_eq!(3, cond_logical_commands2[1].pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].first_command.path);
+                    assert_eq!(3, cond_logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[1].first_command.commands.len());
+                    match &(*cond_logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(3, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(3, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("true"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(2, logical_commands21.len());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].path);
+                    assert_eq!(4, logical_commands21[0].pos.line);
+                    assert_eq!(5, logical_commands21[0].pos.column);
+                    assert_eq!(false, logical_commands21[0].is_in_background);
+                    assert_eq!(true, logical_commands21[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].first_command.path);
+                    assert_eq!(4, logical_commands21[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands21[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands21[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands21[0].first_command.commands.len());
+                    match &(*logical_commands21[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(4, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(4, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(4, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("def"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), logical_commands21[1].path);
+                    assert_eq!(5, logical_commands21[1].pos.line);
+                    assert_eq!(5, logical_commands21[1].pos.column);
+                    assert_eq!(false, logical_commands21[1].is_in_background);
+                    assert_eq!(true, logical_commands21[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands21[1].first_command.path);
+                    assert_eq!(5, logical_commands21[1].first_command.pos.line);
+                    assert_eq!(5, logical_commands21[1].first_command.pos.column);
+                    assert_eq!(false, logical_commands21[1].first_command.is_negative);
+                    assert_eq!(1, logical_commands21[1].first_command.commands.len());
+                    match &(*logical_commands21[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(5, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("ghi"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, pairs.is_empty());
+                    assert_eq!(2, logical_commands22.len());
+                    assert_eq!(String::from("test.sh"), logical_commands22[0].path);
+                    assert_eq!(7, logical_commands22[0].pos.line);
+                    assert_eq!(5, logical_commands22[0].pos.column);
+                    assert_eq!(false, logical_commands22[0].is_in_background);
+                    assert_eq!(true, logical_commands22[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands22[0].first_command.path);
+                    assert_eq!(7, logical_commands22[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands22[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands22[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands22[0].first_command.commands.len());
+                    match &(*logical_commands22[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(7, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(7, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(7, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("jkl"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), logical_commands22[1].path);
+                    assert_eq!(8, logical_commands22[1].pos.line);
+                    assert_eq!(5, logical_commands22[1].pos.column);
+                    assert_eq!(false, logical_commands22[1].is_in_background);
+                    assert_eq!(true, logical_commands22[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands22[1].first_command.path);
+                    assert_eq!(8, logical_commands22[1].first_command.pos.line);
+                    assert_eq!(5, logical_commands22[1].first_command.pos.column);
+                    assert_eq!(false, logical_commands22[1].first_command.is_negative);
+                    assert_eq!(1, logical_commands22[1].first_command.commands.len());
+                    match &(*logical_commands22[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(8, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(8, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(8, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("mno"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }                    
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_if_clause_with_nested_compound_commands()
+{
+    let s = "
+if true; then
+    { echo abc; echo def; }
+else
+    { echo ghi; echo jkl; }
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::If(cond_logical_commands2, logical_commands21, pairs, Some(logical_commands22)), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(1, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(1, cond_logical_commands2[0].pos.line);
+                    assert_eq!(4, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(4, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(1, pos.line);
+                            assert_eq!(4, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(1, simple_command.words[0].pos.line);
+                            assert_eq!(4, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("true"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(1, logical_commands21.len());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].path);
+                    assert_eq!(2, logical_commands21[0].pos.line);
+                    assert_eq!(5, logical_commands21[0].pos.column);
+                    assert_eq!(false, logical_commands21[0].is_in_background);
+                    assert_eq!(true, logical_commands21[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands21[0].first_command.path);
+                    assert_eq!(2, logical_commands21[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands21[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands21[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands21[0].first_command.commands.len());
+                    match &(*logical_commands21[0].first_command.commands[0]) {
+                        Command::Compound(path, pos, CompoundCommand::BraceGroup(logical_commands3), redirects) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, logical_commands3.len());
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].path);
+                            assert_eq!(2, logical_commands3[0].pos.line);
+                            assert_eq!(7, logical_commands3[0].pos.column);
+                            assert_eq!(false, logical_commands3[0].is_in_background);
+                            assert_eq!(true, logical_commands3[0].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].first_command.path);
+                            assert_eq!(2, logical_commands3[0].first_command.pos.line);
+                            assert_eq!(7, logical_commands3[0].first_command.pos.column);
+                            assert_eq!(false, logical_commands3[0].first_command.is_negative);
+                            assert_eq!(1, logical_commands3[0].first_command.commands.len());
+                            match &(*logical_commands3[0].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(2, pos.line);
+                                    assert_eq!(7, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(2, simple_command.words[0].pos.line);
+                                    assert_eq!(7, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(2, simple_command.words[1].pos.line);
+                                    assert_eq!(12, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("abc"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), logical_commands3[1].path);
+                            assert_eq!(2, logical_commands3[1].pos.line);
+                            assert_eq!(17, logical_commands3[1].pos.column);
+                            assert_eq!(false, logical_commands3[1].is_in_background);
+                            assert_eq!(true, logical_commands3[1].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands3[1].first_command.path);
+                            assert_eq!(2, logical_commands3[1].first_command.pos.line);
+                            assert_eq!(17, logical_commands3[1].first_command.pos.column);
+                            assert_eq!(false, logical_commands3[1].first_command.is_negative);
+                            assert_eq!(1, logical_commands3[1].first_command.commands.len());
+                            match &(*logical_commands3[1].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(2, pos.line);
+                                    assert_eq!(17, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(2, simple_command.words[0].pos.line);
+                                    assert_eq!(17, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(2, simple_command.words[1].pos.line);
+                                    assert_eq!(22, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("def"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, pairs.is_empty());
+                    assert_eq!(1, logical_commands22.len());
+                    assert_eq!(String::from("test.sh"), logical_commands22[0].path);
+                    assert_eq!(4, logical_commands22[0].pos.line);
+                    assert_eq!(5, logical_commands22[0].pos.column);
+                    assert_eq!(false, logical_commands22[0].is_in_background);
+                    assert_eq!(true, logical_commands22[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands22[0].first_command.path);
+                    assert_eq!(4, logical_commands22[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands22[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands22[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands22[0].first_command.commands.len());
+                    match &(*logical_commands22[0].first_command.commands[0]) {
+                        Command::Compound(path, pos, CompoundCommand::BraceGroup(logical_commands3), redirects) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(4, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, logical_commands3.len());
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].path);
+                            assert_eq!(4, logical_commands3[0].pos.line);
+                            assert_eq!(7, logical_commands3[0].pos.column);
+                            assert_eq!(false, logical_commands3[0].is_in_background);
+                            assert_eq!(true, logical_commands3[0].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].first_command.path);
+                            assert_eq!(4, logical_commands3[0].first_command.pos.line);
+                            assert_eq!(7, logical_commands3[0].first_command.pos.column);
+                            assert_eq!(false, logical_commands3[0].first_command.is_negative);
+                            assert_eq!(1, logical_commands3[0].first_command.commands.len());
+                            match &(*logical_commands3[0].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(4, pos.line);
+                                    assert_eq!(7, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(4, simple_command.words[0].pos.line);
+                                    assert_eq!(7, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(4, simple_command.words[1].pos.line);
+                                    assert_eq!(12, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("ghi"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), logical_commands3[1].path);
+                            assert_eq!(4, logical_commands3[1].pos.line);
+                            assert_eq!(17, logical_commands3[1].pos.column);
+                            assert_eq!(false, logical_commands3[1].is_in_background);
+                            assert_eq!(true, logical_commands3[1].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands3[1].first_command.path);
+                            assert_eq!(4, logical_commands3[1].first_command.pos.line);
+                            assert_eq!(17, logical_commands3[1].first_command.pos.column);
+                            assert_eq!(false, logical_commands3[1].first_command.is_negative);
+                            assert_eq!(1, logical_commands3[1].first_command.commands.len());
+                            match &(*logical_commands3[1].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(4, pos.line);
+                                    assert_eq!(17, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(4, simple_command.words[0].pos.line);
+                                    assert_eq!(17, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(4, simple_command.words[1].pos.line);
+                                    assert_eq!(22, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("jkl"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_while_clause()
+{
+    let s = "
+while
+    echo abc
+    true; do
+    echo def
+    echo ghi
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::While(cond_logical_commands2, logical_commands2), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(2, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(2, cond_logical_commands2[0].pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(2, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(2, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(2, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("abc"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].path);
+                    assert_eq!(3, cond_logical_commands2[1].pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].first_command.path);
+                    assert_eq!(3, cond_logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[1].first_command.commands.len());
+                    match &(*cond_logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(3, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(3, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("true"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(2, logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                    assert_eq!(4, logical_commands2[0].pos.line);
+                    assert_eq!(5, logical_commands2[0].pos.column);
+                    assert_eq!(false, logical_commands2[0].is_in_background);
+                    assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                    assert_eq!(4, logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                    match &(*logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(4, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(4, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(4, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("def"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), logical_commands2[1].path);
+                    assert_eq!(5, logical_commands2[1].pos.line);
+                    assert_eq!(5, logical_commands2[1].pos.column);
+                    assert_eq!(false, logical_commands2[1].is_in_background);
+                    assert_eq!(true, logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[1].first_command.path);
+                    assert_eq!(5, logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[1].first_command.commands.len());
+                    match &(*logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(5, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("ghi"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_while_clause_with_newline()
+{
+    let s = "
+while
+    echo abc
+    true
+do
+    echo def
+    echo ghi
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::While(cond_logical_commands2, logical_commands2), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(2, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(2, cond_logical_commands2[0].pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(2, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(2, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(2, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("abc"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].path);
+                    assert_eq!(3, cond_logical_commands2[1].pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].first_command.path);
+                    assert_eq!(3, cond_logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[1].first_command.commands.len());
+                    match &(*cond_logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(3, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(3, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("true"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(2, logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                    assert_eq!(5, logical_commands2[0].pos.line);
+                    assert_eq!(5, logical_commands2[0].pos.column);
+                    assert_eq!(false, logical_commands2[0].is_in_background);
+                    assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                    assert_eq!(5, logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                    match &(*logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(5, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(5, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("def"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), logical_commands2[1].path);
+                    assert_eq!(6, logical_commands2[1].pos.line);
+                    assert_eq!(5, logical_commands2[1].pos.column);
+                    assert_eq!(false, logical_commands2[1].is_in_background);
+                    assert_eq!(true, logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[1].first_command.path);
+                    assert_eq!(6, logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[1].first_command.commands.len());
+                    match &(*logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(6, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(6, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(6, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("ghi"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_while_clause_with_nested_compound_command()
+{
+    let s = "
+while true; do
+    { echo abc; echo def; }
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::While(cond_logical_commands2, logical_commands2), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(1, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(1, cond_logical_commands2[0].pos.line);
+                    assert_eq!(7, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(7, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(1, pos.line);
+                            assert_eq!(7, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(1, simple_command.words[0].pos.line);
+                            assert_eq!(7, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("true"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(1, logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                    assert_eq!(2, logical_commands2[0].pos.line);
+                    assert_eq!(5, logical_commands2[0].pos.column);
+                    assert_eq!(false, logical_commands2[0].is_in_background);
+                    assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                    assert_eq!(2, logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                    match &(*logical_commands2[0].first_command.commands[0]) {
+                        Command::Compound(path, pos, CompoundCommand::BraceGroup(logical_commands3), redirects) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, logical_commands3.len());
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].path);
+                            assert_eq!(2, logical_commands3[0].pos.line);
+                            assert_eq!(7, logical_commands3[0].pos.column);
+                            assert_eq!(false, logical_commands3[0].is_in_background);
+                            assert_eq!(true, logical_commands3[0].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].first_command.path);
+                            assert_eq!(2, logical_commands3[0].first_command.pos.line);
+                            assert_eq!(7, logical_commands3[0].first_command.pos.column);
+                            assert_eq!(false, logical_commands3[0].first_command.is_negative);
+                            assert_eq!(1, logical_commands3[0].first_command.commands.len());
+                            match &(*logical_commands3[0].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(2, pos.line);
+                                    assert_eq!(7, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(2, simple_command.words[0].pos.line);
+                                    assert_eq!(7, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(2, simple_command.words[1].pos.line);
+                                    assert_eq!(12, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("abc"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), logical_commands3[1].path);
+                            assert_eq!(2, logical_commands3[1].pos.line);
+                            assert_eq!(17, logical_commands3[1].pos.column);
+                            assert_eq!(false, logical_commands3[1].is_in_background);
+                            assert_eq!(true, logical_commands3[1].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands3[1].first_command.path);
+                            assert_eq!(2, logical_commands3[1].first_command.pos.line);
+                            assert_eq!(17, logical_commands3[1].first_command.pos.column);
+                            assert_eq!(false, logical_commands3[1].first_command.is_negative);
+                            assert_eq!(1, logical_commands3[1].first_command.commands.len());
+                            match &(*logical_commands3[1].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(2, pos.line);
+                                    assert_eq!(17, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(2, simple_command.words[0].pos.line);
+                                    assert_eq!(17, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(2, simple_command.words[1].pos.line);
+                                    assert_eq!(22, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("def"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_until_clause()
+{
+    let s = "
+until
+    echo abc
+    false; do
+    echo def
+    echo ghi
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::Until(cond_logical_commands2, logical_commands2), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(2, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(2, cond_logical_commands2[0].pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(2, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(2, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(2, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("abc"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].path);
+                    assert_eq!(3, cond_logical_commands2[1].pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].first_command.path);
+                    assert_eq!(3, cond_logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[1].first_command.commands.len());
+                    match &(*cond_logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(3, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(3, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("false"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(2, logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                    assert_eq!(4, logical_commands2[0].pos.line);
+                    assert_eq!(5, logical_commands2[0].pos.column);
+                    assert_eq!(false, logical_commands2[0].is_in_background);
+                    assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                    assert_eq!(4, logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                    match &(*logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(4, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(4, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(4, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("def"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), logical_commands2[1].path);
+                    assert_eq!(5, logical_commands2[1].pos.line);
+                    assert_eq!(5, logical_commands2[1].pos.column);
+                    assert_eq!(false, logical_commands2[1].is_in_background);
+                    assert_eq!(true, logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[1].first_command.path);
+                    assert_eq!(5, logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[1].first_command.commands.len());
+                    match &(*logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(5, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("ghi"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_until_clause_with_newline()
+{
+    let s = "
+until
+    echo abc
+    false
+do
+    echo def
+    echo ghi
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::Until(cond_logical_commands2, logical_commands2), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(2, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(2, cond_logical_commands2[0].pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(2, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(2, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(2, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("abc"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].path);
+                    assert_eq!(3, cond_logical_commands2[1].pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[1].first_command.path);
+                    assert_eq!(3, cond_logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, cond_logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[1].first_command.commands.len());
+                    match &(*cond_logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(3, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(3, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("false"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(2, logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                    assert_eq!(5, logical_commands2[0].pos.line);
+                    assert_eq!(5, logical_commands2[0].pos.column);
+                    assert_eq!(false, logical_commands2[0].is_in_background);
+                    assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                    assert_eq!(5, logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                    match &(*logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(5, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(5, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                            assert_eq!(5, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("def"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), logical_commands2[1].path);
+                    assert_eq!(6, logical_commands2[1].pos.line);
+                    assert_eq!(5, logical_commands2[1].pos.column);
+                    assert_eq!(false, logical_commands2[1].is_in_background);
+                    assert_eq!(true, logical_commands2[1].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[1].first_command.path);
+                    assert_eq!(6, logical_commands2[1].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[1].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[1].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[1].first_command.commands.len());
+                    match &(*logical_commands2[1].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(6, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(6, simple_command.words[0].pos.line);
+                            assert_eq!(5, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("echo"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(6, simple_command.words[1].pos.line);
+                            assert_eq!(10, simple_command.words[1].pos.column);
+                            assert_eq!(1, simple_command.words[1].word_elems.len());
+                            match &simple_command.words[1].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("ghi"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_until_clause_with_nested_compound_command()
+{
+    let s = "
+until false; do
+    { echo abc; echo def; }
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Compound(path, pos, CompoundCommand::Until(cond_logical_commands2, logical_commands2), redirects) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(1, cond_logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].path);
+                    assert_eq!(1, cond_logical_commands2[0].pos.line);
+                    assert_eq!(7, cond_logical_commands2[0].pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].is_in_background);
+                    assert_eq!(true, cond_logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), cond_logical_commands2[0].first_command.path);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.pos.line);
+                    assert_eq!(7, cond_logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, cond_logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, cond_logical_commands2[0].first_command.commands.len());
+                    match &(*cond_logical_commands2[0].first_command.commands[0]) {
+                        Command::Simple(path, pos, simple_command) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(1, pos.line);
+                            assert_eq!(7, pos.column);
+                            assert_eq!(1, simple_command.words.len());
+                            assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                            assert_eq!(1, simple_command.words[0].pos.line);
+                            assert_eq!(7, simple_command.words[0].pos.column);
+                            assert_eq!(1, simple_command.words[0].word_elems.len());
+                            match &simple_command.words[0].word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("false"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, simple_command.redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(1, logical_commands2.len());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                    assert_eq!(2, logical_commands2[0].pos.line);
+                    assert_eq!(5, logical_commands2[0].pos.column);
+                    assert_eq!(false, logical_commands2[0].is_in_background);
+                    assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                    assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                    assert_eq!(2, logical_commands2[0].first_command.pos.line);
+                    assert_eq!(5, logical_commands2[0].first_command.pos.column);
+                    assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                    assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                    match &(*logical_commands2[0].first_command.commands[0]) {
+                        Command::Compound(path, pos, CompoundCommand::BraceGroup(logical_commands3), redirects) => {
+                            assert_eq!(&String::from("test.sh"), path);
+                            assert_eq!(2, pos.line);
+                            assert_eq!(5, pos.column);
+                            assert_eq!(2, logical_commands3.len());
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].path);
+                            assert_eq!(2, logical_commands3[0].pos.line);
+                            assert_eq!(7, logical_commands3[0].pos.column);
+                            assert_eq!(false, logical_commands3[0].is_in_background);
+                            assert_eq!(true, logical_commands3[0].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands3[0].first_command.path);
+                            assert_eq!(2, logical_commands3[0].first_command.pos.line);
+                            assert_eq!(7, logical_commands3[0].first_command.pos.column);
+                            assert_eq!(false, logical_commands3[0].first_command.is_negative);
+                            assert_eq!(1, logical_commands3[0].first_command.commands.len());
+                            match &(*logical_commands3[0].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(2, pos.line);
+                                    assert_eq!(7, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(2, simple_command.words[0].pos.line);
+                                    assert_eq!(7, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(2, simple_command.words[1].pos.line);
+                                    assert_eq!(12, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("abc"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), logical_commands3[1].path);
+                            assert_eq!(2, logical_commands3[1].pos.line);
+                            assert_eq!(17, logical_commands3[1].pos.column);
+                            assert_eq!(false, logical_commands3[1].is_in_background);
+                            assert_eq!(true, logical_commands3[1].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands3[1].first_command.path);
+                            assert_eq!(2, logical_commands3[1].first_command.pos.line);
+                            assert_eq!(17, logical_commands3[1].first_command.pos.column);
+                            assert_eq!(false, logical_commands3[1].first_command.is_negative);
+                            assert_eq!(1, logical_commands3[1].first_command.commands.len());
+                            match &(*logical_commands3[1].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(2, pos.line);
+                                    assert_eq!(17, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(2, simple_command.words[0].pos.line);
+                                    assert_eq!(17, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(2, simple_command.words[1].pos.line);
+                                    assert_eq!(22, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("def"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(true, redirects.is_empty());
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
