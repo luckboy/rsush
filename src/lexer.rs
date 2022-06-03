@@ -261,6 +261,9 @@ impl<'a> Lexer<'a>
     pub fn push_third_word(&mut self)
     { self.push_state(State::ThirdWord); }    
 
+    pub fn push_in_arith_expr(&mut self)
+    { self.push_state(State::InArithmeticExpression); }
+
     pub fn push_in_arith_expr_and_paren(&mut self)
     { self.push_state(State::InArithmeticExpressionAndParentheses); }
     
