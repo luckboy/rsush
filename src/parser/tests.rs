@@ -67,6 +67,27 @@ fn test_parser_parse_words_parses_words()
 }
 
 #[test]
+fn test_parser_parse_words_complains_on_unexpected_token()
+{
+    let s = "abc ) def";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_words(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(5, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
 fn test_parser_parse_logical_commands_parses_command()
 {
     let s = "echo abc def";
@@ -6986,4 +7007,2128 @@ done
         _ => assert!(false),
     }
     assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_function_definition()
+{
+    let s = "
+fun() {
+    echo abc
+    echo def
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::FunctionDefinition(path, pos, name_word, fun_body) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(String::from("test.sh"), name_word.path);
+                    assert_eq!(1, name_word.pos.line);
+                    assert_eq!(1, name_word.pos.column);
+                    assert_eq!(1, name_word.word_elems.len());
+                    match &name_word.word_elems[0] {
+                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                            assert_eq!(&String::from("fun"), s);
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), fun_body.path);
+                    assert_eq!(1, fun_body.pos.line);
+                    assert_eq!(7, fun_body.pos.column);
+                    match &fun_body.command {
+                        CompoundCommand::BraceGroup(logical_commands2) => {
+                            assert_eq!(2, logical_commands2.len());
+                            assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                            assert_eq!(2, logical_commands2[0].pos.line);
+                            assert_eq!(5, logical_commands2[0].pos.column);
+                            assert_eq!(false, logical_commands2[0].is_in_background);
+                            assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                            assert_eq!(2, logical_commands2[0].first_command.pos.line);
+                            assert_eq!(5, logical_commands2[0].first_command.pos.column);
+                            assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                            assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                            match &(*logical_commands2[0].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(2, pos.line);
+                                    assert_eq!(5, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(2, simple_command.words[0].pos.line);
+                                    assert_eq!(5, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(2, simple_command.words[1].pos.line);
+                                    assert_eq!(10, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("abc"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), logical_commands2[1].path);
+                            assert_eq!(3, logical_commands2[1].pos.line);
+                            assert_eq!(5, logical_commands2[1].pos.column);
+                            assert_eq!(false, logical_commands2[1].is_in_background);
+                            assert_eq!(true, logical_commands2[1].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands2[1].first_command.path);
+                            assert_eq!(3, logical_commands2[1].first_command.pos.line);
+                            assert_eq!(5, logical_commands2[1].first_command.pos.column);
+                            assert_eq!(false, logical_commands2[1].first_command.is_negative);
+                            assert_eq!(1, logical_commands2[1].first_command.commands.len());
+                            match &(*logical_commands2[1].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(3, pos.line);
+                                    assert_eq!(5, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(3, simple_command.words[0].pos.line);
+                                    assert_eq!(5, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(3, simple_command.words[1].pos.line);
+                                    assert_eq!(10, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("def"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, fun_body.redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_function_definition_with_newline()
+{
+    let s = "
+fun()
+{
+    echo abc
+    echo def
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::FunctionDefinition(path, pos, name_word, fun_body) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(String::from("test.sh"), name_word.path);
+                    assert_eq!(1, name_word.pos.line);
+                    assert_eq!(1, name_word.pos.column);
+                    assert_eq!(1, name_word.word_elems.len());
+                    match &name_word.word_elems[0] {
+                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                            assert_eq!(&String::from("fun"), s);
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), fun_body.path);
+                    assert_eq!(2, fun_body.pos.line);
+                    assert_eq!(1, fun_body.pos.column);
+                    match &fun_body.command {
+                        CompoundCommand::BraceGroup(logical_commands2) => {
+                            assert_eq!(2, logical_commands2.len());
+                            assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                            assert_eq!(3, logical_commands2[0].pos.line);
+                            assert_eq!(5, logical_commands2[0].pos.column);
+                            assert_eq!(false, logical_commands2[0].is_in_background);
+                            assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                            assert_eq!(3, logical_commands2[0].first_command.pos.line);
+                            assert_eq!(5, logical_commands2[0].first_command.pos.column);
+                            assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                            assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                            match &(*logical_commands2[0].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(3, pos.line);
+                                    assert_eq!(5, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(3, simple_command.words[0].pos.line);
+                                    assert_eq!(5, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(3, simple_command.words[1].pos.line);
+                                    assert_eq!(10, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("abc"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), logical_commands2[1].path);
+                            assert_eq!(4, logical_commands2[1].pos.line);
+                            assert_eq!(5, logical_commands2[1].pos.column);
+                            assert_eq!(false, logical_commands2[1].is_in_background);
+                            assert_eq!(true, logical_commands2[1].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands2[1].first_command.path);
+                            assert_eq!(4, logical_commands2[1].first_command.pos.line);
+                            assert_eq!(5, logical_commands2[1].first_command.pos.column);
+                            assert_eq!(false, logical_commands2[1].first_command.is_negative);
+                            assert_eq!(1, logical_commands2[1].first_command.commands.len());
+                            match &(*logical_commands2[1].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(4, pos.line);
+                                    assert_eq!(5, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(4, simple_command.words[0].pos.line);
+                                    assert_eq!(5, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(4, simple_command.words[1].pos.line);
+                                    assert_eq!(10, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("def"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(true, fun_body.redirects.is_empty());
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_function_definition_with_redirections()
+{
+    let s = "
+fun() {
+    echo abc
+    echo def
+} > xxx 2> yyy
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("test.sh"), logical_commands[0].path);
+            assert_eq!(1, logical_commands[0].pos.line);
+            assert_eq!(1, logical_commands[0].pos.column);
+            assert_eq!(false, logical_commands[0].is_in_background);
+            assert_eq!(true, logical_commands[0].pairs.is_empty());
+            assert_eq!(String::from("test.sh"), logical_commands[0].first_command.path);
+            assert_eq!(1, logical_commands[0].first_command.pos.line);
+            assert_eq!(1, logical_commands[0].first_command.pos.column);
+            assert_eq!(false, logical_commands[0].first_command.is_negative);
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::FunctionDefinition(path, pos, name_word, fun_body) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(1, pos.column);
+                    assert_eq!(String::from("test.sh"), name_word.path);
+                    assert_eq!(1, name_word.pos.line);
+                    assert_eq!(1, name_word.pos.column);
+                    assert_eq!(1, name_word.word_elems.len());
+                    match &name_word.word_elems[0] {
+                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                            assert_eq!(&String::from("fun"), s);
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(String::from("test.sh"), fun_body.path);
+                    assert_eq!(1, fun_body.pos.line);
+                    assert_eq!(7, fun_body.pos.column);
+                    match &fun_body.command {
+                        CompoundCommand::BraceGroup(logical_commands2) => {
+                            assert_eq!(2, logical_commands2.len());
+                            assert_eq!(String::from("test.sh"), logical_commands2[0].path);
+                            assert_eq!(2, logical_commands2[0].pos.line);
+                            assert_eq!(5, logical_commands2[0].pos.column);
+                            assert_eq!(false, logical_commands2[0].is_in_background);
+                            assert_eq!(true, logical_commands2[0].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands2[0].first_command.path);
+                            assert_eq!(2, logical_commands2[0].first_command.pos.line);
+                            assert_eq!(5, logical_commands2[0].first_command.pos.column);
+                            assert_eq!(false, logical_commands2[0].first_command.is_negative);
+                            assert_eq!(1, logical_commands2[0].first_command.commands.len());
+                            match &(*logical_commands2[0].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(2, pos.line);
+                                    assert_eq!(5, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(2, simple_command.words[0].pos.line);
+                                    assert_eq!(5, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(2, simple_command.words[1].pos.line);
+                                    assert_eq!(10, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("abc"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                            assert_eq!(String::from("test.sh"), logical_commands2[1].path);
+                            assert_eq!(3, logical_commands2[1].pos.line);
+                            assert_eq!(5, logical_commands2[1].pos.column);
+                            assert_eq!(false, logical_commands2[1].is_in_background);
+                            assert_eq!(true, logical_commands2[1].pairs.is_empty());
+                            assert_eq!(String::from("test.sh"), logical_commands2[1].first_command.path);
+                            assert_eq!(3, logical_commands2[1].first_command.pos.line);
+                            assert_eq!(5, logical_commands2[1].first_command.pos.column);
+                            assert_eq!(false, logical_commands2[1].first_command.is_negative);
+                            assert_eq!(1, logical_commands2[1].first_command.commands.len());
+                            match &(*logical_commands2[1].first_command.commands[0]) {
+                                Command::Simple(path, pos, simple_command) => {
+                                    assert_eq!(&String::from("test.sh"), path);
+                                    assert_eq!(3, pos.line);
+                                    assert_eq!(5, pos.column);
+                                    assert_eq!(2, simple_command.words.len());
+                                    assert_eq!(String::from("test.sh"), simple_command.words[0].path);
+                                    assert_eq!(3, simple_command.words[0].pos.line);
+                                    assert_eq!(5, simple_command.words[0].pos.column);
+                                    assert_eq!(1, simple_command.words[0].word_elems.len());
+                                    match &simple_command.words[0].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("echo"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(String::from("test.sh"), simple_command.words[1].path);
+                                    assert_eq!(3, simple_command.words[1].pos.line);
+                                    assert_eq!(10, simple_command.words[1].pos.column);
+                                    assert_eq!(1, simple_command.words[1].word_elems.len());
+                                    match &simple_command.words[1].word_elems[0] {
+                                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                                            assert_eq!(&String::from("def"), s);
+                                        },
+                                        _ => assert!(false),
+                                    }
+                                    assert_eq!(true, simple_command.redirects.is_empty());
+                                },
+                                _ => assert!(false),
+                            }
+                        },
+                        _ => assert!(false),
+                    }
+                    assert_eq!(2, fun_body.redirects.len());
+                    match &(*fun_body.redirects[0]) {
+                        Redirection::Output(path2, pos2, None, word, is_bar) => {
+                            assert_eq!(&String::from("test.sh"), path2);
+                            assert_eq!(4, pos2.line);
+                            assert_eq!(3, pos2.column);
+                            assert_eq!(false, *is_bar);
+                            assert_eq!(String::from("test.sh"), word.path);
+                            assert_eq!(4, word.pos.line);
+                            assert_eq!(5, word.pos.column);
+                            assert_eq!(1, word.word_elems.len());
+                            match &word.word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("xxx"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(*fun_body.redirects[1]) {
+                        Redirection::Output(path2, pos2, Some(n), word, is_bar) => {
+                            assert_eq!(&String::from("test.sh"), path2);
+                            assert_eq!(4, pos2.line);
+                            assert_eq!(9, pos2.column);
+                            assert_eq!(2, *n);
+                            assert_eq!(false, *is_bar);
+                            assert_eq!(String::from("test.sh"), word.path);
+                            assert_eq!(4, word.pos.line);
+                            assert_eq!(12, word.pos.column);
+                            assert_eq!(1, word.word_elems.len());
+                            match &word.word_elems[0] {
+                                WordElement::Simple(SimpleWordElement::String(s)) => {
+                                    assert_eq!(&String::from("yyy"), s);
+                                },
+                                _ => assert!(false),
+                            }
+                        },
+                        _ => assert!(false),
+                    }
+                    
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_command()
+{
+    let s = "echo xxx;;";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(9, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_for_line_parses_complains_on_unexpected_token_for_command()
+{
+    let s = "echo xxx;;";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands_for_line(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(9, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_logical_operator()
+{
+    let s = "echo xxx && ;";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(13, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_pipe_operator()
+{
+    let s = "echo xxx | !";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(12, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_brace_group()
+{
+    let s = "
+{
+    echo abc
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(3, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_brace_group_and_eof()
+{
+    let s = "
+{
+    echo abc";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(2, pos.line);
+            assert_eq!(13, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_subshell()
+{
+    let s = "
+(
+    echo abc
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(3, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_subshell_and_eof()
+{
+    let s = "
+(
+    echo abc";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(2, pos.line);
+            assert_eq!(13, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_for_clause()
+{
+    let s = "
+for i in 1 2 3; do
+    echo abc
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(3, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_for_clause_and_eof()
+{
+    let s = "
+for i in 1 2 3; do
+    echo abc
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(3, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_for_clause_without_in_keyword()
+{
+    let s = "
+for i 1 2 3
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(7, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_for_clause_without_in_keyword_and_eof()
+{
+    let s = "
+for i";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(6, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_case_clause()
+{
+    let s = "
+case abc in
+    abc) echo xxx;;
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(3, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_case_clause_and_eof()
+{
+    let s = "
+case abc in
+    abc) echo xxx;;
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(3, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_case_clause_without_in_keyword()
+{
+    let s = "
+case abc do";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(10, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_case_clause_without_in_keyword_and_eof()
+{
+    let s = "
+case abc";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(9, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_if_clause()
+{
+    let s = "
+if true; then
+    echo abc
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(3, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_if_clause_and_eof()
+{
+    let s = "
+if true; then
+    echo abc";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(2, pos.line);
+            assert_eq!(13, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_while_clause()
+{
+    let s = "
+while true; do
+    echo abc
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(3, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_while_clause_and_eof()
+{
+    let s = "
+while true; do
+    echo abc";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(2, pos.line);
+            assert_eq!(13, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_until_clause()
+{
+    let s = "
+until true; do
+    echo abc
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(3, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_until_clause_and_eof()
+{
+    let s = "
+until true; do
+    echo abc";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(2, pos.line);
+            assert_eq!(13, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_function_definition()
+{
+    let s = "
+fun() do
+    echo abc
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(7, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_logical_commands_parses_complains_on_unexpected_token_for_function_definition_and_eof()
+{
+    let s = "
+fun()";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(6, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression()
+{
+    let s = "1 + 2))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::Add, op);
+            match &(*expr1) {
+                ArithmeticExpression::Number(path1, pos1, n1) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(1, *n1);
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(5, pos2.column);
+                    assert_eq!(2, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression_with_nested_expressions()
+{
+    let s = "1 * 2 + 4 / 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::Add, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::Multiply, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(5, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Binary(path2, pos2, expr5, op2, expr6) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(9, pos2.column);
+                    assert_eq!(BinaryOperator::Divide, *op2);
+                    match &(**expr5) {
+                        ArithmeticExpression::Number(path5, pos5, n5) => {
+                            assert_eq!(&String::from("test.sh"), path5);
+                            assert_eq!(1, pos5.line);
+                            assert_eq!(9, pos5.column);
+                            assert_eq!(4, *n5);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr6) {
+                        ArithmeticExpression::Number(path6, pos6, n6) => {
+                            assert_eq!(&String::from("test.sh"), path6);
+                            assert_eq!(1, pos6.line);
+                            assert_eq!(13, pos6.column);
+                            assert_eq!(3, *n6);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression_with_nested_expressions_which_are_parentheses()
+{
+    let s = "(1 + 2) * (4 - 3)))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::Multiply, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(2, pos1.column);
+                    assert_eq!(BinaryOperator::Add, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(2, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(6, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Binary(path2, pos2, expr5, op2, expr6) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(12, pos2.column);
+                    assert_eq!(BinaryOperator::Substract, *op2);
+                    match &(**expr5) {
+                        ArithmeticExpression::Number(path5, pos5, n5) => {
+                            assert_eq!(&String::from("test.sh"), path5);
+                            assert_eq!(1, pos5.line);
+                            assert_eq!(12, pos5.column);
+                            assert_eq!(4, *n5);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr6) {
+                        ArithmeticExpression::Number(path6, pos6, n6) => {
+                            assert_eq!(&String::from("test.sh"), path6);
+                            assert_eq!(1, pos6.line);
+                            assert_eq!(16, pos6.column);
+                            assert_eq!(3, *n6);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_number()
+{
+    let s = "123))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Number(path, pos, n)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(123, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_variable()
+{
+    let s = "x))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Parameter(path, pos, ParameterName::Variable(var_name))) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("x"), var_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression12()
+{
+    let s = "~-1))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Unary(path, pos, op, expr1)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(UnaryOperator::Not, op);
+            match &(*expr1) {
+                ArithmeticExpression::Unary(path1, pos1, op1, expr2) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(2, pos1.column);
+                    assert_eq!(UnaryOperator::Negate, *op1);
+                    match &(**expr2) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(3, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression12_with_plus()
+{
+    let s = "+1))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Number(path, pos, n)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(2, pos.column);
+            assert_eq!(1, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression11()
+{
+    let s = "1 * 2 / 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::Divide, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::Multiply, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(5, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(9, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression10()
+{
+    let s = "1 + 2 - 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::Substract, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::Add, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(5, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(9, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression9()
+{
+    let s = "1 << 2 >> 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::ShiftRight, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::ShiftLeft, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(6, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(11, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression8()
+{
+    let s = "1 < 2 > 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::GreaterThan, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::LessThan, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(5, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(9, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression7()
+{
+    let s = "1 == 2 != 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::NotEqual, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::Equal, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(6, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(11, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression6()
+{
+    let s = "1 & 2 & 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::And, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::And, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(5, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(9, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression5()
+{
+    let s = "1 ^ 2 ^ 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::ExclusiveOr, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::ExclusiveOr, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(5, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(9, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression4()
+{
+    let s = "1 | 2 | 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::Or, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::Or, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(5, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(9, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression3()
+{
+    let s = "1 && 2 && 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::LogicalAnd, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::LogicalAnd, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(6, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(11, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression2()
+{
+    let s = "1 || 2 || 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::LogicalOr, op);
+            match &(*expr1) {
+                ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(BinaryOperator::LogicalOr, *op1);
+                    match &(**expr3) {
+                        ArithmeticExpression::Number(path3, pos3, n3) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(1, pos3.column);
+                            assert_eq!(1, *n3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(6, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(11, pos2.column);
+                    assert_eq!(3, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression1()
+{
+    let s = "x = y *= 2))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::Assign, op);
+            match &(*expr1) {
+                ArithmeticExpression::Parameter(path1, pos1, ParameterName::Variable(var_name1)) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(&String::from("x"), var_name1);
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Binary(path2, pos2, expr3, op2, expr4) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(5, pos2.column);
+                    assert_eq!(BinaryOperator::MultiplyAssign, *op2);
+                    match &(**expr3) {
+                        ArithmeticExpression::Parameter(path3, pos3, ParameterName::Variable(var_name3)) => {
+                            assert_eq!(&String::from("test.sh"), path3);
+                            assert_eq!(1, pos3.line);
+                            assert_eq!(5, pos3.column);
+                            assert_eq!(&String::from("y"), var_name3);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(10, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_parses_expression1_with_conditionals()
+{
+    let s = "1 ? 2 ? 3 : 4 : 5 ? 6 : 7))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Conditional(path, pos, expr1, expr2, expr3)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            match &(*expr1) {
+                ArithmeticExpression::Number(path1, pos1, n1) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(1, *n1);
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Conditional(path2, pos2, expr4, expr5, expr6) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(5, pos2.column);
+                    match &(**expr4) {
+                        ArithmeticExpression::Number(path4, pos4, n4) => {
+                            assert_eq!(&String::from("test.sh"), path4);
+                            assert_eq!(1, pos4.line);
+                            assert_eq!(5, pos4.column);
+                            assert_eq!(2, *n4);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr5) {
+                        ArithmeticExpression::Number(path5, pos5, n5) => {
+                            assert_eq!(&String::from("test.sh"), path5);
+                            assert_eq!(1, pos5.line);
+                            assert_eq!(9, pos5.column);
+                            assert_eq!(3, *n5);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr6) {
+                        ArithmeticExpression::Number(path6, pos6, n6) => {
+                            assert_eq!(&String::from("test.sh"), path6);
+                            assert_eq!(1, pos6.line);
+                            assert_eq!(13, pos6.column);
+                            assert_eq!(4, *n6);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*expr3) {
+                ArithmeticExpression::Conditional(path3, pos3, expr7, expr8, expr9) => {
+                    assert_eq!(&String::from("test.sh"), path3);
+                    assert_eq!(1, pos3.line);
+                    assert_eq!(17, pos3.column);
+                    match &(**expr7) {
+                        ArithmeticExpression::Number(path7, pos7, n7) => {
+                            assert_eq!(&String::from("test.sh"), path7);
+                            assert_eq!(1, pos7.line);
+                            assert_eq!(17, pos7.column);
+                            assert_eq!(5, *n7);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr8) {
+                        ArithmeticExpression::Number(path8, pos8, n8) => {
+                            assert_eq!(&String::from("test.sh"), path8);
+                            assert_eq!(1, pos8.line);
+                            assert_eq!(21, pos8.column);
+                            assert_eq!(6, *n8);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr9) {
+                        ArithmeticExpression::Number(path9, pos9, n9) => {
+                            assert_eq!(&String::from("test.sh"), path9);
+                            assert_eq!(1, pos9.line);
+                            assert_eq!(25, pos9.column);
+                            assert_eq!(7, *n9);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_arith_expr_complains_on_syntax_error()
+{
+    let s = "))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("syntax error"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_parser_parse_arith_expr_complains_on_unexpected_token()
+{
+    let s = "()))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(2, pos.column);
+            assert_eq!(String::from("syntax error"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
 }

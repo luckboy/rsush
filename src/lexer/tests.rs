@@ -2745,6 +2745,52 @@ fn test_lexer_next_token_returns_word_with_nested_command_for_backquote()
 }
 
 #[test]
+fn test_lexer_next_token_returns_word_with_arithmetic_expression()
+{
+    let s = "$((1 + 2))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(1, word_elems.len());
+            match &word_elems[0] {
+                WordElement::Simple(SimpleWordElement::ArithmeticExpression(ArithmeticExpression::Binary(expr_path, expr_pos, expr1, op, expr2))) => {
+                    assert_eq!(&String::from("test.sh"), expr_path);
+                    assert_eq!(1, expr_pos.line);
+                    assert_eq!(4, expr_pos.column);
+                    assert_eq!(BinaryOperator::Add, *op);
+                    match &(**expr1) {
+                        ArithmeticExpression::Number(path1, pos1, n1) => {
+                            assert_eq!(&String::from("test.sh"), path1);
+                            assert_eq!(1, pos1.line);
+                            assert_eq!(4, pos1.column);
+                            assert_eq!(1, *n1);
+                        },
+                        _ => assert!(false),
+                    }
+                    match &(**expr2) {
+                        ArithmeticExpression::Number(path2, pos2, n2) => {
+                            assert_eq!(&String::from("test.sh"), path2);
+                            assert_eq!(1, pos2.line);
+                            assert_eq!(8, pos2.column);
+                            assert_eq!(2, *n2);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
 fn test_lexer_next_token_returns_word_with_command_in_doubly_quoted_string()
 {
     let s = "\"$(echo abc def)\"";
@@ -2900,6 +2946,1577 @@ fn test_lexer_next_token_returns_word_with_command_in_doubly_quoted_string_for_b
                 },
                 _ => assert!(false),
             }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_returns_word_with_arithmetic_expression_in_doubly_quoted_string()
+{
+    let s = "\"$((1 + 2))\"";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(1, word_elems.len());
+            match &word_elems[0] {
+                WordElement::DoublyQuoted(simple_word_elems) => {
+                    assert_eq!(1, simple_word_elems.len());
+                    match &simple_word_elems[0] {
+                        SimpleWordElement::ArithmeticExpression(ArithmeticExpression::Binary(expr_path, expr_pos, expr1, op, expr2)) => {
+                            assert_eq!(&String::from("test.sh"), expr_path);
+                            assert_eq!(1, expr_pos.line);
+                            assert_eq!(5, expr_pos.column);
+                            assert_eq!(BinaryOperator::Add, *op);
+                            match &(**expr1) {
+                                ArithmeticExpression::Number(path1, pos1, n1) => {
+                                    assert_eq!(&String::from("test.sh"), path1);
+                                    assert_eq!(1, pos1.line);
+                                    assert_eq!(5, pos1.column);
+                                    assert_eq!(1, *n1);
+                                },
+                                _ => assert!(false),
+                            }
+                            match &(**expr2) {
+                                ArithmeticExpression::Number(path2, pos2, n2) => {
+                                    assert_eq!(&String::from("test.sh"), path2);
+                                    assert_eq!(1, pos2.line);
+                                    assert_eq!(9, pos2.column);
+                                    assert_eq!(2, *n2);
+                                },
+                                _ => assert!(false),
+                            }
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_end_of_file_for_unclosed_singly_quoted_string()
+{
+    let s = "'abc";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(5, pos.column);
+            assert_eq!(String::from("unexpected end of file"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_end_of_file_for_unclosed_doubly_quoted_string()
+{
+    let s = "\"abc";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(5, pos.column);
+            assert_eq!(String::from("unexpected end of file"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_end_of_file_for_unclosed_singly_quoted_string_here_document_word()
+{
+    let s = "'abc";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::HereDocumentWord);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(5, pos.column);
+            assert_eq!(String::from("unexpected end of file"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_end_of_file_for_unclosed_doubly_quoted_string_here_document_word()
+{
+    let s = "\"abc";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::HereDocumentWord);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(5, pos.column);
+            assert_eq!(String::from("unexpected end of file"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_end_of_file_here_document_without_minus()
+{
+    let s = "
+abc def
+ghi$var
+jkl mno
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false));
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(4, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected end of file"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_end_of_file_here_document_with_minus()
+{
+    let s = "
+\t\tabc def
+\tghi$var
+\tjkl mno
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InHereDocument(String::from("EOT"), true));
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(4, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected end of file"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_character_for_parameter_modifier_with_invalid_first_character()
+{
+    let s = "${var/xxx}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(6, pos.column);
+            assert_eq!(String::from("unexpected character"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_character_for_parameter_modifier_with_invalid_second_character()
+{
+    let s = "${var:/xxx}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(7, pos.column);
+            assert_eq!(String::from("unexpected character"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_too_large_argument_number()
+{
+    let s = "$18446744073709551616";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(2, pos.column);
+            assert_eq!(String::from("too large argument number"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_too_large_i_o_number()
+{
+    let s = "2147483648>";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("too large I/O number"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_end_of_file_for_in_parameter_expansion()
+{
+    let s = "";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InParameterExpansion);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected end of file"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_end_of_file_for_in_command_substitution()
+{
+    let s = "";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InCommandSubstitution);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected end of file"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_token()
+{
+    let s = "123";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Number(n), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(123, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_two_tokens()
+{
+    let s = "+234";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Plus, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Number(n), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(2, pos.column);
+            assert_eq!(234, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_eof()
+{
+    let s = "+))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Plus, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),            
+    }
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::EOF, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(2, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_undo_arith_token_undoes_tokens()
+{
+    let s = "+ -";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Plus, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            match lexer.next_arith_token(&settings) {
+                Ok((ArithmeticToken::Minus, pos2)) => {
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(3, pos2.column);
+                    lexer.undo_arith_token(&ArithmeticToken::Minus, &pos2);
+                    lexer.undo_arith_token(&ArithmeticToken::Plus, &pos);
+                    match lexer.next_arith_token(&settings) {
+                        Ok((ArithmeticToken::Plus, pos)) => {
+                            assert_eq!(1, pos.line);
+                            assert_eq!(1, pos.column);
+                        }
+                        _ => assert!(false),
+                    }
+                    match lexer.next_arith_token(&settings) {
+                        Ok((ArithmeticToken::Minus, pos)) => {
+                            assert_eq!(1, pos.line);
+                            assert_eq!(3, pos.column);
+                        }
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_skip_newline()
+{
+    let s = "\n+";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Plus, pos)) => {
+            assert_eq!(2, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_skips_comment()
+{
+    let s = "# comment\n+";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Plus, pos)) => {
+            assert_eq!(2, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_lparen()
+{
+    let s = "(";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::LParen, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_rparen()
+{
+    let s = ")";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpressionAndParentheses);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::RParen, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_tylda()
+{
+    let s = "~";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Tylda, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_excl()
+{
+    let s = "!";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Excl, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_star()
+{
+    let s = "*";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Star, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_slash()
+{
+    let s = "/";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Slash, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_perc()
+{
+    let s = "%";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Perc, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_plus()
+{
+    let s = "+";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Plus, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_minus()
+{
+    let s = "-";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Minus, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_less_less()
+{
+    let s = "<<";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::LessLess, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_greater_greater()
+{
+    let s = ">>";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::GreaterGreater, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_less()
+{
+    let s = "<";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Less, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_greater_equal()
+{
+    let s = ">=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::GreaterEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_greater()
+{
+    let s = ">";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Greater, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_less_equal()
+{
+    let s = "<=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::LessEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_equal_equal()
+{
+    let s = "==";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::EqualEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_excl_equal()
+{
+    let s = "!=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::ExclEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_amp()
+{
+    let s = "&";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Amp, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_caret()
+{
+    let s = "^";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Caret, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_bar()
+{
+    let s = "|";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Bar, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_amp_amp()
+{
+    let s = "&&";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::AmpAmp, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_bar_bar()
+{
+    let s = "||";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::BarBar, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_ques()
+{
+    let s = "?";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Ques, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_colon()
+{
+    let s = ":";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Colon, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_equal()
+{
+    let s = "=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Equal, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+
+#[test]
+fn test_lexer_next_arith_token_returns_star_equal()
+{
+    let s = "*=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::StarEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_slash_equal()
+{
+    let s = "/=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::SlashEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_perc_equal()
+{
+    let s = "%=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::PercEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_plus_equal()
+{
+    let s = "+=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::PlusEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_minus_equal()
+{
+    let s = "-=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::MinusEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_less_less_equal()
+{
+    let s = "<<=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::LessLessEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_greater_greater_equal()
+{
+    let s = ">>=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::GreaterGreaterEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_amp_equal()
+{
+    let s = "&=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::AmpEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_caret_equal()
+{
+    let s = "^=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::CaretEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_bar_equal()
+{
+    let s = "|=";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::BarEqual, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_decimal_number()
+{
+    let s = "123";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Number(n), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(123, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_zero()
+{
+    let s = "0";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Number(n), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(0, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_octal_number()
+{
+    let s = "0765";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Number(n), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(0o765, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_hexdecimal_number_for_lowercase()
+{
+    let s = "0xfe12";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Number(n), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(0xfe12, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_hexdecimal_number_for_uppercase()
+{
+    let s = "0XFE12";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Number(n), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(0xfe12, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_variable()
+{
+    let s = "$var";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Variable(var_name)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("var"), var_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_argument()
+{
+    let s = "$12";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Argument(n)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(12, n);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_at_special_parameter()
+{
+    let s = "$@";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Special(spec_name)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(SpecialParameterName::At, spec_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_star_special_parameter()
+{
+    let s = "$*";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Special(spec_name)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(SpecialParameterName::Star, spec_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_hash_special_parameter()
+{
+    let s = "$#";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Special(spec_name)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(SpecialParameterName::Hash, spec_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_ques_special_parameter()
+{
+    let s = "$?";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Special(spec_name)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(SpecialParameterName::Ques, spec_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_minus_special_parameter()
+{
+    let s = "$-";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Special(spec_name)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(SpecialParameterName::Minus, spec_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_dolar_special_parameter()
+{
+    let s = "$$";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Special(spec_name)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(SpecialParameterName::Dolar, spec_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_excl_special_parameter()
+{
+    let s = "$!";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Special(spec_name)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(SpecialParameterName::Excl, spec_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_returns_variable_without_dolar()
+{
+    let s = "var";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Parameter(ParameterName::Variable(var_name)), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("var"), var_name);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_complains_on_unexpected_end_of_file()
+{
+    let s = "";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("unexpected end of file"), msg);
+            assert_eq!(true, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_complains_on_invalid_character()
+{
+    let s = "@";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("invalid character"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_complains_on_too_large_number_for_decimal_number()
+{
+    let s = "9223372036854775808";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("too large number"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_complains_on_too_large_number_for_octal_number()
+{
+    let s = "01000000000000000000000";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("too large number"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_complains_on_too_large_number_for_hexdecimal_number()
+{
+    let s = "0x8000000000000000";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("too large number"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_arith_token_complains_on_no_hexadecimal_digits()
+{
+    let s = "0x";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpression);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("no hexadecimal digits"), msg);
+            assert_eq!(false, is_cont);
         },
         _ => assert!(false),
     }
