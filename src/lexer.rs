@@ -1173,7 +1173,7 @@ impl<'a> Lexer<'a>
                                 if self.current_state == State::InArithmeticExpression {
                                     match self.get_char(settings)? {
                                         (None, pos2) => Err(ParserError::Syntax(self.path.clone(), pos2, String::from("unexpected end of file"), true)),
-                                        (Some(')'), _) => Ok((ArithmeticToken::RParen, arith_token_pos)),
+                                        (Some(')'), _) => Ok((ArithmeticToken::EOF, arith_token_pos)),
                                         (Some(_), pos2) => Err(ParserError::Syntax(self.path.clone(), pos2, String::from("unexpected character"), false)),
                                     }
                                 } else {
