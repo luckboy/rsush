@@ -1154,7 +1154,7 @@ fn test_lexer_next_token_returns_splitted_word()
 #[test]
 fn test_lexer_next_token_returns_word_with_escapes()
 {
-    let s = "\\a\\b\\c\\?\\*\\[\\]\\:\\!\\^\\~";
+    let s = "\\a\\b\\c\\\\\\?\\*\\[\\]\\:\\!\\^\\-\\~";
     let mut cursor = Cursor::new(s.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
     let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
@@ -1166,7 +1166,7 @@ fn test_lexer_next_token_returns_word_with_escapes()
             assert_eq!(1, word_elems.len());
             match &word_elems[0] {
                 WordElement::Simple(SimpleWordElement::String(s)) => {
-                    assert_eq!(&String::from("abc\\?\\*\\[\\]\\:\\!\\^\\~"), s);
+                    assert_eq!(&String::from("abc\\\\\\?\\*\\[\\]\\:\\!\\^\\-\\~"), s);
                 },
                 _ => assert!(false),
             }
