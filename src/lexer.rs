@@ -757,6 +757,7 @@ impl<'a> Lexer<'a>
         let mut lexer = Lexer::new(self.path.as_str(), &simple_word_elem_pos, &mut cr, self.backquote_column_inc + 1, false);
         let mut parser = Parser::new();
         parser.set_error_cont(false);
+        parser.set_backquote(true);
         let commands = parser.parse_logical_commands(&mut lexer, settings)?;
         Ok(SimpleWordElement::Command(commands))
     }

@@ -267,15 +267,19 @@ pub struct Parser
     here_docs: Vec<Rc<RefCell<HereDocument>>>,
     has_first_word_or_third_word: bool,
     has_error_cont: bool,
+    is_in_backquote: bool,
 }
 
 impl Parser
 {
     pub fn new() -> Parser
-    { Parser { here_docs: Vec::new(), has_first_word_or_third_word: false, has_error_cont: true, } }
+    { Parser { here_docs: Vec::new(), has_first_word_or_third_word: false, has_error_cont: true, is_in_backquote: false, } }
 
     pub fn set_error_cont(&mut self, b: bool)
     { self.has_error_cont = b; }
+
+    pub fn set_backquote(&mut self, b: bool)
+    { self.is_in_backquote = b; }
     
     fn parse_words_without_last_token<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Word>>>
     {
@@ -556,7 +560,10 @@ impl Parser
         lexer.push_initial();
         lexer.push_first_word();
         self.has_first_word_or_third_word = true;
+        let saved_has_err_cont = self.has_error_cont;
+        self.has_error_cont = !self.is_in_backquote;
         let commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
+        self.has_error_cont = saved_has_err_cont;
         match lexer.next_token(settings)? {
             (Token::RBrace, _) => {
                 if self.has_first_word_or_third_word {
@@ -576,7 +583,10 @@ impl Parser
         lexer.push_initial();
         lexer.push_first_word();
         self.has_first_word_or_third_word = true;
+        let saved_has_err_cont = self.has_error_cont;
+        self.has_error_cont = !self.is_in_backquote;        
         let commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
+        self.has_error_cont = saved_has_err_cont;
         match lexer.next_token(settings)? {
             (Token::RParen, _) => {
                 if self.has_first_word_or_third_word {
