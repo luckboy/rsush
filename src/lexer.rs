@@ -679,6 +679,7 @@ impl<'a> Lexer<'a>
                                 match self.get_param_modifier(settings)? {
                                     Some(modifier) => {
                                         let mut parser = Parser::new();
+                                        parser.set_error_cont(false);
                                         self.push_state(State::InParameterExpansion);
                                         let words = parser.parse_words(self, settings)?;
                                         self.pop_state();
@@ -711,6 +712,7 @@ impl<'a> Lexer<'a>
                     (Some(c2), pos2) => {
                         self.unget_char(c2, &pos2, settings);
                         let mut parser = Parser::new();
+                        parser.set_error_cont(false);
                         self.push_state(State::InCommandSubstitution);
                         let commands = parser.parse_logical_commands(self, settings)?;
                         self.pop_state();
@@ -754,6 +756,7 @@ impl<'a> Lexer<'a>
         let mut cr = CharReader::new(&mut cursor);
         let mut lexer = Lexer::new(self.path.as_str(), &simple_word_elem_pos, &mut cr, self.backquote_column_inc + 1, false);
         let mut parser = Parser::new();
+        parser.set_error_cont(false);
         let commands = parser.parse_logical_commands(&mut lexer, settings)?;
         Ok(SimpleWordElement::Command(commands))
     }

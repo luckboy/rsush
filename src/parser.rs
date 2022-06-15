@@ -266,13 +266,17 @@ pub struct Parser
 {
     here_docs: Vec<Rc<RefCell<HereDocument>>>,
     has_first_word_or_third_word: bool,
+    has_error_cont: bool,
 }
 
 impl Parser
 {
     pub fn new() -> Parser
-    { Parser { here_docs: Vec::new(), has_first_word_or_third_word: false } }
+    { Parser { here_docs: Vec::new(), has_first_word_or_third_word: false, has_error_cont: true, } }
 
+    pub fn set_error_cont(&mut self, b: bool)
+    { self.has_error_cont = b; }
+    
     fn parse_words_without_last_token<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<Vec<Rc<Word>>>
     {
         let mut words: Vec<Rc<Word>> = Vec::new();
@@ -345,7 +349,7 @@ impl Parser
                 };
                 Ok(word)
             },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
     }
@@ -360,7 +364,7 @@ impl Parser
             },
             (Token::EOF, pos) => {
                 lexer.pop_state();
-                Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true))
+                Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont))
             },
             (_, pos) => {
                 lexer.pop_state();
@@ -482,7 +486,7 @@ impl Parser
         if !is_do_word {
             match lexer.next_token(settings)? {
                 (Token::Do, _) => (),
-                (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                 (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
             }
         }
@@ -499,7 +503,7 @@ impl Parser
                 }
                 Ok(commands)
             },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
     }
@@ -536,13 +540,13 @@ impl Parser
                             };
                             words.push(Rc::new(word));
                         },
-                        (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                        (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                         (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                     }
                 }
                 Ok(words)
             },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
     }
@@ -562,7 +566,7 @@ impl Parser
                 lexer.pop_state();
                 Ok(CompoundCommand::BraceGroup(commands))
             },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
     }
@@ -582,7 +586,7 @@ impl Parser
                 lexer.pop_state();
                 Ok(CompoundCommand::Subshell(commands))
             },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
     }
@@ -615,7 +619,7 @@ impl Parser
                                 let commands = self.parse_do_clause(lexer, false, settings)?;
                                 Ok(CompoundCommand::For(Rc::new(word), words, commands))
                             },
-                            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                         }
                     },
@@ -636,11 +640,11 @@ impl Parser
                         let commands = self.parse_do_clause(lexer, false, settings)?;
                         Ok(CompoundCommand::For(Rc::new(word), Vec::new(), commands))
                     },
-                    (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                    (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                     (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                 }
             },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
     }
@@ -683,7 +687,7 @@ impl Parser
                             let pattern_words = self.parse_pattern_words(lexer, settings)?;
                             match lexer.next_token(settings)? {
                                 (Token::RParen, _) => (),
-                                (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                                (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                                 (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                             }
                             lexer.push_first_word();
@@ -696,7 +700,7 @@ impl Parser
                                         self.has_first_word_or_third_word = false;
                                     }
                                 },
-                                (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                                (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                                 (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                             }
                             let pair = CasePair {
@@ -708,11 +712,11 @@ impl Parser
                         lexer.pop_state();
                         Ok(CompoundCommand::Case(Rc::new(word), pairs))
                     },
-                    (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                    (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                     (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                 }
             },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
     }
@@ -724,7 +728,7 @@ impl Parser
         let cond_commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
         match lexer.next_token(settings)? {
             (Token::Then, _) => (),
-            (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
             (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
         let commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
@@ -740,7 +744,7 @@ impl Parser
             let cond_commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
             match lexer.next_token(settings)? {
                 (Token::Then, _) => (),
-                (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                 (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
             }
             let commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
@@ -762,7 +766,7 @@ impl Parser
                 let commands2 = self.parse_logical_commands_without_last_token(lexer, settings)?;
                 match lexer.next_token(settings)? {
                     (Token::Fi, _) => (),
-                    (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+                    (Token::EOF, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                     (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
                 }
                 if self.has_first_word_or_third_word {
@@ -771,7 +775,7 @@ impl Parser
                 }
                 Ok(CompoundCommand::If(cond_commands, commands, pairs, Some(commands2)))
             },
-            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), true)),
+            (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
         }
     }
@@ -1168,7 +1172,7 @@ impl Parser
         match lexer.next_token(settings)? {
             (Token::EOF, pos) => {
                 if !self.here_docs.is_empty() {
-                    return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), true))
+                    return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), self.has_error_cont))
                 }
             },
             (_, pos) => return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
@@ -1196,7 +1200,7 @@ impl Parser
                 },
                 (Token::EOF, pos) => {
                     if !self.here_docs.is_empty() {
-                        return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), true))
+                        return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), self.has_error_cont))
                     }
                     is_eof = true;
                     break;
@@ -1220,7 +1224,7 @@ impl Parser
                         },
                         (Token::EOF, pos) => {
                             if !self.here_docs.is_empty() {
-                                return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), true))
+                                return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), self.has_error_cont))
                             }
                             commands.push(Rc::new(command));
                             is_eof = true;
@@ -1233,7 +1237,7 @@ impl Parser
                     match lexer.next_token(settings)? {
                         (Token::EOF, pos) => {
                             if !self.here_docs.is_empty() {
-                                return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), true))
+                                return Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected end of file"), self.has_error_cont))
                             }
                             is_eof = true;
                             break;

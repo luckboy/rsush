@@ -3273,6 +3273,50 @@ fn test_lexer_next_token_complains_on_unexpected_end_of_file_for_in_command_subs
 }
 
 #[test]
+fn test_lexer_next_token_complains_on_unexpected_token_for_command_in_parenthesis_with_dolar()
+{
+    let s = "$({ echo xxx)";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InCommandSubstitution);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(13, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_complains_on_unexpected_token_for_command_in_backquote()
+{
+    let s = "`{ echo xxx`";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InCommandSubstitution);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(12, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
 fn test_lexer_next_arith_token_returns_token()
 {
     let s = "123";
