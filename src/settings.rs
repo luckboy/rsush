@@ -16,6 +16,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 #[derive(Clone)]
+pub struct Arguments
+{
+    pub args: Vec<String>,
+}
+
+impl Arguments
+{
+    pub fn new() -> Arguments
+    { Arguments { args: Vec::new(), } }
+}
+
+#[derive(Clone)]
 pub struct Settings
 {
     pub allexport_flag: bool,
@@ -31,6 +43,9 @@ pub struct Settings
     pub vi_flag: bool,
     pub emacs_flag: bool,
     pub xtrace_flag: bool,
+    pub arg0: String,
+    arg_stack: Vec<Arguments>,
+    current_args: Arguments,
 }
 
 impl Settings
@@ -51,6 +66,29 @@ impl Settings
             vi_flag: false,
             emacs_flag: false,
             xtrace_flag: false,
+            arg0: String::new(),
+            arg_stack: Vec::new(),
+            current_args: Arguments::new(),
         }
     }
+    
+    pub fn push_args(&mut self, args: Arguments)
+    {
+        self.arg_stack.push(self.current_args.clone());
+        self.current_args = args;
+    }
+    
+    pub fn pop_args(&mut self)
+    {
+        match self.arg_stack.pop() {
+            Some(args) => self.current_args = args,
+            None => (),
+        }
+    }
+    
+    pub fn current_args(&self) -> &Arguments
+    { &self.current_args }
+
+    pub fn current_args_mut(&mut self) -> &mut Arguments
+    { &mut self.current_args }
 }

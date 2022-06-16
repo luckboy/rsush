@@ -15,26 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-#[allow(dead_code)]
-mod builtins;
-#[allow(dead_code)]
-mod env;
-#[allow(dead_code)]
-mod exec;
-#[allow(dead_code)]
-mod interp;
-#[allow(dead_code)]
-mod io;
-#[allow(dead_code)]
-mod lexer;
-#[allow(dead_code)]
-mod parser;
-#[allow(dead_code)]
-mod settings;
-#[allow(dead_code)]
-mod utils;
+use crate::env::*;
+use crate::exec::*;
+use crate::interp::*;
+use crate::settings::*;
 
-fn main()
-{
-    println!("Hello, world!");
-}
+pub type BuiltinFunction = fn(&[String], &mut Interpreter, &mut Executor, &mut Environment, &mut Settings) -> i32;

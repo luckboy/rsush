@@ -15,26 +15,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-#[allow(dead_code)]
-mod builtins;
-#[allow(dead_code)]
-mod env;
-#[allow(dead_code)]
-mod exec;
-#[allow(dead_code)]
-mod interp;
-#[allow(dead_code)]
-mod io;
-#[allow(dead_code)]
-mod lexer;
-#[allow(dead_code)]
-mod parser;
-#[allow(dead_code)]
-mod settings;
-#[allow(dead_code)]
-mod utils;
+use crate::env::*;
+use crate::exec::*;
+use crate::parser::*;
+use crate::settings::*;
 
-fn main()
+pub struct Interpreter
+{}
+
+impl Interpreter
 {
-    println!("Hello, world!");
+    pub fn new() -> Interpreter
+    { Interpreter {} }
+    
+    pub fn interpret_fun_body(&mut self, exec: &mut Executor, fun_body: &FunctionBody, env: &mut Environment, settings: &mut Settings) -> i32
+    { 0 }
 }

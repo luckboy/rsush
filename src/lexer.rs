@@ -21,6 +21,7 @@ use std::rc::*;
 use crate::io::*;
 use crate::parser::*;
 use crate::settings::*;
+use crate::utils::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum State
@@ -1419,9 +1420,6 @@ impl<'a> Lexer<'a>
     pub fn undo_arith_token(&mut self, arith_token: &ArithmeticToken, pos: &Position)
     { self.pushed_arith_tokens.push((arith_token.clone(), *pos)); }
 }
-
-fn is_number_str(s: &str) -> bool
-{ s.chars().all(|c| c >= '0' && c <= '9') }
 
 #[cfg(test)]
 mod tests;
