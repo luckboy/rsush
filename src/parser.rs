@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-use std::fmt;
 use std::cell::*;
+use std::fmt;
 use std::io::*;
 use std::rc::*;
 use std::result;
