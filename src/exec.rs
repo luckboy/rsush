@@ -17,7 +17,6 @@
 //
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::collections::hash_map;
 use std::cell::*;
 use std::io::*;
 use std::fs::*;
@@ -182,8 +181,8 @@ impl Executor
     pub fn clear_pipes(&mut self)
     { self.pipes.clear(); }
     
-    pub fn jobs(&self) -> hash_map::Iter<'_, i32, i32>
-    { self.jobs.iter() }
+    pub fn jobs(&self) -> &HashMap<i32, i32>
+    { &self.jobs }
     
     pub fn add_job(&mut self, pid: i32)
     {
@@ -362,7 +361,9 @@ impl Executor
                                         tmp_args.args.push(arg.clone());
                                     }
                                     settings.push_args(tmp_args);
-                                    interp.interpret_fun_body(exec, &(*fun_body), env, settings)
+                                    let status = interp.interpret_fun_body(exec, &(*fun_body), env, settings);
+                                    settings.pop_args();
+                                    status
                             })?;
                             let wait_status = self.wait_for_process(pid, true)?;
                             Ok(wait_status)
@@ -373,6 +374,7 @@ impl Executor
                             }
                             settings.push_args(tmp_args);
                             let status = interp.interpret_fun_body(self, &(*fun_body), env, settings);
+                            settings.pop_args();
                             Ok(WaitStatus::Exited(status))
                         }
                     },
