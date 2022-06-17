@@ -50,10 +50,16 @@ struct VirtualFile
 }
 
 #[derive(Clone)]
-struct PipeFiles
+pub struct Pipe
 {
-    reading_file: Rc<RefCell<File>>,
-    writing_file: Rc<RefCell<File>>,
+    pub reading_file: Rc<RefCell<File>>,
+    pub writing_file: Rc<RefCell<File>>,
+}
+
+impl Pipe
+{
+    pub fn new(reading_file: Rc<RefCell<File>>, writing_file: Rc<RefCell<File>>) -> Pipe
+    { Pipe { reading_file, writing_file, } }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -69,7 +75,7 @@ pub struct Executor
     state_stack: Vec<State>,
     current_state: State,
     virtual_files: HashMap<i32, VirtualFile>,
-    pipe_file_stack: Vec<PipeFiles>,
+    pipes: Vec<Pipe>,
     interp_status: i32,
     shell_pid: i32,
     jobs: HashMap<i32, i32>,
@@ -83,7 +89,7 @@ impl Executor
             state_stack: Vec::new(),
             current_state: State::InInterpreter,
             virtual_files: HashMap::new(),
-            pipe_file_stack: Vec::new(),
+            pipes: Vec::new(),
             interp_status: 0,
             shell_pid: process::id() as i32,
             jobs: HashMap::new(),
@@ -156,28 +162,25 @@ impl Executor
         }
     }
     
-    pub fn current_file(&mut self, vfd: i32) -> Option<Rc<RefCell<File>>>
-    { self.virtual_files.get(&vfd).map(|vf| vf.current_file.clone()) }
+    pub fn current_file(&mut self, vfd: i32) -> Option<&Rc<RefCell<File>>>
+    { self.virtual_files.get(&vfd).map(|vf| &vf.current_file) }
     
-    pub fn saved_file(&mut self, vfd: i32) -> Option<Rc<RefCell<File>>>
+    pub fn saved_file(&mut self, vfd: i32) -> Option<&Rc<RefCell<File>>>
     {
         match self.virtual_files.get(&vfd) {
-            Some(virtual_file) => virtual_file.saved_file.as_ref().map(|f| f.clone()),
+            Some(virtual_file) => virtual_file.saved_file.as_ref(),
             None => None,
         }
     }
     
-    pub fn push_pipe(&mut self, reading_file: Rc<RefCell<File>>, writing_file: Rc<RefCell<File>>)
-    {   
-        let pipe_files = PipeFiles {
-            reading_file,
-            writing_file,
-        };
-        self.pipe_file_stack.push(pipe_files);
-    }
+    pub fn pipes(&self) -> &[Pipe]
+    { self.pipes.as_slice() }
     
-    pub fn pop_pipe(&mut self)
-    { self.pipe_file_stack.pop(); }
+    pub fn set_pipes(&mut self, pipes: Vec<Pipe>)
+    { self.pipes = pipes; }
+    
+    pub fn clear_pipes(&mut self)
+    { self.pipes.clear(); }
     
     pub fn jobs(&self) -> hash_map::Iter<'_, i32, i32>
     { self.jobs.iter() }
@@ -302,7 +305,7 @@ impl Executor
             virtual_file.saved_file = None;
             virtual_file.file_stack.clear();
         }
-        self.pipe_file_stack.clear();
+        self.pipes.clear();
         let mut fds: HashSet<i32> = HashSet::new();
         for (_, virtual_file) in self.virtual_files.iter() {
             fds.insert(virtual_file.current_file.borrow().as_raw_fd());
