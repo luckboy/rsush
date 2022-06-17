@@ -314,9 +314,9 @@ impl Executor
         for (vfd, _) in self.virtual_files.iter() {
             vfds.insert(*vfd);
         }
+        let mut new_fd = 0;
         for (vfd, virtual_file) in self.virtual_files.iter_mut() {
             if vfds.contains(&vfd) && *vfd != virtual_file.current_file.borrow().as_raw_fd() {
-                let mut new_fd = 0;
                 loop {
                     if !fds.contains(&new_fd) && !vfds.contains(&new_fd) && !is_fd(new_fd) {
                         break;
@@ -325,6 +325,7 @@ impl Executor
                 }
                 dup2(virtual_file.current_file.borrow().as_raw_fd(), new_fd)?;
                 virtual_file.current_file = Rc::new(RefCell::new(unsafe { File::from_raw_fd(new_fd) }));
+                new_fd += 1;
             }
         }
         for (vfd, virtual_file) in self.virtual_files.iter_mut() {
