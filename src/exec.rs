@@ -203,10 +203,10 @@ impl Executor
         res
     }
     
-    pub fn create_process<F>(&mut self, is_background: bool, settings: &mut Settings, f: F) -> Result<Option<i32>>
+    pub fn create_process<F>(&mut self, is_in_background: bool, settings: &mut Settings, f: F) -> Result<Option<i32>>
         where F: FnOnce(&mut Self, &mut Settings) -> i32
     {
-        if is_background {
+        if is_in_background {
             self.push_state(State::InInterpreter);
         }
         let pid = match self.current_state {
@@ -233,13 +233,13 @@ impl Executor
             },
             Some(Some(_)) => (),
         }
-        if is_background {
+        if is_in_background {
             self.pop_state();
         }
         match pid {
             Some(None) => exit(status),
             Some(Some(pid)) => {
-                if is_background {
+                if is_in_background {
                     self.add_job(pid);
                 }
                 Ok(Some(pid))
@@ -261,17 +261,27 @@ impl Executor
                 } else {
                     libc::WNOHANG
                 };
-                let pid2 = waitpid(pid, Some(&mut status), opts)?;
-                match pid2 {
-                    Some(_) => {
-                        if libc::WIFSIGNALED(status) {
-                            Ok(WaitStatus::Exited(libc::WTERMSIG(status)))
-                        } else {
-                            Ok(WaitStatus::Exited(libc::WEXITSTATUS(status)))
-                        }
-                    },
-                    None => Ok(WaitStatus::None),
+                let mut res = Ok(WaitStatus::None);
+                loop {
+                    let pid2 = waitpid(pid, Some(&mut status), opts)?;
+                    match pid2 {
+                        Some(_) => {
+                            if libc::WIFEXITED(status) {
+                                res = Ok(WaitStatus::Exited(libc::WEXITSTATUS(status)));
+                                break;
+                            } else if libc::WIFSIGNALED(status) {
+                                res = Ok(WaitStatus::Signaled(libc::WTERMSIG(status)));
+                                break;
+                            } else {
+                                if !is_hang {
+                                    break;
+                                }
+                            }
+                        },
+                        None => break,
+                    }
                 }
+                res
             },
             _  => Ok(WaitStatus::Exited(self.interp_status)),
         }
@@ -309,6 +319,8 @@ impl Executor
             if *vfd != virtual_file.current_file.borrow().as_raw_fd() {
                 dup2(virtual_file.current_file.borrow().as_raw_fd(), *vfd)?;
                 virtual_file.current_file = Rc::new(RefCell::new(unsafe { File::from_raw_fd(*vfd) }));
+                let flags = fcntl_f_getfd(*vfd)?;
+                fcntl_f_setfd(*vfd, flags & !libc::FD_CLOEXEC)?;
             }
         }
         Ok(())
@@ -330,19 +342,25 @@ impl Executor
                     Some(fun_body) => {
                         if !vars.is_empty() {
                             let pid = self.create_process(false, settings, |exec, settings| {
-                                    exec.interpret(|exec| {
-                                            for (name, value) in vars.iter() {
-                                                env.set_global_var(name.as_str(), value.as_str());
-                                            }
-                                            interp.interpret_fun_body(exec, &(*fun_body), env, settings)
-                                    })
+                                    for (name, value) in vars.iter() {
+                                        env.set_global_var(name.as_str(), value.as_str());
+                                    }
+                                    let mut tmp_args = Arguments::new();
+                                    for arg in args.iter() {
+                                        tmp_args.args.push(arg.clone());
+                                    }
+                                    settings.push_args(tmp_args);
+                                    interp.interpret_fun_body(exec, &(*fun_body), env, settings)
                             })?;
                             let wait_status = self.wait_for_process(pid, true)?;
                             Ok(wait_status)
                         } else {
-                            let status = self.interpret(|exec| {
-                                    interp.interpret_fun_body(exec, &(*fun_body), env, settings)
-                            });
+                            let mut tmp_args = Arguments::new();
+                            for arg in args.iter() {
+                                tmp_args.args.push(arg.clone());
+                            }
+                            settings.push_args(tmp_args);
+                            let status = interp.interpret_fun_body(self, &(*fun_body), env, settings);
                             Ok(WaitStatus::Exited(status))
                         }
                     },
