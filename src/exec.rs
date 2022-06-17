@@ -194,6 +194,9 @@ impl Executor
         self.jobs.insert(job_id, pid);
     }
     
+    pub fn remove_job(&mut self, job_id: i32)
+    { self.jobs.remove(&job_id); }
+    
     pub fn interpret<T, F>(&mut self, f: F) -> T
         where F: FnOnce(&mut Self) -> T
     {
