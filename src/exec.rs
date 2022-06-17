@@ -76,7 +76,7 @@ pub struct Executor
     current_state: State,
     virtual_files: HashMap<i32, VirtualFile>,
     pipes: Vec<Pipe>,
-    interp_status: i32,
+    exit_status: i32,
     shell_pid: i32,
     jobs: HashMap<i32, i32>,
 }
@@ -90,7 +90,7 @@ impl Executor
             current_state: State::InInterpreter,
             virtual_files: HashMap::new(),
             pipes: Vec::new(),
-            interp_status: 0,
+            exit_status: 0,
             shell_pid: process::id() as i32,
             jobs: HashMap::new(),
        }
@@ -257,7 +257,7 @@ impl Executor
                 Ok(Some(pid))
             },
             None => {
-                self.interp_status = status;
+                self.exit_status = status;
                 Ok(None)
             },
         }
@@ -265,8 +265,8 @@ impl Executor
 
     pub fn wait_for_process(&self, pid: Option<i32>, is_hang: bool) -> Result<WaitStatus>
     {
-        match (pid, self.current_state) {
-            (Some(pid), State::InInterpreter) => {
+        match pid {
+            Some(pid) => {
                 let mut status = 0;
                 let opts = if is_hang {
                     0
@@ -295,7 +295,7 @@ impl Executor
                 }
                 res
             },
-            _  => Ok(WaitStatus::Exited(self.interp_status)),
+            _  => Ok(WaitStatus::Exited(self.exit_status)),
         }
     }
     
