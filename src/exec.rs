@@ -28,6 +28,7 @@ use std::process::Command;
 use std::process::exit;
 use std::rc::*;
 use libc;
+use crate::args::*;
 use crate::env::*;
 use crate::interp::*;
 use crate::settings::*;
@@ -357,9 +358,7 @@ impl Executor
                                         env.set_global_var(name.as_str(), value.as_str());
                                     }
                                     let mut tmp_args = Arguments::new();
-                                    for arg in args.iter() {
-                                        tmp_args.args.push(arg.clone());
-                                    }
+                                    tmp_args.set_args(args.iter().map(|a| a.clone()).collect());
                                     settings.push_args(tmp_args);
                                     let status = interp.interpret_fun_body(exec, &(*fun_body), env, settings);
                                     settings.pop_args();
@@ -369,9 +368,7 @@ impl Executor
                             Ok(wait_status)
                         } else {
                             let mut tmp_args = Arguments::new();
-                            for arg in args.iter() {
-                                tmp_args.args.push(arg.clone());
-                            }
+                            tmp_args.set_args(args.iter().map(|a| a.clone()).collect());
                             settings.push_args(tmp_args);
                             let status = interp.interpret_fun_body(self, &(*fun_body), env, settings);
                             settings.pop_args();

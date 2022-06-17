@@ -15,28 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-#[allow(dead_code)]
-mod args;
-#[allow(dead_code)]
-mod builtins;
-#[allow(dead_code)]
-mod env;
-#[allow(dead_code)]
-mod exec;
-#[allow(dead_code)]
-mod interp;
-#[allow(dead_code)]
-mod io;
-#[allow(dead_code)]
-mod lexer;
-#[allow(dead_code)]
-mod parser;
-#[allow(dead_code)]
-mod settings;
-#[allow(dead_code)]
-mod utils;
-
-fn main()
+#[derive(Clone)]
+pub struct Arguments
 {
-    println!("Hello, world!");
+    args: Vec<String>,
+}
+
+impl Arguments
+{
+    pub fn new() -> Arguments
+    { Arguments { args: Vec::new(), } }
+    
+    pub fn args(&self) -> &[String]
+    { self.args.as_slice() }
+    
+    pub fn set_args(&mut self, args: Vec<String>)
+    { self.args = args; }
 }

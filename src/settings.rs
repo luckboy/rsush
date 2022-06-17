@@ -15,17 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-#[derive(Clone)]
-pub struct Arguments
-{
-    pub args: Vec<String>,
-}
-
-impl Arguments
-{
-    pub fn new() -> Arguments
-    { Arguments { args: Vec::new(), } }
-}
+use crate::args::*;
 
 #[derive(Clone)]
 pub struct Settings
