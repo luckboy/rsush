@@ -275,7 +275,13 @@ impl Executor
                 };
                 let mut res = Ok(WaitStatus::None);
                 loop {
-                    let pid2 = waitpid(pid, Some(&mut status), opts)?;
+                    let pid2 = loop {
+                        match waitpid(pid, Some(&mut status), opts) {
+                            Ok(pid) => break pid,
+                            Err(err) if err.kind() == ErrorKind::Interrupted => (),
+                            Err(err) => return Err(err),
+                        }
+                    };
                     match pid2 {
                         Some(_) => {
                             if libc::WIFEXITED(status) {
@@ -323,14 +329,26 @@ impl Executor
                     }
                     new_fd += 1;
                 }
-                dup2(virtual_file.current_file.borrow().as_raw_fd(), new_fd)?;
+                loop {
+                    match dup2(virtual_file.current_file.borrow().as_raw_fd(), new_fd) {
+                        Ok(()) => break,
+                        Err(err) if err.kind() == ErrorKind::Interrupted => (),
+                        Err(err) => return Err(err),
+                    }
+                }
                 virtual_file.current_file = Rc::new(RefCell::new(unsafe { File::from_raw_fd(new_fd) }));
                 new_fd += 1;
             }
         }
         for (vfd, virtual_file) in self.virtual_files.iter_mut() {
             if *vfd != virtual_file.current_file.borrow().as_raw_fd() {
-                dup2(virtual_file.current_file.borrow().as_raw_fd(), *vfd)?;
+                loop {
+                    match dup2(virtual_file.current_file.borrow().as_raw_fd(), *vfd) {
+                        Ok(()) => break,
+                        Err(err) if err.kind() == ErrorKind::Interrupted => (),
+                        Err(err) => return Err(err),
+                    }
+                }
                 virtual_file.current_file = Rc::new(RefCell::new(unsafe { File::from_raw_fd(*vfd) }));
                 let flags = fcntl_f_getfd(*vfd)?;
                 fcntl_f_setfd(*vfd, flags & !libc::FD_CLOEXEC)?;
