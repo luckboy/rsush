@@ -67,7 +67,14 @@ impl Environment
         if settings.allexport_flag {
             self.set_global_var(name, value);
         } else {
-            self.set_local_var(name, value);
+            if self.local_vars.contains_key(&String::from(name)) {
+                self.set_local_var(name, value);
+            } else {
+                match self.global_var(name) {
+                    Some(_) => self.set_global_var(name, value),
+                    None    => self.set_local_var(name, value),
+                }
+            }
         }
     }
 

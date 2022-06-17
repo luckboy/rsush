@@ -374,6 +374,7 @@ impl Executor
                         if !vars.is_empty() {
                             let pid = self.create_process(false, settings, |exec, settings| {
                                     for (name, value) in vars.iter() {
+                                        env.unset_local_var(name.as_str());
                                         env.set_global_var(name.as_str(), value.as_str());
                                     }
                                     let mut tmp_args = Arguments::new();
@@ -397,6 +398,7 @@ impl Executor
                     None => {
                         let pid = self.create_process(false, settings, |exec, settings| {
                                 for (name, value) in vars.iter() {
+                                    env.unset_local_var(name.as_str());
                                     env.set_global_var(name.as_str(), value.as_str());
                                 }
                                 match exec.close_and_move_files_for_execute() {
