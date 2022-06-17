@@ -44,7 +44,7 @@ pub struct Settings
     pub emacs_flag: bool,
     pub xtrace_flag: bool,
     pub arg0: String,
-    arg_stack: Vec<Arguments>,
+    arg_vec_stack: Vec<Arguments>,
     current_args: Arguments,
 }
 
@@ -67,20 +67,20 @@ impl Settings
             emacs_flag: false,
             xtrace_flag: false,
             arg0: String::new(),
-            arg_stack: Vec::new(),
+            arg_vec_stack: Vec::new(),
             current_args: Arguments::new(),
         }
     }
     
     pub fn push_args(&mut self, args: Arguments)
     {
-        self.arg_stack.push(self.current_args.clone());
+        self.arg_vec_stack.push(self.current_args.clone());
         self.current_args = args;
     }
     
     pub fn pop_args(&mut self)
     {
-        match self.arg_stack.pop() {
+        match self.arg_vec_stack.pop() {
             Some(args) => self.current_args = args,
             None => (),
         }
