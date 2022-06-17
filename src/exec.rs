@@ -227,8 +227,14 @@ impl Executor
         }
         match pid {
             Some(None) | None => {
-                for (_, virtual_file) in self.virtual_files.iter_mut() {
-                    virtual_file.file_stack.clear();
+                match pid {
+                    Some(None) => {
+                        for (_, virtual_file) in self.virtual_files.iter_mut() {
+                            virtual_file.file_stack.clear();
+                        }
+                        self.jobs.clear();
+                    },
+                    _ => ()
                 }
                 self.push_state(State::InNewProcess);
                 status = f(self, settings);
