@@ -374,8 +374,8 @@ impl Executor
                         if !vars.is_empty() {
                             let pid = self.create_process(false, settings, |exec, settings| {
                                     for (name, value) in vars.iter() {
-                                        env.unset_local_var(name.as_str());
-                                        env.set_global_var(name.as_str(), value.as_str());
+                                        env.unset_unexported_var(name.as_str());
+                                        env.set_exported_var(name.as_str(), value.as_str());
                                     }
                                     let mut tmp_args = Arguments::new();
                                     tmp_args.set_args(args.iter().map(|a| a.clone()).collect());
@@ -398,8 +398,8 @@ impl Executor
                     None => {
                         let pid = self.create_process(false, settings, |exec, settings| {
                                 for (name, value) in vars.iter() {
-                                    env.unset_local_var(name.as_str());
-                                    env.set_global_var(name.as_str(), value.as_str());
+                                    env.unset_unexported_var(name.as_str());
+                                    env.set_exported_var(name.as_str(), value.as_str());
                                 }
                                 match exec.close_and_move_files_for_execute() {
                                     Ok(()) => {

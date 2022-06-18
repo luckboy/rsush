@@ -25,7 +25,7 @@ use crate::settings::*;
 #[derive(Clone)]
 pub struct Environment
 {
-    local_vars: HashMap<String, String>,
+    unexported_vars: HashMap<String, String>,
     funs: HashMap<String, Rc<FunctionBody>>,
     builtin_funs: HashMap<String, BuiltinFunction>,
 }
@@ -35,44 +35,44 @@ impl Environment
     pub fn new() -> Environment
     {
         Environment {
-            local_vars: HashMap::new(),
+            unexported_vars: HashMap::new(),
             funs: HashMap::new(),
             builtin_funs: HashMap::new(),
         }
     }
 
-    pub fn local_var(&self, name: &str) -> Option<String>
-    { self.local_vars.get(&String::from(name)).map(|v| v.clone()) }
+    pub fn unexported_var(&self, name: &str) -> Option<String>
+    { self.unexported_vars.get(&String::from(name)).map(|v| v.clone()) }
 
-    pub fn set_local_var(&mut self, name: &str, value: &str)
-    { self.local_vars.insert(String::from(name), String::from(value)); }
+    pub fn set_unexported_var(&mut self, name: &str, value: &str)
+    { self.unexported_vars.insert(String::from(name), String::from(value)); }
 
-    pub fn unset_local_var(&mut self, name: &str)
-    { self.local_vars.remove(&String::from(name)); }
+    pub fn unset_unexported_var(&mut self, name: &str)
+    { self.unexported_vars.remove(&String::from(name)); }
 
-    pub fn global_var(&self, name: &str) -> Option<String>
+    pub fn exported_var(&self, name: &str) -> Option<String>
     { env::var(name).ok() }
 
-    pub fn set_global_var(&mut self, name: &str, value: &str)
+    pub fn set_exported_var(&mut self, name: &str, value: &str)
     { env::set_var(name, value); }
 
-    pub fn unset_global_var(&mut self, name: &str)
+    pub fn unset_exported_var(&mut self, name: &str)
     { env::remove_var(name); }
 
     pub fn var(&self, name: &str) -> Option<String>
-    { self.local_var(name).or(self.global_var(name)) }
+    { self.unexported_var(name).or(self.exported_var(name)) }
 
     pub fn set_var(&mut self, name: &str, value: &str, settings: &Settings)
     {
         if settings.allexport_flag {
-            self.set_global_var(name, value);
+            self.set_exported_var(name, value);
         } else {
-            if self.local_vars.contains_key(&String::from(name)) {
-                self.set_local_var(name, value);
+            if self.unexported_vars.contains_key(&String::from(name)) {
+                self.set_unexported_var(name, value);
             } else {
-                match self.global_var(name) {
-                    Some(_) => self.set_global_var(name, value),
-                    None    => self.set_local_var(name, value),
+                match self.exported_var(name) {
+                    Some(_) => self.set_exported_var(name, value),
+                    None    => self.set_unexported_var(name, value),
                 }
             }
         }
@@ -80,8 +80,8 @@ impl Environment
 
     pub fn unset_var(&mut self, name: &str)
     {
-        self.unset_local_var(name);
-        self.unset_global_var(name);
+        self.unset_unexported_var(name);
+        self.unset_exported_var(name);
     }
 
     pub fn fun(&self, name: &str) -> Option<Rc<FunctionBody>>
