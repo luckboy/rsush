@@ -411,7 +411,7 @@ impl Executor
                                     },
                                     Err(err) => {
                                         eprintln!("{}: {}", arg0, err);
-                                        127
+                                        126
                                     },
                                 }
                         })?;
