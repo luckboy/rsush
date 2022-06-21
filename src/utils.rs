@@ -231,7 +231,7 @@ pub fn escape_str(s: &str) -> String
     new_s
 }
 
-pub fn unescape_pattern_path<S: AsRef<OsStr>>(s: S) -> PathBuf
+pub fn unescape_path_pattern<S: AsRef<OsStr>>(s: S) -> PathBuf
 {
     let mut buf: Vec<u8> = Vec::new();
     for c in s.as_ref().as_bytes().iter() {
