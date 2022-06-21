@@ -15,9 +15,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+use std::ffi::*;
 use std::io::*;
+use std::mem::MaybeUninit;
+use std::path::*;
 use std::ptr::null_mut;
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::ffi::OsStringExt;
+use std::slice::*;
+use fnmatch_sys;
 use libc;
+
+pub struct PipeFds
+{
+    pub reading_fd: i32,
+    pub writing_fd: i32,
+}
+
+pub enum GlobResult
+{
+    Ok(Vec<PathBuf>),
+    Aborted,
+    NoMatch,
+    NoSpace,
+}
 
 pub fn is_number_str(s: &str) -> bool
 { s.chars().all(|c| c >= '0' && c <= '9') }
@@ -73,6 +94,16 @@ pub fn dup2(old_fd: i32, new_fd: i32) -> Result<()>
     }
 }
 
+pub fn close(fd: i32) -> Result<()>
+{
+    let res = unsafe { libc::close(fd) };
+    if res != -1 {
+        Ok(())
+    } else {
+        Err(Error::last_os_error())
+    }
+}
+
 pub fn fcntl_f_getfd(fd: i32) -> Result<i32>
 {
     let res = unsafe { libc::fcntl(fd, libc::F_GETFD) };
@@ -93,10 +124,122 @@ pub fn fcntl_f_setfd(fd: i32, flags: i32) -> Result<()>
     }
 }
 
+pub fn pipe() -> Result<PipeFds>
+{
+    let mut libc_pipe_fds: [i32; 2] = [-1, -1];
+    let res = unsafe { libc::pipe(&mut libc_pipe_fds as *mut i32) };
+    if res != -1 {
+        Ok(PipeFds { reading_fd: libc_pipe_fds[0], writing_fd: libc_pipe_fds[1], })
+    } else {
+        Err(Error::last_os_error())        
+    }
+}
+
+pub fn pipe_with_cloexec() -> Result<PipeFds>
+{
+    let pipe_fds = pipe()?;
+    match fcntl_f_getfd(pipe_fds.reading_fd) {
+        Ok(flags) => {
+            match fcntl_f_setfd(pipe_fds.reading_fd, flags | libc::FD_CLOEXEC) {
+                Ok(()) => {
+                    match fcntl_f_getfd(pipe_fds.writing_fd) {
+                        Ok(flags2) => {
+                            match fcntl_f_setfd(pipe_fds.writing_fd, flags2 | libc::FD_CLOEXEC) {
+                                Ok(()) => Ok(pipe_fds),
+                                Err(err) => {
+                                    let _res = close(pipe_fds.reading_fd);
+                                    let _res = close(pipe_fds.writing_fd);
+                                    Err(err)
+                                },
+                            }
+                        },
+                        Err(err) => {
+                            let _res = close(pipe_fds.reading_fd);
+                            let _res = close(pipe_fds.writing_fd);
+                            Err(err)
+                        },
+                    }
+                },
+                Err(err) => {
+                    let _res = close(pipe_fds.reading_fd);
+                    let _res = close(pipe_fds.writing_fd);
+                    Err(err)
+                },
+            }
+        },
+        Err(err) => {
+            let _res = close(pipe_fds.reading_fd);
+            let _res = close(pipe_fds.writing_fd);
+            Err(err)
+        },
+    }
+}
+
 pub fn is_fd(fd: i32) -> bool
 {
     match fcntl_f_getfd(fd) {
         Ok(_)  => true,
         Err(_) => false,
     }
+}
+
+pub fn glob<S: AsRef<OsStr>>(pattern: S, flags: i32, err_f: Option<extern "C" fn(*const libc::c_char, i32) -> i32>) -> GlobResult
+{
+    let mut tmp_glob: libc::glob_t = unsafe { MaybeUninit::uninit().assume_init() };
+    tmp_glob.gl_offs = 0;
+    let pattern_cstring = CString::new(pattern.as_ref().as_bytes()).unwrap();
+    let res = unsafe { libc::glob(pattern_cstring.as_ptr(), flags, err_f, &mut tmp_glob as *mut libc::glob_t) };
+    match res {
+        0 => {
+            let mut path_bufs: Vec<PathBuf> = Vec::new();
+            let tmp_paths: &[*mut libc::c_char] = unsafe { from_raw_parts_mut(tmp_glob.gl_pathv, tmp_glob.gl_pathc) };
+            for i in 0..tmp_glob.gl_pathc {
+                let path_len = unsafe { libc::strlen(tmp_paths[i] as *const libc::c_char) };
+                let path_osstring = OsString::from(&OsStr::from_bytes(unsafe { from_raw_parts(tmp_paths[i] as *const u8, path_len) }));
+                let mut path_buf = PathBuf::new();
+                path_buf.push(path_osstring);
+                path_bufs.push(path_buf);
+            }
+            unsafe { libc::globfree(&mut tmp_glob as *mut libc::glob_t); };
+            GlobResult::Ok(path_bufs)
+        },
+        libc::GLOB_ABORTED => GlobResult::Aborted,
+        libc::GLOB_NOMATCH => GlobResult::NoMatch,
+        libc::GLOB_NOSPACE => GlobResult::NoSpace,
+        _ => panic!("unknown glob result"),
+    }
+}
+
+pub fn fnmatch<S: AsRef<OsStr>, P: AsRef<Path>>(pattern: S, path: P, flags: i32) -> bool
+{
+    let pattern_cstring = CString::new(pattern.as_ref().as_bytes()).unwrap();
+    let path_cstring = CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
+    let res = unsafe { fnmatch_sys::fnmatch(pattern_cstring.as_ptr(), path_cstring.as_ptr(), flags) };
+    res == 0
+}
+
+pub fn escape_str(s: &str) -> String
+{
+    let mut new_s = String::new();
+    for c in s.chars() {
+        match c {
+            '\\' | '?' | '*' | '[' | ']' | ':' | '!' | '^' | '-' | '~' => new_s.push('\\'),
+            _ => (),
+        }
+        new_s.push(c);
+    }
+    new_s
+}
+
+pub fn unescape_pattern_path<S: AsRef<OsStr>>(s: S) -> PathBuf
+{
+    let mut buf: Vec<u8> = Vec::new();
+    for c in s.as_ref().as_bytes().iter() {
+        if *c != b'\\' {
+            buf.push(*c);
+        }
+    }
+    let mut path_buf = PathBuf::new();
+    path_buf.push(&OsString::from_vec(buf));
+    path_buf
 }
