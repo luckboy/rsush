@@ -25,6 +25,7 @@ use std::os::unix::ffi::OsStringExt;
 use std::slice::*;
 use fnmatch_sys;
 use libc;
+use crate::iter::*;
 
 pub struct PipeFds
 {
@@ -242,4 +243,84 @@ pub fn unescape_path_pattern<S: AsRef<OsStr>>(s: S) -> PathBuf
     let mut path_buf = PathBuf::new();
     path_buf.push(&OsString::from_vec(buf));
     path_buf
+}
+
+pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
+{
+    let delims_without_spaces = delims.replace(char::is_whitespace, "");
+    let is_space = delims.chars().any(char::is_whitespace);
+    let mut fields: Vec<&'a str> = Vec::new();
+    let new_s = if is_space {
+        s.trim()
+    } else {
+        s
+    };
+    if !new_s.is_empty() {
+        let mut iter = PushbackIter::new(s.char_indices());
+        let mut i: usize = 0;
+        let mut j: usize;
+        loop {
+            let mut is_first = true;
+            let mut is_stop = false;
+            loop {
+                match iter.next() {
+                    Some((k, c)) if is_space && c.is_whitespace() => {
+                        if is_first { i = k; }
+                        iter.undo((k, c));
+                        j = k;
+                        break;
+                    },
+                    Some((k, c)) if delims_without_spaces.contains(c) => {
+                        if is_first { i = k; }
+                        iter.undo((k, c));
+                        j = k;
+                        break;
+                    },
+                    Some((k, _)) => {
+                        if is_first { i = k; }
+                        is_first = false;
+                    },
+                    None => {
+                        if is_first { i = new_s.len(); }
+                        j = new_s.len();
+                        is_stop = true;
+                        break;
+                    },
+                }
+            }
+            fields.push(&new_s[i..j]);
+            if is_stop { break; }
+            if is_space {
+                loop {
+                    match iter.next() {
+                        Some((_, c)) if c.is_whitespace() => (),
+                        Some((k, c)) => {
+                            iter.undo((k, c));
+                            break;
+                        },
+                        None => break,
+                    }
+                }
+            }
+            match iter.next() {
+                Some((_, c)) if delims_without_spaces.contains(c) => {
+                    if is_space {
+                        loop {
+                            match iter.next() {
+                                Some((_, c2)) if c2.is_whitespace() => (),
+                                Some((l, c2)) => {
+                                    iter.undo((l, c2));
+                                    break;
+                                }
+                                None => break,
+                            }
+                        }
+                    }
+                },
+                Some((k, c)) => iter.undo((k, c)),
+                None => (),
+            }
+        }
+    }
+    fields
 }

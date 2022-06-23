@@ -28,6 +28,8 @@ mod interp;
 #[allow(dead_code)]
 mod io;
 #[allow(dead_code)]
+mod iter;
+#[allow(dead_code)]
 mod lexer;
 #[allow(dead_code)]
 mod parser;
