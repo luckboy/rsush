@@ -250,12 +250,12 @@ pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
     let delims_without_spaces = delims.replace(char::is_whitespace, "");
     let is_space = delims.chars().any(char::is_whitespace);
     let mut fields: Vec<&'a str> = Vec::new();
-    let new_s = if is_space {
+    let t = if is_space {
         s.trim()
     } else {
         s
     };
-    if !new_s.is_empty() {
+    if !t.is_empty() {
         let mut iter = PushbackIter::new(s.char_indices());
         let mut i: usize = 0;
         let mut j: usize;
@@ -281,14 +281,14 @@ pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
                         is_first = false;
                     },
                     None => {
-                        if is_first { i = new_s.len(); }
-                        j = new_s.len();
+                        if is_first { i = t.len(); }
+                        j = t.len();
                         is_stop = true;
                         break;
                     },
                 }
             }
-            fields.push(&new_s[i..j]);
+            fields.push(&t[i..j]);
             if is_stop { break; }
             if is_space {
                 loop {
