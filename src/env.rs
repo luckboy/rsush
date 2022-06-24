@@ -26,8 +26,8 @@ use crate::settings::*;
 pub struct Environment
 {
     unexported_vars: HashMap<String, String>,
-    funs: HashMap<String, Rc<FunctionBody>>,
     builtin_funs: HashMap<String, BuiltinFunction>,
+    funs: HashMap<String, Rc<FunctionBody>>,
 }
 
 impl Environment
@@ -36,8 +36,8 @@ impl Environment
     {
         Environment {
             unexported_vars: HashMap::new(),
-            funs: HashMap::new(),
             builtin_funs: HashMap::new(),
+            funs: HashMap::new(),
         }
     }
 
@@ -84,6 +84,15 @@ impl Environment
         self.unset_exported_var(name);
     }
 
+    pub fn builtin_fun(&self, name: &str) -> Option<BuiltinFunction>
+    { self.builtin_funs.get(&String::from(name)).map(|bf| *bf) }
+
+    pub fn set_builtin_fun(&mut self, name: &str, builtin_fun: BuiltinFunction)
+    { self.builtin_funs.insert(String::from(name), builtin_fun); }
+
+    pub fn unset_builtin_fun(&mut self, name: &str)
+    { self.builtin_funs.remove(&String::from(name)); }    
+    
     pub fn fun(&self, name: &str) -> Option<Rc<FunctionBody>>
     { self.funs.get(&String::from(name)).map(|fb| fb.clone()) }
 
@@ -92,14 +101,4 @@ impl Environment
 
     pub fn unset_fun(&mut self, name: &str)
     { self.funs.remove(&String::from(name)); }
-
-
-    pub fn builtin_fun(&self, name: &str) -> Option<BuiltinFunction>
-    { self.builtin_funs.get(&String::from(name)).map(|bf| *bf) }
-
-    pub fn set_builtin_fun(&mut self, name: &str, builtin_fun: BuiltinFunction)
-    { self.builtin_funs.insert(String::from(name), builtin_fun); }
-
-    pub fn unset_builtin_fun(&mut self, name: &str)
-    { self.builtin_funs.remove(&String::from(name)); }
 }
