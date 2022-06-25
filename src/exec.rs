@@ -67,7 +67,22 @@ pub enum WaitStatus
 {
     None,
     Exited(i32),
-    Signaled(i32),
+    Signaled(i32, bool),
+    Stopped(i32),
+}
+
+#[derive(Clone)]
+pub struct Job
+{
+    pub pid: i32,
+    pub status: WaitStatus,
+    pub name: String,
+}
+
+impl Job
+{
+    pub fn new(pid: i32, name: &str) -> Job
+    { Job { pid, status: WaitStatus::None, name: String::from(name), } }
 }
 
 pub struct Executor
@@ -78,7 +93,7 @@ pub struct Executor
     pipes: Vec<Pipe>,
     exit_status: i32,
     shell_pid: i32,
-    jobs: HashMap<i32, i32>,
+    jobs: HashMap<i32, Job>,
 }
 
 impl Executor
@@ -182,10 +197,10 @@ impl Executor
     pub fn clear_pipes(&mut self)
     { self.pipes.clear(); }
     
-    pub fn jobs(&self) -> &HashMap<i32, i32>
+    pub fn jobs(&self) -> &HashMap<i32, Job>
     { &self.jobs }
     
-    pub fn add_job(&mut self, pid: i32)
+    pub fn add_job(&mut self, job: &Job)
     {
         let mut job_id = 1;
         loop {
@@ -194,7 +209,15 @@ impl Executor
             }
             job_id += 1;
         }
-        self.jobs.insert(job_id, pid);
+        self.jobs.insert(job_id, job.clone());
+    }
+    
+    pub fn set_job_status(&mut self, job_id: i32, status: WaitStatus)
+    {
+        match self.jobs.get_mut(&job_id) {
+            Some(job) => job.status = status,
+            None => (),
+        }
     }
     
     pub fn remove_job(&mut self, job_id: i32)
@@ -250,12 +273,7 @@ impl Executor
         }
         match pid {
             Some(None) => exit(status),
-            Some(Some(pid)) => {
-                if is_in_background {
-                    self.add_job(pid);
-                }
-                Ok(Some(pid))
-            },
+            Some(Some(pid)) => Ok(Some(pid)),
             None => {
                 self.exit_status = status;
                 Ok(None)
@@ -263,15 +281,20 @@ impl Executor
         }
     }
 
-    pub fn wait_for_process(&self, pid: Option<i32>, is_hang: bool) -> Result<WaitStatus>
+    pub fn wait_for_process(&self, pid: Option<i32>, is_hang: bool, is_untraced: bool) -> Result<WaitStatus>
     {
         match pid {
             Some(pid) => {
                 let mut status = 0;
-                let opts = if is_hang {
+                let mut opts = if is_hang {
                     0
                 } else {
                     libc::WNOHANG
+                };
+                opts |= if is_untraced {
+                    libc::WUNTRACED
+                } else {
+                    0
                 };
                 let mut res = Ok(WaitStatus::None);
                 loop {
@@ -288,7 +311,10 @@ impl Executor
                                 res = Ok(WaitStatus::Exited(libc::WEXITSTATUS(status)));
                                 break;
                             } else if libc::WIFSIGNALED(status) {
-                                res = Ok(WaitStatus::Signaled(libc::WTERMSIG(status)));
+                                res = Ok(WaitStatus::Signaled(libc::WTERMSIG(status), libc::WCOREDUMP(status)));
+                                break;
+                            } else if libc::WIFSTOPPED(status) {
+                                res = Ok(WaitStatus::Stopped(libc::WSTOPSIG(status)));
                                 break;
                             } else {
                                 if !is_hang {
@@ -384,7 +410,7 @@ impl Executor
                                     settings.pop_args();
                                     status
                             })?;
-                            let wait_status = self.wait_for_process(pid, true)?;
+                            let wait_status = self.wait_for_process(pid, true, false)?;
                             Ok(wait_status)
                         } else {
                             let mut tmp_args = Arguments::new();
@@ -415,7 +441,7 @@ impl Executor
                                     },
                                 }
                         })?;
-                        let wait_status = self.wait_for_process(pid, true)?;
+                        let wait_status = self.wait_for_process(pid, true, false)?;
                         Ok(wait_status)
                     },
                 }
