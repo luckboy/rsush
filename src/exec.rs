@@ -209,6 +209,9 @@ impl Executor
     pub fn clear_pipes(&mut self)
     { self.pipes.clear(); }
     
+    pub fn shell_pid(&self) -> i32
+    { self.shell_pid }
+    
     pub fn jobs(&self) -> &HashMap<u32, Job>
     { &self.jobs }
     
