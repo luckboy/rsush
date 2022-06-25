@@ -214,7 +214,15 @@ impl Executor
     
     pub fn current_job_id(&self) -> Option<u32>
     { self.current_job_id }
-    
+
+    pub fn prev_current_job_id(&self) -> Option<u32>
+    {
+        match self.current_job_id.map(|id| self.jobs.get(&id)).flatten() {
+            Some(job) => job.prev_job_id,
+            None => None,
+        }
+    }
+
     pub fn add_job(&mut self, job: &Job)
     {
         let mut job_id: u32 = 1;
