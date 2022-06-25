@@ -77,12 +77,22 @@ pub struct Job
     pub pid: i32,
     pub status: WaitStatus,
     pub name: String,
+    prev_job_id: Option<u32>,
+    next_job_id: Option<u32>,
 }
 
 impl Job
 {
     pub fn new(pid: i32, name: &str) -> Job
-    { Job { pid, status: WaitStatus::None, name: String::from(name), } }
+    {
+        Job {
+            pid,
+            status: WaitStatus::None,
+            name: String::from(name),
+            prev_job_id: None,
+            next_job_id: None,
+        }
+    }
 }
 
 pub struct Executor
@@ -93,7 +103,8 @@ pub struct Executor
     pipes: Vec<Pipe>,
     exit_status: i32,
     shell_pid: i32,
-    jobs: HashMap<i32, Job>,
+    jobs: HashMap<u32, Job>,
+    current_job_id: Option<u32>,
 }
 
 impl Executor
@@ -108,6 +119,7 @@ impl Executor
             exit_status: 0,
             shell_pid: process::id() as i32,
             jobs: HashMap::new(),
+            current_job_id: None,
        }
     }
    
@@ -197,22 +209,32 @@ impl Executor
     pub fn clear_pipes(&mut self)
     { self.pipes.clear(); }
     
-    pub fn jobs(&self) -> &HashMap<i32, Job>
+    pub fn jobs(&self) -> &HashMap<u32, Job>
     { &self.jobs }
+    
+    pub fn current_job_id(&self) -> Option<u32>
+    { self.current_job_id }
     
     pub fn add_job(&mut self, job: &Job)
     {
-        let mut job_id = 1;
+        let mut job_id: u32 = 1;
         loop {
             if !self.jobs.contains_key(&job_id) {
                 break;
             }
             job_id += 1;
         }
-        self.jobs.insert(job_id, job.clone());
+        match self.current_job_id.map(|id| self.jobs.get_mut(&id)).flatten() {
+            Some(tmp_job) => tmp_job.next_job_id = Some(job_id),
+            None => (),
+        }
+        let mut tmp_job = job.clone();
+        tmp_job.prev_job_id = self.current_job_id;
+        self.jobs.insert(job_id, tmp_job);
+        self.current_job_id = Some(job_id);
     }
     
-    pub fn set_job_status(&mut self, job_id: i32, status: WaitStatus)
+    pub fn set_job_status(&mut self, job_id: u32, status: WaitStatus)
     {
         match self.jobs.get_mut(&job_id) {
             Some(job) => job.status = status,
@@ -220,8 +242,30 @@ impl Executor
         }
     }
     
-    pub fn remove_job(&mut self, job_id: i32)
-    { self.jobs.remove(&job_id); }
+    pub fn remove_job(&mut self, job_id: u32)
+    {
+        let mut prev_job_id: Option<u32> = None;
+        let mut next_job_id: Option<u32> = None;
+        match self.jobs.get(&job_id) {
+            Some(job) => {
+                if self.current_job_id.map(|id| id == job_id).unwrap_or(false) {
+                    self.current_job_id = job.prev_job_id;
+                }
+                prev_job_id = job.prev_job_id;
+                next_job_id = job.next_job_id;
+            },
+            None => (),
+        }
+        match prev_job_id.map(|id| self.jobs.get_mut(&id)).flatten() {
+            Some(prev_job) => prev_job.next_job_id = next_job_id,
+            None => (),
+        }
+        match next_job_id.map(|id| self.jobs.get_mut(&id)).flatten() {
+            Some(next_job) => next_job.prev_job_id = prev_job_id,
+            None => (),
+        }
+        self.jobs.remove(&job_id);
+    }
     
     pub fn interpret<T, F>(&mut self, f: F) -> T
         where F: FnOnce(&mut Self) -> T
