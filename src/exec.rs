@@ -226,7 +226,7 @@ impl Executor
         }
     }
 
-    pub fn add_job(&mut self, job: &Job)
+    pub fn add_job(&mut self, job: &Job) -> u32
     {
         let mut job_id: u32 = 1;
         loop {
@@ -243,6 +243,7 @@ impl Executor
         tmp_job.prev_job_id = self.current_job_id;
         self.jobs.insert(job_id, tmp_job);
         self.current_job_id = Some(job_id);
+        job_id
     }
     
     pub fn set_job_status(&mut self, job_id: u32, status: WaitStatus)
