@@ -8054,6 +8054,159 @@ fun()";
 }
 
 #[test]
+fn test_parser_parse_alias_command_parses_command()
+{
+    let s = "echo abc def";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_alias_command(&mut lexer, &settings) {
+        Ok(alias_command) => {
+            assert_eq!(String::from("test.sh"), alias_command.path);
+            assert_eq!(1, alias_command.pos.line);
+            assert_eq!(1, alias_command.pos.column);
+            assert_eq!(3, alias_command.simple_command.words.len());
+            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[0].path);
+            assert_eq!(1, alias_command.simple_command.words[0].pos.line);
+            assert_eq!(1, alias_command.simple_command.words[0].pos.column);
+            assert_eq!(1, alias_command.simple_command.words[0].word_elems.len());
+            match &alias_command.simple_command.words[0].word_elems[0] {
+                WordElement::Simple(SimpleWordElement::String(s)) => {
+                    assert_eq!(&String::from("echo"), s);
+                },
+                _ => assert!(false),
+            }
+            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[1].path);
+            assert_eq!(1, alias_command.simple_command.words[1].pos.line);
+            assert_eq!(6, alias_command.simple_command.words[1].pos.column);
+            assert_eq!(1, alias_command.simple_command.words[1].word_elems.len());
+            match &alias_command.simple_command.words[1].word_elems[0] {
+                WordElement::Simple(SimpleWordElement::String(s)) => {
+                    assert_eq!(&String::from("abc"), s);
+                },
+                _ => assert!(false),
+            }
+            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[2].path);
+            assert_eq!(1, alias_command.simple_command.words[2].pos.line);
+            assert_eq!(10, alias_command.simple_command.words[2].pos.column);
+            assert_eq!(1, alias_command.simple_command.words[2].word_elems.len());
+            match &alias_command.simple_command.words[2].word_elems[0] {
+                WordElement::Simple(SimpleWordElement::String(s)) => {
+                    assert_eq!(&String::from("def"), s);
+                },
+                _ => assert!(false),
+            }
+            assert_eq!(true, alias_command.simple_command.redirects.is_empty());
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_alias_command_parses_command_with_redictions()
+{
+    let s = "echo abc > xxx 2>> yyy";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_alias_command(&mut lexer, &settings) {
+        Ok(alias_command) => {
+            assert_eq!(String::from("test.sh"), alias_command.path);
+            assert_eq!(1, alias_command.pos.line);
+            assert_eq!(1, alias_command.pos.column);
+            assert_eq!(2, alias_command.simple_command.words.len());
+            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[0].path);
+            assert_eq!(1, alias_command.simple_command.words[0].pos.line);
+            assert_eq!(1, alias_command.simple_command.words[0].pos.column);
+            assert_eq!(1, alias_command.simple_command.words[0].word_elems.len());
+            match &alias_command.simple_command.words[0].word_elems[0] {
+                WordElement::Simple(SimpleWordElement::String(s)) => {
+                    assert_eq!(&String::from("echo"), s);
+                },
+                _ => assert!(false),
+            }
+            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[1].path);
+            assert_eq!(1, alias_command.simple_command.words[1].pos.line);
+            assert_eq!(6, alias_command.simple_command.words[1].pos.column);
+            assert_eq!(1, alias_command.simple_command.words[1].word_elems.len());
+            match &alias_command.simple_command.words[1].word_elems[0] {
+                WordElement::Simple(SimpleWordElement::String(s)) => {
+                    assert_eq!(&String::from("abc"), s);
+                },
+                _ => assert!(false),
+            }
+            assert_eq!(2, alias_command.simple_command.redirects.len());
+            match &(*alias_command.simple_command.redirects[0]) {
+                Redirection::Output(path, pos, None, word, is_bar) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(10, pos.column);
+                    assert_eq!(false, *is_bar);
+                    assert_eq!(String::from("test.sh"), word.path);
+                    assert_eq!(1, word.pos.line);
+                    assert_eq!(12, word.pos.column);
+                    assert_eq!(1, word.word_elems.len());
+                    match &word.word_elems[0] {
+                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                            assert_eq!(&String::from("xxx"), s);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+            match &(*alias_command.simple_command.redirects[1]) {
+                Redirection::Appending(path, pos, Some(n), word) => {
+                    assert_eq!(&String::from("test.sh"), path);
+                    assert_eq!(1, pos.line);
+                    assert_eq!(16, pos.column);
+                    assert_eq!(2, *n);
+                    assert_eq!(String::from("test.sh"), word.path);
+                    assert_eq!(1, word.pos.line);
+                    assert_eq!(20, word.pos.column);
+                    assert_eq!(1, word.word_elems.len());
+                    match &word.word_elems[0] {
+                        WordElement::Simple(SimpleWordElement::String(s)) => {
+                            assert_eq!(&String::from("yyy"), s);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
+fn test_parser_parse_alias_command_parses_complains_on_unexpected_token_for_command()
+{
+    let s = "echo xxx;;";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_alias_command(&mut lexer, &settings) {
+        Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(9, pos.column);
+            assert_eq!(String::from("unexpected token"), msg);
+            assert_eq!(false, is_cont);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
 fn test_parser_parse_arith_expr_parses_expression()
 {
     let s = "1 + 2))";
