@@ -185,6 +185,14 @@ pub struct LogicalCommand
     pub is_in_background: bool,
 }
 
+#[derive(Clone)]
+pub struct AliasCommand
+{
+    pub path: String,
+    pub pos: Position,
+    pub simple_command: SimpleCommand,
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum UnaryOperator
 {
@@ -1265,6 +1273,40 @@ impl Parser
             Ok(Some(commands))
         } else {
             Ok(None)
+        }
+    }
+    
+    pub fn parse_alias_command<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<AliasCommand>
+    {
+        if !self.has_first_word_or_third_word {
+            lexer.push_first_word();
+            self.has_first_word_or_third_word = true;
+        }
+        match self.parse_simple_command(lexer, settings)? {
+            Some((command, pos)) => { 
+                match lexer.next_token(settings)? {
+                    (Token::EOF, pos2) => {
+                        if !self.here_docs.is_empty() {
+                            return Err(ParserError::Syntax(lexer.path().clone(), pos2, String::from("unexpected token"), false))
+                        }
+                    },
+                    (_, pos2) => return Err(ParserError::Syntax(lexer.path().clone(), pos2, String::from("unexpected token"), false)),
+                }
+                if self.has_first_word_or_third_word {
+                    lexer.pop_state();
+                    self.has_first_word_or_third_word = false;
+                }
+                let alias_command = AliasCommand {
+                    path: lexer.path(),
+                    pos,
+                    simple_command: command,
+                };
+                Ok(alias_command)
+            },
+            None => {
+                let (_, pos) = lexer.next_token(settings)?;
+                Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false))
+            },
         }
     }
 
