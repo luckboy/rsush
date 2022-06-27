@@ -28,6 +28,7 @@ pub struct Environment
     unexported_vars: HashMap<String, String>,
     builtin_funs: HashMap<String, BuiltinFunction>,
     funs: HashMap<String, Rc<FunctionBody>>,
+    aliases: HashMap<String, String>,
 }
 
 impl Environment
@@ -38,6 +39,7 @@ impl Environment
             unexported_vars: HashMap::new(),
             builtin_funs: HashMap::new(),
             funs: HashMap::new(),
+            aliases: HashMap::new(),
         }
     }
 
@@ -101,4 +103,13 @@ impl Environment
 
     pub fn unset_fun(&mut self, name: &str)
     { self.funs.remove(&String::from(name)); }
+
+    pub fn alias(&self, name: &str) -> Option<String>
+    { self.aliases.get(&String::from(name)).map(|v| v.clone()) }
+
+    pub fn set_alias(&mut self, name: &str, value: &str)
+    { self.aliases.insert(String::from(name), String::from(value)); }
+
+    pub fn unset_alias(&mut self, name: &str)
+    { self.aliases.remove(&String::from(name)); }
 }
