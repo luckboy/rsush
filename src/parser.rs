@@ -98,8 +98,8 @@ pub struct CasePair
 #[derive(Clone)]
 pub struct ElifPair
 {
-    cond_commands: Vec<Rc<LogicalCommand>>,
-    commands: Vec<Rc<LogicalCommand>>,
+    pub cond_commands: Vec<Rc<LogicalCommand>>,
+    pub commands: Vec<Rc<LogicalCommand>>,
 }
 
 #[derive(Clone)]
@@ -117,10 +117,10 @@ pub enum CompoundCommand
 #[derive(Clone)]
 pub struct FunctionBody
 {
-    path: String,
-    pos: Position,
-    command: CompoundCommand,
-    redirects: Vec<Rc<Redirection>>,
+    pub path: String,
+    pub pos: Position,
+    pub command: CompoundCommand,
+    pub redirects: Vec<Rc<Redirection>>,
 }
 
 #[derive(Clone)]

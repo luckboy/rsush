@@ -60,6 +60,14 @@ impl Pipe
 {
     pub fn new(reading_file: Rc<RefCell<File>>, writing_file: Rc<RefCell<File>>) -> Pipe
     { Pipe { reading_file, writing_file, } }
+    
+    pub fn from_pipe_fds(pipe_fds: &PipeFds) -> Pipe
+    {
+        Pipe {
+            reading_file: Rc::new(RefCell::new(unsafe { File::from_raw_fd(pipe_fds.reading_fd) })),
+            writing_file: Rc::new(RefCell::new(unsafe { File::from_raw_fd(pipe_fds.writing_fd) })),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -288,6 +296,19 @@ impl Executor
         res
     }
     
+    pub fn interpret_or<T, F>(&mut self, is_interp: bool, f: F) -> T
+        where F: FnOnce(&mut Self) -> T
+    {
+        if is_interp {
+            self.push_state(State::InInterpreter);
+        }
+        let res = f(self);
+        if is_interp {
+            self.pop_state();
+        }
+        res
+    }
+    
     pub fn create_process<F>(&mut self, is_in_background: bool, settings: &mut Settings, f: F) -> Result<Option<i32>>
         where F: FnOnce(&mut Self, &mut Settings) -> i32
     {
@@ -478,7 +499,7 @@ impl Executor
                         }
                     },
                     None => {
-                        let pid = self.create_process(false, settings, |exec, settings| {
+                        let pid = self.create_process(false, settings, |exec, _| {
                                 for (name, value) in vars.iter() {
                                     env.unset_unexported_var(name.as_str());
                                     env.set_exported_var(name.as_str(), value.as_str());
