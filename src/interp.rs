@@ -198,7 +198,7 @@ impl Interpreter
                                     Ok(None) => break self.last_status,
                                     Ok(Some(commands)) => {
                                         if settings.verbose_flag {
-                                            eprintln!("{}", lexer.content_for_verbose());
+                                            eprint!("{}", lexer.content_for_verbose());
                                         }
                                         self.interpret_logical_commands(exec, &commands, env, settings);
                                     },
