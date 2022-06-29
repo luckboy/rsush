@@ -278,24 +278,24 @@ impl Interpreter
         }
     }
 
-    fn performe_var_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
+    fn perform_var_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
         None
     }
 
-    fn performe_pattern_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
+    fn perform_pattern_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
         None
     }
 
-    fn performe_word_expansion(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<Vec<String>>
+    fn perform_word_expansion(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<Vec<String>>
     {
         None
     }
         
-    fn performe_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
+    fn perform_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
-       match self.performe_word_expansion(exec, word, env, settings) {
+       match self.perform_word_expansion(exec, word, env, settings) {
            Some(ss) => {
                let mut s = String::new();
                let mut is_first = true;
@@ -310,14 +310,14 @@ impl Interpreter
        }
     }
 
-    fn performe_word_expansions(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<Vec<String>>
+    fn perform_word_expansions(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<Vec<String>>
     {
         None
     }
     
-    fn performe_word_expansions_as_string(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<String>
+    fn perform_word_expansions_as_string(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
-       match self.performe_word_expansions(exec, words, env, settings) {
+       match self.perform_word_expansions(exec, words, env, settings) {
            Some(ss) => {
                let mut s = String::new();
                let mut is_first = true;
@@ -332,7 +332,7 @@ impl Interpreter
        }
     }
 
-    fn performe_here_doc_expansion(&mut self, exec: &mut Executor, here_doc: &HereDocument, env: &mut Environment, settings: &mut Settings) -> Option<String>
+    fn perform_here_doc_expansion(&mut self, exec: &mut Executor, here_doc: &HereDocument, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
         None
     }
@@ -345,7 +345,7 @@ impl Interpreter
         for redirect in redirects.iter() {
             match &(**redirect) {
                 Redirection::Input(_, _, n, word) => {
-                    match self.performe_word_expansion_as_string(exec, &(*word), env, settings) {
+                    match self.perform_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(path) => interp_redirects.push(InterpreterRedirection::Input(n.unwrap_or(0), path)),
                         None => {
                             is_success = false;
@@ -354,7 +354,7 @@ impl Interpreter
                     }
                 },
                 Redirection::Output(_, _, n, word, is_bar) => {
-                    match self.performe_word_expansion_as_string(exec, &(*word), env, settings) {
+                    match self.perform_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(path) => interp_redirects.push(InterpreterRedirection::Output(n.unwrap_or(1), path, *is_bar)),
                         None => {
                             is_success = false;
@@ -363,7 +363,7 @@ impl Interpreter
                     }
                 },
                 Redirection::InputAndOutput(_, _, n, word) => {
-                    match self.performe_word_expansion_as_string(exec, &(*word), env, settings) {
+                    match self.perform_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(path) => interp_redirects.push(InterpreterRedirection::InputAndOutput(n.unwrap_or(0), path)),
                         None => {
                             is_success = false;
@@ -372,7 +372,7 @@ impl Interpreter
                     }
                 },
                 Redirection::Appending(_, _, n, word) => {
-                    match self.performe_word_expansion_as_string(exec, &(*word), env, settings) {
+                    match self.perform_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(path) => interp_redirects.push(InterpreterRedirection::Appending(n.unwrap_or(1), path)),
                         None => {
                             is_success = false;
@@ -381,7 +381,7 @@ impl Interpreter
                     }
                 },
                 Redirection::InputDuplicating(_, _, n, word) => {
-                    match self.performe_word_expansion_as_string(exec, &(*word), env, settings) {
+                    match self.perform_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(fd_s) => {
                             if is_io_number_str(fd_s.as_str()) {
                                 match fd_s.parse::<i32>() {
@@ -402,7 +402,7 @@ impl Interpreter
                     }
                 },
                 Redirection::OutputDuplicating(_, _, n, word) => {
-                    match self.performe_word_expansion_as_string(exec, &(*word), env, settings) {
+                    match self.perform_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(fd_s) => {
                             if is_io_number_str(fd_s.as_str()) {
                                 match fd_s.parse::<i32>() {
@@ -423,7 +423,7 @@ impl Interpreter
                     }
                 },
                 Redirection::HereDocument(_, _, n, here_doc) => {
-                    match self.performe_here_doc_expansion(exec, &here_doc.borrow(), env, settings) {
+                    match self.perform_here_doc_expansion(exec, &here_doc.borrow(), env, settings) {
                         Some(s) => interp_redirects.push(InterpreterRedirection::HereDocument(n.unwrap_or(1), s)),
                         None => {
                             is_success = false;
@@ -640,7 +640,7 @@ impl Interpreter
                                     pos: Position { line: word.pos.line, column: word.pos.column + name.len() as u64, }, 
                                     word_elems,
                                 };
-                                match self.performe_var_word_expansion_as_string(exec, &new_word, env, settings) {
+                                match self.perform_var_word_expansion_as_string(exec, &new_word, env, settings) {
                                     Some(value) => vars.push((String::from(name), value)),
                                     None => break None,
                                 }
@@ -665,7 +665,7 @@ impl Interpreter
         let mut word_iter = command.words.iter();
         let status = match self.add_vars(exec, &mut word_iter, &mut vars, env, settings) {
             Some(Some(prog_word)) => {
-                match self.performe_word_expansion(exec, &(*prog_word), env, settings) {
+                match self.perform_word_expansion(exec, &(*prog_word), env, settings) {
                     Some(mut args) => {
                         let mut redirects: Vec<Rc<Redirection>> = Vec::new();
                         let mut is_success = true;
@@ -673,7 +673,7 @@ impl Interpreter
                             loop {
                                 match word_iter.next() {
                                     Some(prog_word) => {
-                                        match self.performe_word_expansion(exec, &(*prog_word), env, settings) {
+                                        match self.perform_word_expansion(exec, &(*prog_word), env, settings) {
                                             Some(args2) => {
                                                 args.extend(args2);
                                                 if !args.is_empty() { break; }
@@ -701,13 +701,13 @@ impl Interpreter
                                                     match self.add_vars(exec, &mut alias_word_iter, &mut vars, env, settings) {
                                                         Some(Some(alias_prog_word)) => {
                                                             let mut alias_args: Vec<String> = Vec::new();
-                                                            match self.performe_word_expansion(exec, &(*alias_prog_word), env, settings) {
+                                                            match self.perform_word_expansion(exec, &(*alias_prog_word), env, settings) {
                                                                 Some(alias_args2) => alias_args.extend(alias_args2),
                                                                 None => is_success = false,
                                                             }
                                                             if is_success {
                                                                 let tmp_alias_words: Vec<Rc<Word>> = alias_word_iter.map(|we| we.clone()).collect();
-                                                                match self.performe_word_expansions(exec, tmp_alias_words.as_slice(), env, settings) {
+                                                                match self.perform_word_expansions(exec, tmp_alias_words.as_slice(), env, settings) {
                                                                     Some(alias_args2) => alias_args.extend(alias_args2),
                                                                     None => is_success = false,
                                                                 }
@@ -738,7 +738,7 @@ impl Interpreter
                         }
                         if is_success {
                             let tmp_words: Vec<Rc<Word>> = word_iter.map(|we| we.clone()).collect();
-                            match self.performe_word_expansions(exec, tmp_words.as_slice(), env, settings) {
+                            match self.perform_word_expansions(exec, tmp_words.as_slice(), env, settings) {
                                 Some(args2) => args.extend(args2),
                                 None => is_success = false,
                             }
@@ -812,9 +812,9 @@ impl Interpreter
                                 if settings.noexec_flag {
                                     return interp.last_status;
                                 }
-                                match interp.performe_word_expansion_as_string(exec, &(*name_word), env, settings) {
+                                match interp.perform_word_expansion_as_string(exec, &(*name_word), env, settings) {
                                     Some(name) => {
-                                        match interp.performe_word_expansions(exec, words.as_slice(), env, settings) {
+                                        match interp.perform_word_expansions(exec, words.as_slice(), env, settings) {
                                             Some(elems) => {
                                                 interp.current_loop_count += 1;
                                                 for elem in elems {
@@ -843,13 +843,13 @@ impl Interpreter
                                 if settings.noexec_flag {
                                     return interp.last_status;
                                 }
-                                match interp.performe_word_expansion_as_string(exec, &(*name_word), env, settings) {
+                                match interp.perform_word_expansion_as_string(exec, &(*name_word), env, settings) {
                                     Some(value) => {
                                         let mut is_success = true;
                                         for pair in pairs.iter() {
                                             let mut is_matched = true;
                                             for word_pattern in &pair.pattern_words {
-                                                match interp.performe_word_expansion_as_string(exec, &(*name_word), env, settings) {
+                                                match interp.perform_word_expansion_as_string(exec, &(*name_word), env, settings) {
                                                     Some(pattern) => {
                                                         is_matched = fnmatch(&pattern, &value, 0);
                                                         if is_matched { break; }
