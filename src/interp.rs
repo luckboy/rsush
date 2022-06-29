@@ -380,18 +380,18 @@ impl Interpreter
                         },
                     }
                 },
-                Redirection::InputDuplicating(_, _, n, word) => {
+                Redirection::InputDuplicating(path, pos, n, word) => {
                     match self.perform_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(fd_s) => {
                             if is_io_number_str(fd_s.as_str()) {
                                 match fd_s.parse::<i32>() {
                                     Ok(fd) => interp_redirects.push(InterpreterRedirection::Duplicating(n.unwrap_or(0), fd)),
                                     Err(err) => {
-                                        eprintln!("Too large I/O number");
+                                        eprintln!("{}: {}: too large I/O number", path, pos);
                                     },
                                 }
                             } else {
-                                eprintln!("Invalid I/O number");
+                                eprintln!("{}: {}: invalid I/O number", path, pos);
                                 is_success = false;
                             }
                         },
@@ -401,18 +401,18 @@ impl Interpreter
                         },
                     }
                 },
-                Redirection::OutputDuplicating(_, _, n, word) => {
+                Redirection::OutputDuplicating(path, pos, n, word) => {
                     match self.perform_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(fd_s) => {
                             if is_io_number_str(fd_s.as_str()) {
                                 match fd_s.parse::<i32>() {
                                     Ok(fd) => interp_redirects.push(InterpreterRedirection::Duplicating(n.unwrap_or(1), fd)),
                                     Err(_) => {
-                                        eprintln!("Too large I/O number");
+                                        eprintln!("{}: {}: too large I/O number", path, pos);
                                     },
                                 }
                             } else {
-                                eprintln!("Invalid I/O number");
+                                eprintln!("{}: {}: invalid I/O number", path, pos);
                                 is_success = false;
                             }
                         },
