@@ -694,7 +694,7 @@ impl Interpreter
                                             parser.set_error_cont(false);
                                             match parser.parse_alias_command(&mut lexer, settings) {
                                                 Ok(alias_command) => {
-                                                    let mut alias_word_iter = alias_command.simple_command.words.iter();
+                                                    let mut alias_word_iter = alias_command.command.words.iter();
                                                     match self.add_vars(exec, &mut alias_word_iter, &mut vars, env, settings) {
                                                         Some(Some(alias_prog_word)) => {
                                                             let mut alias_args: Vec<String> = Vec::new();
@@ -713,7 +713,7 @@ impl Interpreter
                                                                 let tmp_args = args.clone();
                                                                 args = alias_args;
                                                                 args.extend_from_slice(&tmp_args[1..]);
-                                                                redirects.extend(alias_command.simple_command.redirects);
+                                                                redirects.extend(alias_command.command.redirects);
                                                             }
                                                         },
                                                         Some(None) => {

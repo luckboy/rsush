@@ -8067,38 +8067,38 @@ fn test_parser_parse_alias_command_parses_command()
             assert_eq!(String::from("test.sh"), alias_command.path);
             assert_eq!(1, alias_command.pos.line);
             assert_eq!(1, alias_command.pos.column);
-            assert_eq!(3, alias_command.simple_command.words.len());
-            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[0].path);
-            assert_eq!(1, alias_command.simple_command.words[0].pos.line);
-            assert_eq!(1, alias_command.simple_command.words[0].pos.column);
-            assert_eq!(1, alias_command.simple_command.words[0].word_elems.len());
-            match &alias_command.simple_command.words[0].word_elems[0] {
+            assert_eq!(3, alias_command.command.words.len());
+            assert_eq!(String::from("test.sh"), alias_command.command.words[0].path);
+            assert_eq!(1, alias_command.command.words[0].pos.line);
+            assert_eq!(1, alias_command.command.words[0].pos.column);
+            assert_eq!(1, alias_command.command.words[0].word_elems.len());
+            match &alias_command.command.words[0].word_elems[0] {
                 WordElement::Simple(SimpleWordElement::String(s)) => {
                     assert_eq!(&String::from("echo"), s);
                 },
                 _ => assert!(false),
             }
-            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[1].path);
-            assert_eq!(1, alias_command.simple_command.words[1].pos.line);
-            assert_eq!(6, alias_command.simple_command.words[1].pos.column);
-            assert_eq!(1, alias_command.simple_command.words[1].word_elems.len());
-            match &alias_command.simple_command.words[1].word_elems[0] {
+            assert_eq!(String::from("test.sh"), alias_command.command.words[1].path);
+            assert_eq!(1, alias_command.command.words[1].pos.line);
+            assert_eq!(6, alias_command.command.words[1].pos.column);
+            assert_eq!(1, alias_command.command.words[1].word_elems.len());
+            match &alias_command.command.words[1].word_elems[0] {
                 WordElement::Simple(SimpleWordElement::String(s)) => {
                     assert_eq!(&String::from("abc"), s);
                 },
                 _ => assert!(false),
             }
-            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[2].path);
-            assert_eq!(1, alias_command.simple_command.words[2].pos.line);
-            assert_eq!(10, alias_command.simple_command.words[2].pos.column);
-            assert_eq!(1, alias_command.simple_command.words[2].word_elems.len());
-            match &alias_command.simple_command.words[2].word_elems[0] {
+            assert_eq!(String::from("test.sh"), alias_command.command.words[2].path);
+            assert_eq!(1, alias_command.command.words[2].pos.line);
+            assert_eq!(10, alias_command.command.words[2].pos.column);
+            assert_eq!(1, alias_command.command.words[2].word_elems.len());
+            match &alias_command.command.words[2].word_elems[0] {
                 WordElement::Simple(SimpleWordElement::String(s)) => {
                     assert_eq!(&String::from("def"), s);
                 },
                 _ => assert!(false),
             }
-            assert_eq!(true, alias_command.simple_command.redirects.is_empty());
+            assert_eq!(true, alias_command.command.redirects.is_empty());
         },
         _ => assert!(false),
     }
@@ -8119,29 +8119,29 @@ fn test_parser_parse_alias_command_parses_command_with_redictions()
             assert_eq!(String::from("test.sh"), alias_command.path);
             assert_eq!(1, alias_command.pos.line);
             assert_eq!(1, alias_command.pos.column);
-            assert_eq!(2, alias_command.simple_command.words.len());
-            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[0].path);
-            assert_eq!(1, alias_command.simple_command.words[0].pos.line);
-            assert_eq!(1, alias_command.simple_command.words[0].pos.column);
-            assert_eq!(1, alias_command.simple_command.words[0].word_elems.len());
-            match &alias_command.simple_command.words[0].word_elems[0] {
+            assert_eq!(2, alias_command.command.words.len());
+            assert_eq!(String::from("test.sh"), alias_command.command.words[0].path);
+            assert_eq!(1, alias_command.command.words[0].pos.line);
+            assert_eq!(1, alias_command.command.words[0].pos.column);
+            assert_eq!(1, alias_command.command.words[0].word_elems.len());
+            match &alias_command.command.words[0].word_elems[0] {
                 WordElement::Simple(SimpleWordElement::String(s)) => {
                     assert_eq!(&String::from("echo"), s);
                 },
                 _ => assert!(false),
             }
-            assert_eq!(String::from("test.sh"), alias_command.simple_command.words[1].path);
-            assert_eq!(1, alias_command.simple_command.words[1].pos.line);
-            assert_eq!(6, alias_command.simple_command.words[1].pos.column);
-            assert_eq!(1, alias_command.simple_command.words[1].word_elems.len());
-            match &alias_command.simple_command.words[1].word_elems[0] {
+            assert_eq!(String::from("test.sh"), alias_command.command.words[1].path);
+            assert_eq!(1, alias_command.command.words[1].pos.line);
+            assert_eq!(6, alias_command.command.words[1].pos.column);
+            assert_eq!(1, alias_command.command.words[1].word_elems.len());
+            match &alias_command.command.words[1].word_elems[0] {
                 WordElement::Simple(SimpleWordElement::String(s)) => {
                     assert_eq!(&String::from("abc"), s);
                 },
                 _ => assert!(false),
             }
-            assert_eq!(2, alias_command.simple_command.redirects.len());
-            match &(*alias_command.simple_command.redirects[0]) {
+            assert_eq!(2, alias_command.command.redirects.len());
+            match &(*alias_command.command.redirects[0]) {
                 Redirection::Output(path, pos, None, word, is_bar) => {
                     assert_eq!(&String::from("test.sh"), path);
                     assert_eq!(1, pos.line);
@@ -8160,7 +8160,7 @@ fn test_parser_parse_alias_command_parses_command_with_redictions()
                 },
                 _ => assert!(false),
             }
-            match &(*alias_command.simple_command.redirects[1]) {
+            match &(*alias_command.command.redirects[1]) {
                 Redirection::Appending(path, pos, Some(n), word) => {
                     assert_eq!(&String::from("test.sh"), path);
                     assert_eq!(1, pos.line);

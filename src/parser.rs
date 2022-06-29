@@ -190,7 +190,7 @@ pub struct AliasCommand
 {
     pub path: String,
     pub pos: Position,
-    pub simple_command: SimpleCommand,
+    pub command: SimpleCommand,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -1299,7 +1299,7 @@ impl Parser
                 let alias_command = AliasCommand {
                     path: lexer.path(),
                     pos,
-                    simple_command: command,
+                    command,
                 };
                 Ok(alias_command)
             },
