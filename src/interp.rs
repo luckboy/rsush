@@ -19,7 +19,6 @@ use std::collections::HashMap;
 use std::cell::*;
 use std::io::*;
 use std::fs::*;
-use std::path::*;
 use std::rc::*;
 use std::slice;
 use libc;
@@ -1067,10 +1066,10 @@ impl Interpreter
     
     fn interpret_logical_command(&mut self, exec: &mut Executor, command: &LogicalCommand, env: &mut Environment, settings: &mut Settings) -> i32
     {
+        if settings.noexec_flag {
+            return self.last_status;
+        }
         let mut f = |exec: &mut Executor, settings: &mut Settings| -> i32 {
-            if settings.noexec_flag {
-                return self.last_status;
-            }
             if command.pairs.is_empty() {
                 if settings.noexec_flag { return self.last_status; }
                 self.interpret_pipe_command(exec, &(*command.first_command), env, settings)
