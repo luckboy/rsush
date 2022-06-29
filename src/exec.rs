@@ -64,8 +64,8 @@ impl Pipe
     pub unsafe fn from_pipe_fds(pipe_fds: &PipeFds) -> Pipe
     {
         Pipe {
-            reading_file: Rc::new(RefCell::new(unsafe { File::from_raw_fd(pipe_fds.reading_fd) })),
-            writing_file: Rc::new(RefCell::new(unsafe { File::from_raw_fd(pipe_fds.writing_fd) })),
+            reading_file: Rc::new(RefCell::new(File::from_raw_fd(pipe_fds.reading_fd))),
+            writing_file: Rc::new(RefCell::new(File::from_raw_fd(pipe_fds.writing_fd))),
         }
     }
 }
