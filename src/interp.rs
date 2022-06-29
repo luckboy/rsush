@@ -629,19 +629,23 @@ impl Interpreter
                     };
                     match first_s.map(|s| s.split_once('=')).flatten() {
                         Some((name, value_part)) => {
-                            let mut word_elems: Vec<WordElement> = Vec::new();
-                            if !value_part.is_empty() {
-                                word_elems.push(WordElement::Simple(SimpleWordElement::String(String::from(value_part))));
-                            }
-                            word_elems.extend_from_slice(&word.word_elems[1..]);
-                            let new_word = Word {
-                                path: word.path.clone(),
-                                pos: Position { line: word.pos.line, column: word.pos.column + name.len() as u64, }, 
-                                word_elems,
-                            };
-                            match self.performe_var_word_expansion_as_string(exec, &new_word, env, settings) {
-                                Some(value) => vars.push((String::from(name), value)),
-                                None => break None,
+                            if is_name_str(name) {
+                                let mut word_elems: Vec<WordElement> = Vec::new();
+                                if !value_part.is_empty() {
+                                    word_elems.push(WordElement::Simple(SimpleWordElement::String(String::from(value_part))));
+                                }
+                                word_elems.extend_from_slice(&word.word_elems[1..]);
+                                let new_word = Word {
+                                    path: word.path.clone(),
+                                    pos: Position { line: word.pos.line, column: word.pos.column + name.len() as u64, }, 
+                                    word_elems,
+                                };
+                                match self.performe_var_word_expansion_as_string(exec, &new_word, env, settings) {
+                                    Some(value) => vars.push((String::from(name), value)),
+                                    None => break None,
+                                }
+                            } else {
+                                break Some(Some((*word).clone()));
                             }
                         },
                         None => break Some(Some((*word).clone())),
