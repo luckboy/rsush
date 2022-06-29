@@ -67,6 +67,7 @@ impl Environment
     pub fn set_var(&mut self, name: &str, value: &str, settings: &Settings)
     {
         if settings.allexport_flag {
+            self.unset_unexported_var(name);
             self.set_exported_var(name, value);
         } else {
             if self.unexported_vars.contains_key(&String::from(name)) {
