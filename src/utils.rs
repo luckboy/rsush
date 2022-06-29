@@ -64,7 +64,7 @@ pub fn is_number_str(s: &str) -> bool
     } else if t.starts_with('0') {
         t[1..].chars().all(|c| c >= '0' && c <= '7')
     } else {
-        t.chars().all(|c| c >= '0' && c <= '9')
+        !t.is_empty() && t.chars().all(|c| c >= '0' && c <= '9')
     }
 }
 
@@ -91,7 +91,7 @@ pub fn str_to_number(s: &str) -> result::Result<i64, ParseIntError>
 }
 
 pub fn is_io_number_str(s: &str) -> bool
-{ s.chars().all(|c| c >= '0' && c <= '9') }
+{ !s.is_empty() && s.chars().all(|c| c >= '0' && c <= '9') }
 
 pub fn fork() -> Result<Option<i32>>
 {
