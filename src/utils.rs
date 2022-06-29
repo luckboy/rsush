@@ -18,10 +18,12 @@
 use std::ffi::*;
 use std::io::*;
 use std::mem::MaybeUninit;
-use std::path::*;
-use std::ptr::null_mut;
+use std::num::ParseIntError;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::ffi::OsStringExt;
+use std::path::*;
+use std::ptr::null_mut;
+use std::result;
 use std::slice::*;
 use fnmatch_sys;
 use libc;
@@ -39,6 +41,59 @@ pub enum GlobResult
     Aborted,
     NoMatch,
     NoSpace,
+}
+
+pub fn is_name_str(s: &str) -> bool
+{
+    let mut char_iter = s.chars();
+    match char_iter.next() {
+        Some(c) if c.is_alphabetic() || c == '_' => char_iter.all(|c| c.is_alphanumeric() || c == '_'),
+        _ => false,
+    }
+}
+
+pub fn is_number_str(s: &str) -> bool
+{
+    let t = if s.starts_with('+') || s.starts_with('-') {
+        &s[1..]
+    } else {
+        s
+    };
+    if t.starts_with("0X") || t.starts_with("0x") {
+        t[2..].chars().all(|c| (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' || c <= 'f'))
+    } else if t.starts_with('0') {
+        t[1..].chars().all(|c| c >= '0' && c <= '7')
+    } else {
+        t.chars().all(|c| c >= '0' && c <= '9')
+    }
+}
+
+pub fn str_to_number(s: &str) -> result::Result<i64, ParseIntError>
+{
+    let (sign_c, t) = if s.starts_with('+') || s.starts_with('-') {
+        (s.chars().next(), &s[1..])
+    } else {
+        (None, s)
+    };
+    if t.starts_with("0X") || t.starts_with("0x") {
+        let mut new_s = String::new();
+        match sign_c {
+            Some(sign_c) => new_s.push(sign_c),
+            None         => (),
+        }
+        new_s.push_str(&t[2..]);
+        i64::from_str_radix(new_s.as_str(), 16) 
+    } else if t.starts_with('0') {
+        let mut new_s = String::new();
+        match sign_c {
+            Some(sign_c) => new_s.push(sign_c),
+            None         => (),
+        }
+        new_s.push_str(&t[1..]);
+        i64::from_str_radix(new_s.as_str(), 8)
+    } else {
+        s.parse::<i64>()
+    }
 }
 
 pub fn is_io_number_str(s: &str) -> bool
