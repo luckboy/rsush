@@ -557,12 +557,12 @@ impl Interpreter
                     let mut pid: Option<i32> = None;
                     if is_success {
                         let res = exec.create_process(false, settings, |exec, settings| {
-                                let mut j = 0;
+                                let mut l = 0;
                                 for interp_redirect in &interp_redirects {
                                     match interp_redirect {
                                         InterpreterRedirection::HereDocument(vfd, _) => {
-                                            exec.push_file(*vfd, exec.pipes()[j].reading_file.clone());
-                                            j += 1;
+                                            exec.push_file(*vfd, exec.pipes()[l].reading_file.clone());
+                                            l += 1;
                                         },
                                         _ => (),
                                     }
@@ -572,7 +572,7 @@ impl Interpreter
                                 for interp_redirect in &interp_redirects {
                                     match interp_redirect {
                                         InterpreterRedirection::HereDocument(vfd, _) => {
-                                            j -= 1;
+                                            l -= 1;
                                             exec.pop_file(*vfd);
                                         },
                                         _ => (),
