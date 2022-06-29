@@ -43,7 +43,7 @@ enum Value
 enum ReturnState
 {
     None,
-    Break,
+    Break(usize),
     Return,
     Exit,
 }
@@ -121,11 +121,29 @@ impl Interpreter
     pub fn last_status(&self) -> i32
     { self.last_status }
 
-    pub fn has_return(&self) -> bool
-    { self.return_state == ReturnState::Return }    
+    pub fn has_break(&self) -> bool
+    { 
+        match self.return_state {
+            ReturnState::Break(_) => true,
+            _ => false,
+        }
+    }
+    
+    pub fn has_break_or_return(&self) -> bool
+    { 
+        match self.return_state {
+            ReturnState::Break(_) | ReturnState::Return => true,
+            _ => false,
+        }
+    }
     
     pub fn has_break_or_return_or_exit(&self) -> bool
-    { self.return_state == ReturnState::Break || self.return_state == ReturnState::Return || self.return_state == ReturnState::Exit }
+    { 
+        match self.return_state {
+            ReturnState::Break(_) | ReturnState::Return | ReturnState::Exit => true,
+            _ => false,
+        }
+    }
     
     pub fn exit(&mut self, status: i32) -> i32
     {
@@ -139,15 +157,23 @@ impl Interpreter
         status
     }
     
-    pub fn brk(&mut self) -> i32
+    pub fn brk(&mut self, n: usize) -> i32
     {
-        self.return_state = ReturnState::Break;
+        self.return_state = ReturnState::Break(n);
         0
     }
     
     pub fn clear_return_state(&mut self)
     { self.return_state = ReturnState::None; }
 
+    pub fn clear_return_state_for_break(&mut self)
+    {
+        match self.return_state {
+            ReturnState::Break(n) if n > 1 => self.return_state = ReturnState::Break(n - 1),
+            _ => self.return_state = ReturnState::None,
+        }
+    }
+    
     pub fn is_in_loop(&self) -> bool
     { self.current_loop_count > 0 }
     
@@ -497,6 +523,7 @@ impl Interpreter
         } else {
             status = exec.interpret(|exec| {
                     let mut j = 0;
+                    let mut k = 0;
                     let mut pids: Vec<Option<i32>> = Vec::new(); 
                     for interp_redirect in &interp_redirects {
                         match interp_redirect {
@@ -518,12 +545,14 @@ impl Interpreter
                                     Err(err) => {
                                         eprintln!("{}", err);
                                         is_success = false;
+                                        break
                                     },
                                 }
                                 j += 1;
                             },
                             _ => (),
                         }
+                        k += 1;
                     }
                     let mut pid: Option<i32> = None;
                     if is_success {
@@ -561,7 +590,7 @@ impl Interpreter
                     }
                     exec.clear_pipes();
                     interp_redirects.reverse();
-                    for interp_redirect in &interp_redirects {
+                    for interp_redirect in &interp_redirects[(interp_redirects.len() - k)..] {
                         match interp_redirect {
                             InterpreterRedirection::HereDocument(_, _) => {
                                 j -= 1;
@@ -577,7 +606,7 @@ impl Interpreter
                     }
             });
         }
-        for interp_redirect in &interp_redirects[0..i] {
+        for interp_redirect in &interp_redirects[(interp_redirects.len() - i)..] {
             match interp_redirect {
                 InterpreterRedirection::Input(vfd, _) => exec.pop_file(*vfd),
                 InterpreterRedirection::Output(vfd, _, _) => exec.pop_file(*vfd),
@@ -626,6 +655,9 @@ impl Interpreter
 
     fn interpret_simple_command(&mut self, exec: &mut Executor, command: &SimpleCommand, env: &mut Environment, settings: &mut Settings) -> i32
     {
+        if settings.noexec_flag {
+            return self.last_status;
+        }
         let mut vars: Vec<(String, String)> = Vec::new();
         let mut word_iter = command.words.iter();
         let status = match self.add_vars(exec, &mut word_iter, &mut vars, env, settings) {
@@ -752,6 +784,9 @@ impl Interpreter
                         })
                     },
                     CompoundCommand::Subshell(commands) => {
+                        if settings.noexec_flag {
+                            return interp.last_status;
+                        }
                         let res = exec.create_process(false, settings, |exec, settings| {
                                 exec.interpret_or(commands.len() > 1, |exec| {
                                         interp.interpret_logical_commands(exec, commands.as_slice(), env, settings)
@@ -771,6 +806,9 @@ impl Interpreter
                     },
                     CompoundCommand::For(name_word, words, commands) => {
                         exec.interpret(|exec| {
+                                if settings.noexec_flag {
+                                    return interp.last_status;
+                                }
                                 match interp.performe_word_expansion_as_string(exec, &(*name_word), env, settings) {
                                     Some(name) => {
                                         match interp.performe_word_expansions(exec, words.as_slice(), env, settings) {
@@ -778,12 +816,16 @@ impl Interpreter
                                                 interp.current_loop_count += 1;
                                                 for elem in elems {
                                                     env.set_var(name.as_str(), elem.as_str(), settings);
+                                                    if settings.noexec_flag { break; }
                                                     interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
                                                     if interp.has_break_or_return_or_exit() {
                                                         break;
                                                     }
                                                 }
                                                 interp.current_loop_count -= 1;
+                                                if interp.has_break() {
+                                                    interp.clear_return_state_for_break();
+                                                }
                                                 interp.last_status
                                             },
                                             None => 1,
@@ -795,6 +837,9 @@ impl Interpreter
                     },
                     CompoundCommand::Case(name_word, pairs) => {
                         exec.interpret(|exec| {
+                                if settings.noexec_flag {
+                                    return interp.last_status;
+                                }
                                 match interp.performe_word_expansion_as_string(exec, &(*name_word), env, settings) {
                                     Some(value) => {
                                         let mut is_success = true;
@@ -830,6 +875,9 @@ impl Interpreter
                     },
                     CompoundCommand::If(cond_commands, commands, pairs, else_commands) => {
                         exec.interpret(|exec| {
+                                if settings.noexec_flag {
+                                    return interp.last_status;
+                                }
                                 interp.non_simple_comamnd_count += 1;
                                 let cond_status = interp.interpret_logical_commands(exec, cond_commands.as_slice(), env, settings);
                                 interp.non_simple_comamnd_count -= 1;
@@ -839,6 +887,9 @@ impl Interpreter
                                     let mut elif_cond = false;
                                     let mut status = interp.last_status;
                                     for pair in pairs {
+                                        if settings.noexec_flag {
+                                            return interp.last_status;
+                                        }
                                         interp.non_simple_comamnd_count += 1;
                                         let cond_status2 = interp.interpret_logical_commands(exec, pair.cond_commands.as_slice(), env, settings);
                                         interp.non_simple_comamnd_count -= 1;
@@ -863,10 +914,12 @@ impl Interpreter
                         exec.interpret(|exec| {
                                 interp.current_loop_count += 1;
                                 loop {
+                                    if settings.noexec_flag { break; }
                                     interp.non_simple_comamnd_count += 1;
                                     let cond_status = interp.interpret_logical_commands(exec, cond_commands.as_slice(), env, settings);
                                     interp.non_simple_comamnd_count -= 1;
                                     if cond_status == 0 {
+                                        if settings.noexec_flag { break; }
                                         interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
                                         if interp.has_break_or_return_or_exit() {
                                             break;
@@ -876,6 +929,9 @@ impl Interpreter
                                     }
                                 }
                                 interp.current_loop_count -= 1;
+                                if interp.has_break() {
+                                    interp.clear_return_state_for_break();
+                                }
                                 interp.last_status
                         })
                     },
@@ -896,6 +952,9 @@ impl Interpreter
                                     }
                                 }
                                 interp.current_loop_count -= 1;
+                                if interp.has_break() {
+                                    interp.clear_return_state_for_break();
+                                }
                                 interp.last_status
                         })
                     },
@@ -920,6 +979,9 @@ impl Interpreter
     fn interpret_pipe_command(&mut self, exec: &mut Executor, command: &PipeCommand, env: &mut Environment, settings: &mut Settings) -> i32
     {
         let mut status = self.last_status;
+        if settings.noexec_flag {
+            return status;
+        }
         if command.commands.len() <= 1 {
             if command.is_negative {
                 self.non_simple_comamnd_count += 1;
@@ -945,6 +1007,7 @@ impl Interpreter
                     }
                     if !is_success { return; }
                     exec.set_pipes(pipes);
+                    self.non_simple_comamnd_count += 1;
                     let mut pids: Vec<Option<i32>> = Vec::new();
                     for i in 0..command.commands.len() {
                         let res = exec.create_process(false, settings, |exec, settings| {
@@ -977,6 +1040,7 @@ impl Interpreter
                             },
                         }
                     }
+                    self.non_simple_comamnd_count -= 1;
                     exec.clear_pipes();
                     status = 1;
                     for (i, pid) in pids.iter().enumerate() {
@@ -1004,6 +1068,9 @@ impl Interpreter
     fn interpret_logical_command(&mut self, exec: &mut Executor, command: &LogicalCommand, env: &mut Environment, settings: &mut Settings) -> i32
     {
         let mut f = |exec: &mut Executor, settings: &mut Settings| -> i32 {
+            if settings.noexec_flag {
+                return self.last_status;
+            }
             if command.pairs.is_empty() {
                 if settings.noexec_flag { return self.last_status; }
                 self.interpret_pipe_command(exec, &(*command.first_command), env, settings)
@@ -1070,7 +1137,9 @@ impl Interpreter
         self.push_loop_count(0);
         let status = self.interpret_compound_command(exec, &fun_body.command, fun_body.redirects.as_slice(), env, settings);
         self.pop_loop_count();
-        self.clear_return_state();
+        if self.has_break_or_return() {
+            self.clear_return_state();
+        }
         status
     }
 }
