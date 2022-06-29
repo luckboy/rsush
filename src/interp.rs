@@ -515,95 +515,96 @@ impl Interpreter
             }
             i += 1;
         }
-        if !is_success { return 1; }
-        let status: i32;
-        if pipes.is_empty() {
-            status = f(self, exec, env, settings);
-        } else {
-            status = exec.interpret(|exec| {
-                    let mut j = 0;
-                    let mut k = 0;
-                    let mut pids: Vec<Option<i32>> = Vec::new(); 
-                    for interp_redirect in &interp_redirects {
-                        match interp_redirect {
-                            InterpreterRedirection::HereDocument(_, s) => {
-                                let res = exec.create_process(false, settings, |exec, settings| {
-                                        let file = exec.pipes()[j].writing_file.clone();
-                                        exec.clear_pipes();
-                                        let mut tmp_file = file.borrow_mut();
-                                        match tmp_file.write_all(s.as_bytes()) {
-                                            Ok(()) => 0,
-                                            Err(err) => {
-                                                eprintln!("{}", err);
-                                                1
+        let mut status = 1;
+        if is_success {
+            if pipes.is_empty() {
+                status = f(self, exec, env, settings);
+            } else {
+                status = exec.interpret(|exec| {
+                        let mut j = 0;
+                        let mut k = 0;
+                        let mut pids: Vec<Option<i32>> = Vec::new(); 
+                        for interp_redirect in &interp_redirects {
+                            match interp_redirect {
+                                InterpreterRedirection::HereDocument(_, s) => {
+                                    let res = exec.create_process(false, settings, |exec, settings| {
+                                            let file = exec.pipes()[j].writing_file.clone();
+                                            exec.clear_pipes();
+                                            let mut tmp_file = file.borrow_mut();
+                                            match tmp_file.write_all(s.as_bytes()) {
+                                                Ok(()) => 0,
+                                                Err(err) => {
+                                                    eprintln!("{}", err);
+                                                    1
+                                                },
+                                            }
+                                    });
+                                    match res {
+                                        Ok(pid) => pids.push(pid),
+                                        Err(err) => {
+                                            eprintln!("{}", err);
+                                            is_success = false;
+                                            break
+                                        },
+                                    }
+                                    j += 1;
+                                },
+                                _ => (),
+                            }
+                            k += 1;
+                        }
+                        let mut pid: Option<i32> = None;
+                        if is_success {
+                            let res = exec.create_process(false, settings, |exec, settings| {
+                                    let mut l = 0;
+                                    for interp_redirect in &interp_redirects {
+                                        match interp_redirect {
+                                            InterpreterRedirection::HereDocument(vfd, _) => {
+                                                exec.push_file(*vfd, exec.pipes()[l].reading_file.clone());
+                                                l += 1;
                                             },
+                                            _ => (),
                                         }
-                                });
-                                match res {
-                                    Ok(pid) => pids.push(pid),
-                                    Err(err) => {
-                                        eprintln!("{}", err);
-                                        is_success = false;
-                                        break
-                                    },
-                                }
-                                j += 1;
-                            },
-                            _ => (),
-                        }
-                        k += 1;
-                    }
-                    let mut pid: Option<i32> = None;
-                    if is_success {
-                        let res = exec.create_process(false, settings, |exec, settings| {
-                                let mut l = 0;
-                                for interp_redirect in &interp_redirects {
-                                    match interp_redirect {
-                                        InterpreterRedirection::HereDocument(vfd, _) => {
-                                            exec.push_file(*vfd, exec.pipes()[l].reading_file.clone());
-                                            l += 1;
-                                        },
-                                        _ => (),
                                     }
-                                }
-                                let status = f(self, exec, env, settings);
-                                interp_redirects.reverse();
-                                for interp_redirect in &interp_redirects {
-                                    match interp_redirect {
-                                        InterpreterRedirection::HereDocument(vfd, _) => {
-                                            l -= 1;
-                                            exec.pop_file(*vfd);
-                                        },
-                                        _ => (),
+                                    let status = f(self, exec, env, settings);
+                                    interp_redirects.reverse();
+                                    for interp_redirect in &interp_redirects {
+                                        match interp_redirect {
+                                            InterpreterRedirection::HereDocument(vfd, _) => {
+                                                l -= 1;
+                                                exec.pop_file(*vfd);
+                                            },
+                                            _ => (),
+                                        }
                                     }
-                                }
-                                status
-                        });
-                        match res {
-                            Ok(tmp_pid) => pid = tmp_pid,
-                            Err(err) => {
-                                eprintln!("{}", err);
-                                is_success = false;
-                            },
+                                    status
+                            });
+                            match res {
+                                Ok(tmp_pid) => pid = tmp_pid,
+                                Err(err) => {
+                                    eprintln!("{}", err);
+                                    is_success = false;
+                                },
+                            }
                         }
-                    }
-                    exec.clear_pipes();
-                    interp_redirects.reverse();
-                    for interp_redirect in &interp_redirects[(interp_redirects.len() - k)..] {
-                        match interp_redirect {
-                            InterpreterRedirection::HereDocument(_, _) => {
-                                j -= 1;
-                                self.wait_for_process(exec, pids[j]);
-                            },
-                            _ => (),
+                        exec.clear_pipes();
+                        interp_redirects.reverse();
+                        for interp_redirect in &interp_redirects[(interp_redirects.len() - k)..] {
+                            match interp_redirect {
+                                InterpreterRedirection::HereDocument(_, _) => {
+                                    j -= 1;
+                                    self.wait_for_process(exec, pids[j]);
+                                },
+                                _ => (),
+                            }
                         }
-                    }
-                    if is_success {
-                        self.wait_for_process(exec, pid)
-                    } else {
-                        1
-                    }
-            });
+                        if is_success {
+                            self.wait_for_process(exec, pid)
+                        } else {
+                            1
+                        }
+                });
+            }
         }
         for interp_redirect in &interp_redirects[(interp_redirects.len() - i)..] {
             match interp_redirect {
