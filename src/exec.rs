@@ -61,7 +61,7 @@ impl Pipe
     pub fn new(reading_file: Rc<RefCell<File>>, writing_file: Rc<RefCell<File>>) -> Pipe
     { Pipe { reading_file, writing_file, } }
     
-    pub fn from_pipe_fds(pipe_fds: &PipeFds) -> Pipe
+    pub unsafe fn from_pipe_fds(pipe_fds: &PipeFds) -> Pipe
     {
         Pipe {
             reading_file: Rc::new(RefCell::new(unsafe { File::from_raw_fd(pipe_fds.reading_fd) })),
@@ -433,7 +433,7 @@ impl Executor
                     new_fd += 1;
                 }
                 loop {
-                    match dup2(virtual_file.current_file.borrow().as_raw_fd(), new_fd) {
+                    match unsafe { dup2(virtual_file.current_file.borrow().as_raw_fd(), new_fd) } {
                         Ok(()) => break,
                         Err(err) if err.kind() == ErrorKind::Interrupted => (),
                         Err(err) => return Err(err),
@@ -446,7 +446,7 @@ impl Executor
         for (vfd, virtual_file) in self.virtual_files.iter_mut() {
             if *vfd != virtual_file.current_file.borrow().as_raw_fd() {
                 loop {
-                    match dup2(virtual_file.current_file.borrow().as_raw_fd(), *vfd) {
+                    match unsafe { dup2(virtual_file.current_file.borrow().as_raw_fd(), *vfd) } {
                         Ok(()) => break,
                         Err(err) if err.kind() == ErrorKind::Interrupted => (),
                         Err(err) => return Err(err),
@@ -454,7 +454,7 @@ impl Executor
                 }
                 virtual_file.current_file = Rc::new(RefCell::new(unsafe { File::from_raw_fd(*vfd) }));
                 let flags = fcntl_f_getfd(*vfd)?;
-                fcntl_f_setfd(*vfd, flags & !libc::FD_CLOEXEC)?;
+                unsafe { fcntl_f_setfd(*vfd, flags & !libc::FD_CLOEXEC) }?;
             }
         }
         Ok(())

@@ -134,9 +134,9 @@ pub fn setpgid(pid: i32, pgid: i32) -> Result<()>
     }
 }
 
-pub fn dup2(old_fd: i32, new_fd: i32) -> Result<()>
+pub unsafe fn dup2(old_fd: i32, new_fd: i32) -> Result<()>
 {
-    let res = unsafe { libc::dup2(old_fd, new_fd) };
+    let res = libc::dup2(old_fd, new_fd);
     if res != -1 {
         Ok(())
     } else {
@@ -144,9 +144,9 @@ pub fn dup2(old_fd: i32, new_fd: i32) -> Result<()>
     }
 }
 
-pub fn close(fd: i32) -> Result<()>
+pub unsafe fn close(fd: i32) -> Result<()>
 {
-    let res = unsafe { libc::close(fd) };
+    let res = libc::close(fd);
     if res != -1 {
         Ok(())
     } else {
@@ -164,9 +164,9 @@ pub fn fcntl_f_getfd(fd: i32) -> Result<i32>
     }
 }
 
-pub fn fcntl_f_setfd(fd: i32, flags: i32) -> Result<()>
+pub unsafe fn fcntl_f_setfd(fd: i32, flags: i32) -> Result<()>
 {
-    let res = unsafe { libc::fcntl(fd, libc::F_SETFD, flags) };
+    let res = libc::fcntl(fd, libc::F_SETFD, flags);
     if res != -1 {
         Ok(())
     } else {
@@ -190,36 +190,36 @@ pub fn pipe_with_cloexec() -> Result<PipeFds>
     let pipe_fds = pipe()?;
     match fcntl_f_getfd(pipe_fds.reading_fd) {
         Ok(flags) => {
-            match fcntl_f_setfd(pipe_fds.reading_fd, flags | libc::FD_CLOEXEC) {
+            match unsafe { fcntl_f_setfd(pipe_fds.reading_fd, flags | libc::FD_CLOEXEC) } {
                 Ok(()) => {
                     match fcntl_f_getfd(pipe_fds.writing_fd) {
                         Ok(flags2) => {
-                            match fcntl_f_setfd(pipe_fds.writing_fd, flags2 | libc::FD_CLOEXEC) {
+                            match unsafe { fcntl_f_setfd(pipe_fds.writing_fd, flags2 | libc::FD_CLOEXEC) } {
                                 Ok(()) => Ok(pipe_fds),
                                 Err(err) => {
-                                    let _res = close(pipe_fds.reading_fd);
-                                    let _res = close(pipe_fds.writing_fd);
+                                    let _res = unsafe { close(pipe_fds.reading_fd) };
+                                    let _res2 = unsafe { close(pipe_fds.writing_fd) };
                                     Err(err)
                                 },
                             }
                         },
                         Err(err) => {
-                            let _res = close(pipe_fds.reading_fd);
-                            let _res = close(pipe_fds.writing_fd);
+                            let _res = unsafe { close(pipe_fds.reading_fd) };
+                            let _res2 = unsafe { close(pipe_fds.writing_fd) };
                             Err(err)
                         },
                     }
                 },
                 Err(err) => {
-                    let _res = close(pipe_fds.reading_fd);
-                    let _res = close(pipe_fds.writing_fd);
+                    let _res = unsafe { close(pipe_fds.reading_fd) };
+                    let _res2 = unsafe { close(pipe_fds.writing_fd) };
                     Err(err)
                 },
             }
         },
         Err(err) => {
-            let _res = close(pipe_fds.reading_fd);
-            let _res = close(pipe_fds.writing_fd);
+            let _res = unsafe { close(pipe_fds.reading_fd) };
+            let _res2 = unsafe { close(pipe_fds.writing_fd) };
             Err(err)
         },
     }

@@ -504,7 +504,7 @@ impl Interpreter
                 },
                 InterpreterRedirection::HereDocument(_, _) => {
                     match pipe_with_cloexec() {
-                        Ok(pipe_fds) => pipes.push(Pipe::from_pipe_fds(&pipe_fds)),
+                        Ok(pipe_fds) => pipes.push(unsafe { Pipe::from_pipe_fds(&pipe_fds) }),
                         Err(err) => {
                             eprintln!("{}", err);
                             is_success = false;
@@ -1001,7 +1001,7 @@ impl Interpreter
                     let mut is_success = true;
                     for _ in 0..(command.commands.len() - 1) {
                         match pipe_with_cloexec() {
-                            Ok(pipe_fds) => pipes.push(Pipe::from_pipe_fds(&pipe_fds)),
+                            Ok(pipe_fds) => pipes.push(unsafe { Pipe::from_pipe_fds(&pipe_fds) }),
                             Err(err) => {
                                 eprintln!("{}", err);
                                 is_success = false;
