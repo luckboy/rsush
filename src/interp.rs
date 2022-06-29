@@ -899,7 +899,7 @@ impl Interpreter
                                             break;
                                         }
                                     }
-                                    if elif_cond {
+                                    if !elif_cond {
                                         match else_commands {
                                             Some(else_commands) => interp.interpret_logical_commands(exec, else_commands.as_slice(), env, settings),
                                             None => status,
