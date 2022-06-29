@@ -383,7 +383,7 @@ impl Interpreter
                 Redirection::InputDuplicating(_, _, n, word) => {
                     match self.performe_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(fd_s) => {
-                            if is_number_str(fd_s.as_str()) {
+                            if is_io_number_str(fd_s.as_str()) {
                                 match fd_s.parse::<i32>() {
                                     Ok(fd) => interp_redirects.push(InterpreterRedirection::Duplicating(n.unwrap_or(0), fd)),
                                     Err(err) => {
@@ -404,7 +404,7 @@ impl Interpreter
                 Redirection::OutputDuplicating(_, _, n, word) => {
                     match self.performe_word_expansion_as_string(exec, &(*word), env, settings) {
                         Some(fd_s) => {
-                            if is_number_str(fd_s.as_str()) {
+                            if is_io_number_str(fd_s.as_str()) {
                                 match fd_s.parse::<i32>() {
                                     Ok(fd) => interp_redirects.push(InterpreterRedirection::Duplicating(n.unwrap_or(1), fd)),
                                     Err(_) => {

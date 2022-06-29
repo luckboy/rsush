@@ -41,7 +41,7 @@ pub enum GlobResult
     NoSpace,
 }
 
-pub fn is_number_str(s: &str) -> bool
+pub fn is_io_number_str(s: &str) -> bool
 { s.chars().all(|c| c >= '0' && c <= '9') }
 
 pub fn fork() -> Result<Option<i32>>

@@ -1098,7 +1098,7 @@ impl<'a> Lexer<'a>
                                 self.unget_char(c, &pos, settings);
                                 let (word_elem, can_be_keyword) = self.get_string_word_elem(settings)?;
                                 match (word_elem, can_be_keyword) {
-                                    (WordElement::Simple(SimpleWordElement::String(s)), true) if is_number_str(s.as_str()) => {
+                                    (WordElement::Simple(SimpleWordElement::String(s)), true) if is_io_number_str(s.as_str()) => {
                                         match s.parse::<i32>() {
                                             Ok(n) => {
                                                 match self.get_less_or_greater_token(Some(n), &token_pos, settings)? {
