@@ -60,7 +60,7 @@ pub fn is_number_str(s: &str) -> bool
         s
     };
     if t.starts_with("0X") || t.starts_with("0x") {
-        t[2..].chars().all(|c| (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' || c <= 'f'))
+        !t[2..].is_empty() && t[2..].chars().all(|c| (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' || c <= 'f'))
     } else if t.starts_with('0') {
         t[1..].chars().all(|c| c >= '0' && c <= '7')
     } else {
@@ -84,13 +84,7 @@ pub fn str_to_number(s: &str) -> result::Result<i64, ParseIntError>
         new_s.push_str(&t[2..]);
         i64::from_str_radix(new_s.as_str(), 16) 
     } else if t.starts_with('0') {
-        let mut new_s = String::new();
-        match sign_c {
-            Some(sign_c) => new_s.push(sign_c),
-            None         => (),
-        }
-        new_s.push_str(&t[1..]);
-        i64::from_str_radix(new_s.as_str(), 8)
+        i64::from_str_radix(s, 8)
     } else {
         s.parse::<i64>()
     }
