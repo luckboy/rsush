@@ -912,6 +912,8 @@ impl Interpreter
                     _ => is_last_s_to_pop = false,
                 }
                 ts = tmp_ts;
+            } else {
+                is_last_s_to_pop = false;
             }
             if !is_empty {
                 if !ts.is_empty() {
