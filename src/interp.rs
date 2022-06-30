@@ -1548,10 +1548,16 @@ impl Interpreter
                                                 }
                                                 interp.last_status
                                             },
-                                            None => 1,
+                                            None => {
+                                                interp.last_status = 1;
+                                                1
+                                            },
                                         }
                                     },
-                                    None => 1,
+                                    None => {
+                                        interp.last_status = 1;
+                                        1
+                                    },
                                 }
                         })
                     },
@@ -1586,6 +1592,7 @@ impl Interpreter
                                         if is_success {
                                             interp.last_status
                                         } else {
+                                            interp.last_status = 1;
                                             1
                                         }
                                     },
@@ -1691,11 +1698,11 @@ impl Interpreter
             Some(name) => {
                 env.set_fun(name.as_str(), fun_body);
                 self.last_status = 0;
-                self.last_status
+                0
             },
             None => {
                 self.last_status = 1;
-                self.last_status
+                1
             },
         }
     }
