@@ -744,6 +744,7 @@ impl Interpreter
     
     fn add_simple_word_elem_expansions(&mut self, exec: &mut Executor, elems: &[SimpleWordElement], ss: &mut Vec<String>, is_here_doc: bool, env: &mut Environment, settings: &mut Settings) -> bool
     {
+        let mut is_empty = true;
         for elem in elems.iter() {
             let mut ts: Vec<String> = Vec::new();
             let mut is_join = false;
@@ -796,13 +797,14 @@ impl Interpreter
                 ts = vec![ts.join(sep.as_str())];
             }
             ts = ts.iter().map(|s| escape_str(s.as_str())).collect();
-            if !ss.is_empty() {
+            if !is_empty {
                 if !ts.is_empty() {
                     let ss_len = ss.len();
                     ss[ss_len - 1].push_str(ts[0].as_str());
                     ss.extend_from_slice(&ts[1..]);
                 }
             } else {
+                is_empty = ts.is_empty();
                 ss.extend(ts);
             }
         }
@@ -812,6 +814,7 @@ impl Interpreter
     fn add_word_elem_expansions(&mut self, exec: &mut Executor, elems: &[WordElement], ss: &mut Vec<String>, env: &mut Environment, settings: &mut Settings) -> bool
     {
         let mut is_first = true;
+        let mut is_empty = true;
         let is_one_elem = elems.len() == 1;
         let mut is_last_s_to_pop = false;
         for elem in elems.iter() {
@@ -910,13 +913,14 @@ impl Interpreter
                 }
                 ts = tmp_ts;
             }
-            if !ss.is_empty() {
+            if !is_empty {
                 if !ts.is_empty() {
                     let ss_len = ss.len();
                     ss[ss_len - 1].push_str(ts[0].as_str());
                     ss.extend_from_slice(&ts[1..]);
                 }
             } else {
+                is_empty = ts.is_empty();
                 ss.extend(ts);
             }
             is_first = false;
