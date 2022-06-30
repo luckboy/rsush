@@ -1326,7 +1326,7 @@ impl Interpreter
         status
     }
     
-    fn add_vars<'a>(&mut self, exec: &mut Executor, word_iter: &mut slice::Iter<'a, Rc<Word>>, vars: &mut Vec<(String, String)>,  env: &mut Environment, settings: &mut Settings) -> Option<Option<Rc<Word>>>
+    fn add_vars(&mut self, exec: &mut Executor, word_iter: &mut slice::Iter<'_, Rc<Word>>, vars: &mut Vec<(String, String)>,  env: &mut Environment, settings: &mut Settings) -> Option<Option<Rc<Word>>>
     {
         loop {
             match word_iter.next() {
