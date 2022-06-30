@@ -37,7 +37,6 @@ pub struct HereDocument
     pub delim: String,
     pub has_minus: bool,
     pub simple_word_elems: Vec<SimpleWordElement>,
-    
 }
 
 #[derive(Clone)]

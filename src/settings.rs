@@ -34,6 +34,7 @@ pub struct Settings
     pub vi_flag: bool,
     pub emacs_flag: bool,
     pub xtrace_flag: bool,
+    pub strlossy_flag: bool,
     pub arg0: String,
     arg_vec_stack: Vec<Arguments>,
     current_args: Arguments,
@@ -58,6 +59,7 @@ impl Settings
             vi_flag: false,
             emacs_flag: false,
             xtrace_flag: false,
+            strlossy_flag: false,
             arg0: String::new(),
             arg_vec_stack: Vec::new(),
             current_args: Arguments::new(),
@@ -83,4 +85,20 @@ impl Settings
 
     pub fn current_args_mut(&mut self) -> &mut Arguments
     { &mut self.current_args }
+    
+    pub fn option_string(&self) -> String
+    {
+        let mut s = String::new();
+        if self.allexport_flag { s.push('a'); }
+        if self.errexit_flag { s.push('e'); }
+        if self.monitor_flag { s.push('m'); }
+        if self.noclobber_flag { s.push('C'); }
+        if self.noglob_flag { s.push('f'); }
+        if self.noexec_flag { s.push('n'); }
+        if self.notify_flag { s.push('b'); }
+        if self.nounset_flag { s.push('u'); }
+        if self.verbose_flag { s.push('v'); }
+        if self.xtrace_flag { s.push('x'); }
+        s
+    }
 }

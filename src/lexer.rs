@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 use std::collections::HashMap;
+use std::fmt;
 use std::io::*;
 use std::rc::*;
 use crate::io::*;
@@ -49,6 +50,22 @@ pub enum SpecialParameterName
     Excl,
 }
 
+impl fmt::Display for SpecialParameterName
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            SpecialParameterName::At => write!(f, "@"),
+            SpecialParameterName::Star => write!(f, "*"),
+            SpecialParameterName::Hash => write!(f, "#"),
+            SpecialParameterName::Ques => write!(f, "?"),
+            SpecialParameterName::Minus => write!(f, "-"),
+            SpecialParameterName::Dolar => write!(f, "$"),
+            SpecialParameterName::Excl => write!(f, "!"),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ParameterModifier
 {
@@ -72,6 +89,18 @@ pub enum ParameterName
     Variable(String),
     Argument(usize),
     Special(SpecialParameterName),
+}
+
+impl fmt::Display for ParameterName
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            ParameterName::Variable(name) => write!(f, "{}", name),
+            ParameterName::Argument(n) => write!(f, "{}", n),
+            ParameterName::Special(name) => write!(f, "{}", name),
+        }
+    }
 }
 
 #[derive(Clone)]

@@ -17,8 +17,9 @@
 //
 use std::collections::HashMap;
 use std::cell::*;
-use std::io::*;
 use std::fs::*;
+use std::io::*;
+use std::path;
 use std::rc::*;
 use std::slice;
 use libc;
@@ -30,12 +31,24 @@ use crate::parser::*;
 use crate::settings::*;
 use crate::utils::*;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum Value
+#[derive(Clone, Debug)]
+pub enum Value
 {
     String(String),
     AtArray(Vec<String>),
     StarArray(Vec<String>),
+}
+
+impl Value
+{
+    pub fn is_null(&self) -> bool
+    {
+        match self {
+            Value::String(s) => s.is_empty(),
+            Value::AtArray(ss) => ss.is_empty(),
+            Value::StarArray(ss) => ss.is_empty(),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -65,6 +78,7 @@ pub struct Interpreter
     return_state: ReturnState,
     loop_count_stack: Vec<usize>,
     current_loop_count: usize,
+    last_job_pid: Option<i32>,
     signal_names: HashMap<i32, String>,
 }
 
@@ -73,6 +87,82 @@ fn set_vars(vars: &[(String, String)], env: &mut Environment, settings: &Setting
     for (name, value) in vars.iter() {
         env.set_var(name.as_str(), value.as_str(), settings);
     }
+}
+
+fn print_command_for_xtrace(vars: &[(String, String)], args: &[String])
+{
+    eprint!("+");
+    for (name, value) in vars.iter() {
+        print!(" {}={}", name, value);
+    }
+    for arg in args.iter() {
+        print!(" {}", arg);
+    }
+    println!("");
+}
+
+fn add_glob_expansions(ss: &[String], ts: &mut Vec<String>, settings: &mut Settings) -> bool
+{
+    for s in ss.iter() {
+        if !settings.noglob_flag {
+            match glob(s, 0, None) {
+                GlobResult::Ok(path_bufs) => {
+                    for path_buf in &path_bufs {
+                        let t = if settings.strlossy_flag {
+                            path_buf.to_string_lossy().into_owned()
+                        } else {
+                            match path_buf.to_str() {
+                                Some(t) => String::from(t),
+                                None => {
+                                    eprintln!("Invalid UTF-8");
+                                    return false;
+                                },
+                            }
+                        };
+                        ts.push(t);
+                    }
+                },
+                GlobResult::Aborted => {
+                    eprintln!("Glob I/O error");
+                    return false;
+                },
+                GlobResult::NoMatch => {
+                    let path_buf = unescape_path_pattern(s);
+                    let t = if settings.strlossy_flag {
+                        path_buf.to_string_lossy().into_owned()
+                    } else {
+                        match path_buf.to_str() {
+                            Some(t) => String::from(t),
+                            None => {
+                                eprintln!("Invalid UTF-8");
+                                return false;
+                            },
+                        }
+                    };
+                    ts.push(t);
+                },
+                GlobResult::NoSpace => {
+                    eprintln!("Can't allocate memory");
+                    return false;
+                },
+            }
+        } else {
+            let path_buf = unescape_path_pattern(s);
+            let t = if settings.strlossy_flag {
+                path_buf.to_string_lossy().into_owned()
+            } else {
+                match path_buf.to_str() {
+                    Some(t) => String::from(t),
+                    None => {
+                        eprintln!("Invalid UTF-8");
+                        return false;
+                    },
+                }
+            };
+            ts.push(t);
+        }
+    }
+    false
 }
 
 impl Interpreter
@@ -113,6 +203,7 @@ impl Interpreter
             return_state: ReturnState::None,
             loop_count_stack: Vec::new(),
             current_loop_count: 0,
+            last_job_pid: None,
             signal_names: sig_names,
         }
     }
@@ -161,6 +252,15 @@ impl Interpreter
         self.return_state = ReturnState::Break(n);
         0
     }
+
+    pub fn set_break(&mut self, n: usize)
+    { self.return_state = ReturnState::Break(n); }
+
+    pub fn set_return(&mut self)
+    { self.return_state = ReturnState::Return; }
+    
+    pub fn set_exit(&mut self)
+    { self.return_state = ReturnState::Exit; }
     
     pub fn clear_return_state(&mut self)
     { self.return_state = ReturnState::None; }
@@ -277,64 +377,671 @@ impl Interpreter
             },
         }
     }
+    
+    pub fn param(&self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<Value>
+    {
+        match param_name {
+            ParameterName::Variable(name) => env.var(name.as_str()).map(|s| Value::String(s)),
+            ParameterName::Argument(n) => {
+                if *n > 0 {
+                    settings.current_args().args().get(n - 1).map(|s| Value::String(s.clone()))
+                } else {
+                    Some(Value::String(settings.arg0.clone()))
+                }
+            },
+            ParameterName::Special(SpecialParameterName::At) => Some(Value::AtArray(settings.current_args().args().iter().map(|s| s.clone()).collect())),
+            ParameterName::Special(SpecialParameterName::Star) => Some(Value::StarArray(settings.current_args().args().iter().map(|s| s.clone()).collect())),
+            ParameterName::Special(SpecialParameterName::Hash) => Some(Value::String(format!("{}", settings.current_args().args().len()))),
+            ParameterName::Special(SpecialParameterName::Ques) => Some(Value::String(format!("{}", self.last_status))),
+            ParameterName::Special(SpecialParameterName::Minus) => Some(Value::String(settings.option_string())),
+            ParameterName::Special(SpecialParameterName::Dolar) => Some(Value::String(format!("{}", exec.shell_pid()))),
+            ParameterName::Special(SpecialParameterName::Excl) => self.last_job_pid.map(|pid| Value::String(format!("{}", pid))),
+        }
+    }
+    
+    fn param_to_string(&self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<String>
+    {
+        match self.param(exec, param_name, env, settings) {
+            Some(Value::String(s)) => Some(s),
+            Some(Value::AtArray(ss)) => {
+                let ifs = env.var("IFS").unwrap_or(String::from(" "));
+                let sep = match ifs.chars().next() {
+                    Some(c) => {
+                        let mut tmp_sep = String::new();
+                        tmp_sep.push(c);
+                        tmp_sep
+                    },
+                    None => String::new(),
+                };
+                Some(ss.join(sep.as_str()))
+            },
+            Some(Value::StarArray(ss)) => {
+                let ifs = env.var("IFS").unwrap_or(String::from(" "));
+                let sep = match ifs.chars().next() {
+                    Some(c) => {
+                        let mut tmp_sep = String::new();
+                        tmp_sep.push(c);
+                        tmp_sep
+                    },
+                    None => String::new(),
+                };
+                Some(ss.join(sep.as_str()))
+            },
+            None => None,
+        }
+    }
+    
+    fn perform_param_expansion(&mut self, exec: &mut Executor, param_name: &ParameterName, modifier_and_words: &Option<(ParameterModifier, Vec<Rc<Word>>)>, env: &mut Environment, settings: &mut Settings) -> Option<Option<Value>>
+    {
+        match modifier_and_words {
+            None => {
+                match self.param(exec, param_name, env, settings) {
+                    Some(value) => Some(Some(value)),
+                    None => {
+                        if !settings.nounset_flag {
+                            Some(None)
+                        } else {
+                            eprintln!("{}: Parameter not set", param_name);
+                            None
+                        }
+                    },
+                }
+            },
+            Some((ParameterModifier::ColonMinus, words)) => {
+                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(word) => {
+                        match self.param(exec, param_name, env, settings) {
+                            Some(value) => {
+                                if !value.is_null() {
+                                    Some(Some(value))
+                                } else {
+                                    Some(Some(Value::String(word)))
+                                }
+                            },
+                            None => Some(Some(Value::String(word))),
+                        }
+                    },
+                    None => None,
+                }
+            },
+            Some((ParameterModifier::Minus, words)) => {
+                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(word) => {
+                        match self.param(exec, param_name, env, settings) {
+                            Some(value) => {
+                                if !value.is_null() {
+                                    Some(Some(value))
+                                } else {
+                                    Some(Some(Value::String(String::new())))
+                                }
+                            },
+                            None => Some(Some(Value::String(word))),
+                        }
+                    },
+                    None => None,
+                }
+            },
+            Some((ParameterModifier::ColonEqual, words)) => {
+                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(word) => {
+                        match self.param(exec, param_name, env, settings) {
+                            Some(value) => {
+                                if !value.is_null() {
+                                    Some(Some(value))
+                                } else {
+                                    if set_param(param_name, word.as_str(), env, settings) {
+                                        Some(Some(Value::String(word)))
+                                    } else {
+                                        eprintln!("{}: Can't set parameter", param_name);
+                                        None
+                                    }
+                                }
+                            },
+                            None => {
+                                if set_param(param_name, word.as_str(), env, settings) {
+                                    Some(Some(Value::String(word)))
+                                } else {
+                                    eprintln!("{}: Can't set parameter", param_name);
+                                    None
+                                }
+                            },
+                        }
+                    },
+                    None => None,
+                }
+            },
+            Some((ParameterModifier::Equal, words)) => {
+                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(word) => {
+                        match self.param(exec, param_name, env, settings) {
+                            Some(value) => {
+                                if !value.is_null() {
+                                    Some(Some(value))
+                                } else {
+                                    Some(Some(Value::String(String::new())))
+                                }
+                            },
+                            None => {
+                                if set_param(param_name, word.as_str(), env, settings) {
+                                    Some(Some(Value::String(word)))
+                                } else {
+                                    eprintln!("{}: Can't set parameter", param_name);
+                                    None
+                                }
+                            },
+                        }
+                    },
+                    None => None,
+                }
+            },
+            Some((ParameterModifier::ColonQues, words)) => {
+                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(word) => {
+                        match self.param(exec, param_name, env, settings) {
+                            Some(value) => {
+                                if !value.is_null() {
+                                    Some(Some(value))
+                                } else {
+                                    let err = if !word.is_empty() {
+                                        word
+                                    } else {
+                                        String::from("Parameter null or not set")
+                                    };
+                                    eprintln!("{}: {}", param_name, err);
+                                    self.set_exit();
+                                    None
+                                }
+                            },
+                            None => {
+                                let err = if !word.is_empty() {
+                                   word
+                                } else {
+                                    String::from("Parameter null or not set")
+                                };
+                                eprintln!("{}: {}", param_name, err);
+                                self.set_exit();
+                                None
+                            },
+                        }
+                    },
+                    None => None,
+                }
+            },
+            Some((ParameterModifier::Ques, words)) => {
+                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(word) => {
+                        match self.param(exec, param_name, env, settings) {
+                            Some(value) => {
+                                if !value.is_null() {
+                                    Some(Some(value))
+                                } else {
+                                    Some(Some(Value::String(String::new())))
+                                }
+                            },
+                            None => {
+                                let err = if !word.is_empty() {
+                                   word
+                                } else {
+                                    String::from("Parameter not set")
+                                };
+                                eprintln!("{}: {}", param_name, err);
+                                self.set_exit();
+                                None
+                            },
+                        }
+                    },
+                    None => None,
+                }
+            },
+            Some((ParameterModifier::ColonPlus, words)) => {
+                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(word) => {
+                        match self.param(exec, param_name, env, settings) {
+                            Some(value) => {
+                                if !value.is_null() {
+                                    Some(Some(Value::String(word)))
+                                } else {
+                                    Some(Some(Value::String(String::new())))
+                                }
+                            },
+                            None => Some(Some(Value::String(String::new()))),
+                        }
+                    },
+                    None => None,
+                }
+            },
+            Some((ParameterModifier::Plus, words)) => {
+                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(word) => {
+                        match self.param(exec, param_name, env, settings) {
+                            Some(_) => Some(Some(Value::String(word))),
+                            None => Some(Some(Value::String(String::new()))),
+                        }
+                    },
+                    None => None,
+                }
+            },
+            Some((modifier @ (ParameterModifier::Perc | ParameterModifier::PercPerc), words)) => {
+                match self.perform_pattern_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(pattern) => {
+                        let s = self.param_to_string(exec, param_name, env, settings).unwrap_or(String::new());
+                        if !s.is_empty() {
+                            let mut is: Vec<usize> = s.char_indices().map(|p| p.0).collect();
+                            is.push(s.len());
+                            let mut t = s.as_str();
+                            if modifier == &ParameterModifier::Perc {
+                                is.reverse();
+                            }
+                            for i in &is {
+                                if fnmatch(&pattern, &s[(*i)..], 0) {
+                                    t = &s[..(*i)];
+                                    break;
+                                }
+                            }
+                            Some(Some(Value::String(String::from(t))))
+                        } else {
+                            Some(Some(Value::String(s)))
+                        }
+                    },
+                    None => None,
+                }
+            },
+            Some((modifier @ (ParameterModifier::Hash | ParameterModifier::HashHash), words)) => {
+                match self.perform_pattern_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                    Some(pattern) => {
+                        let s = self.param_to_string(exec, param_name, env, settings).unwrap_or(String::new());
+                        if !s.is_empty() {
+                            let mut is: Vec<usize> = s.char_indices().map(|p| p.0).collect();
+                            is.push(s.len());
+                            let mut t = s.as_str();
+                            if modifier != &ParameterModifier::Hash {
+                                is.reverse();
+                            }
+                            for i in &is {
+                                if fnmatch(&pattern, &s[..(*i)], 0) {
+                                    t = &s[(*i)..];
+                                    break;
+                                }
+                            }
+                            Some(Some(Value::String(String::from(t))))
+                        } else {
+                            Some(Some(Value::String(s)))
+                        }
+                    },
+                    None => None,
+                }
+            },
+        }
+    }
 
+    fn perform_param_len_expansion(&self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<String>
+    {
+        match self.param_to_string(exec, param_name, env, settings) {
+            Some(s) => Some(format!("{}", s.len())),
+            None => {
+                if !settings.nounset_flag {
+                    Some(String::from("0"))
+                } else {
+                    eprintln!("{}: Parameter not set", param_name);
+                    None
+                }
+            },
+        }
+    }
+    
+    fn substitute_command(&mut self, exec: &mut Executor, commands: &[Rc<LogicalCommand>], env: &mut Environment, settings: &mut Settings) -> Option<String>
+    {
+        exec.interpret(|exec| {
+                let mut pipes: Vec<Pipe> = Vec::new();
+                let mut is_success = true;
+                let mut pid: Option<i32> = None;
+                let mut s = String::new();
+                match pipe_with_cloexec() {
+                    Ok(pipe_fds) => pipes.push(unsafe { Pipe::from_pipe_fds(&pipe_fds) }),
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        is_success = false;
+                    },
+                }
+                if is_success {
+                    exec.set_pipes(pipes);
+                    let res = exec.create_process(false, settings, |exec, settings| {
+                            exec.push_file(1, exec.pipes()[0].writing_file.clone());
+                            exec.clear_pipes();
+                            self.interpret_logical_commands(exec, commands, env, settings)
+                    });
+                    match res {
+                        Ok(tmp_pid) => pid = tmp_pid,
+                        Err(err) => {
+                            eprintln!("{}", err);
+                            is_success = false;
+                        },
+                    }
+                }
+                if is_success {
+                    let file = exec.pipes()[0].reading_file.clone();
+                    exec.clear_pipes();
+                    let mut file_r = file.borrow_mut();
+                    match file_r.read_to_string(&mut s) {
+                        Ok(_) => (),
+                        Err(err) => {
+                            eprintln!("{}", err);
+                            is_success = false;
+                        },
+                    }
+                    self.last_status = self.wait_for_process(exec, pid);
+                }
+                if is_success {
+                    Some(s)
+                } else {
+                    None
+                }
+        })
+    }
+
+    fn perform_arith_expansion(&mut self, exec: &mut Executor, expr: &ArithmeticExpression, env: &mut Environment, settings: &mut Settings) -> Option<String>
+    { None }
+    
+    fn add_simple_word_elem_expansions(&mut self, exec: &mut Executor, elems: &[SimpleWordElement], ss: &mut Vec<String>, is_here_doc: bool, env: &mut Environment, settings: &mut Settings) -> bool
+    {
+        for elem in elems.iter() {
+            let mut ts: Vec<String> = Vec::new();
+            let mut is_join = false;
+            match elem {
+                SimpleWordElement::String(s) => ts.push(s.clone()),
+                SimpleWordElement::Parameter(param_name, modifier_and_words) => {
+                    match self.perform_param_expansion(exec, param_name, modifier_and_words, env, settings) {
+                        Some(Some(Value::String(s))) => ts.push(s.clone()),
+                        Some(Some(Value::AtArray(ss))) => {
+                            ts.extend(ss);
+                            is_join = is_here_doc;
+                        },
+                        Some(Some(Value::StarArray(ss))) => {
+                            ts.extend(ss);
+                            is_join = true;
+                        },
+                        Some(None) => (),
+                        None => return false,
+                    }
+                },
+                SimpleWordElement::ParameterLength(param_name) => {
+                    match self.perform_param_len_expansion(exec, param_name, env, settings) {
+                        Some(s) => ts.push(s),
+                        None => return false,
+                    }
+                },
+                SimpleWordElement::Command(commands) => {
+                    match self.substitute_command(exec, commands, env, settings) {
+                        Some(s) => ts.push(s),
+                        None => return false,
+                    }
+                },
+                SimpleWordElement::ArithmeticExpression(expr) => {
+                    match self.perform_arith_expansion(exec, expr, env, settings) {
+                        Some(s) => ts.push(s),
+                        None => return false,
+                    }
+                },
+            }
+            if is_join {
+                let ifs = env.var("IFS").unwrap_or(String::from(" "));
+                let sep = match ifs.chars().next() {
+                    Some(c) => {
+                        let mut tmp_sep = String::new();
+                        tmp_sep.push(c);
+                        tmp_sep
+                    },
+                    None => String::new(),
+                };
+                ts = vec![ts.join(sep.as_str())];
+            }
+            ts = ts.iter().map(|s| escape_str(s.as_str())).collect();
+            if !ss.is_empty() {
+                if !ts.is_empty() {
+                    let ss_len = ss.len();
+                    ss[ss_len - 1].push_str(ts[0].as_str());
+                    ss.extend_from_slice(&ts[1..]);
+                }
+            } else {
+                ss.extend(ts);
+            }
+        }
+        true
+    }
+
+    fn add_word_elem_expansions(&mut self, exec: &mut Executor, elems: &[WordElement], ss: &mut Vec<String>, env: &mut Environment, settings: &mut Settings) -> bool
+    {
+        let mut is_first = true;
+        let is_one_elem = elems.len() == 1;
+        let mut is_last_s_to_pop = false;
+        for elem in elems.iter() {
+            let mut ts: Vec<String> = Vec::new();
+            let mut is_split = false;
+            match elem {
+                WordElement::Simple(SimpleWordElement::String(s)) => {
+                    let mut tylda_with_sep = String::from("~");
+                    tylda_with_sep.push(path::MAIN_SEPARATOR);
+                    let mut sep = String::new();
+                    sep.push(path::MAIN_SEPARATOR);
+                    if is_first && s.starts_with(tylda_with_sep.as_str()) {
+                        let mut t = String::new();
+                        t.push_str(escape_str(env.var("HOME").unwrap_or(sep).as_str()).as_str());
+                        t.push(path::MAIN_SEPARATOR);
+                        t.push_str(&s[2..]);
+                        ts.push(t);
+                    } else if is_first && s == &String::from("~") && is_one_elem {
+                        ts.push(escape_str(env.var("HOME").unwrap_or(sep).as_str()));
+                    } else {
+                        ts.push(s.clone());
+                    }
+                },
+                WordElement::Simple(SimpleWordElement::Parameter(param_name, modifier_and_words)) => {
+                    match self.perform_param_expansion(exec, param_name, modifier_and_words, env, settings) {
+                        Some(Some(Value::String(s))) => ts.push(s.clone()),
+                        Some(Some(Value::AtArray(ss))) => ts.extend(ss),
+                        Some(Some(Value::StarArray(ss))) => ts.extend(ss),
+                        Some(None) => (),
+                        None => return false,
+                    }
+                    is_split = true;
+                },
+                WordElement::Simple(SimpleWordElement::ParameterLength(param_name)) => {
+                    match self.perform_param_len_expansion(exec, param_name, env, settings) {
+                        Some(s) => ts.push(s),
+                        None => return false,
+                    }
+                    is_split = true;
+                },
+                WordElement::Simple(SimpleWordElement::Command(commands)) => {
+                    match self.substitute_command(exec, commands, env, settings) {
+                        Some(s) => ts.push(s),
+                        None => return false,
+                    }
+                    is_split = true;
+                },
+                WordElement::Simple(SimpleWordElement::ArithmeticExpression(expr)) => {
+                    match self.perform_arith_expansion(exec, expr, env, settings) {
+                        Some(s) => ts.push(s),
+                        None => return false,
+                    }
+                    is_split = true;
+                },
+                WordElement::SinglyQuoted(s) => ts.push(escape_str(s.as_str())),
+                WordElement::DoublyQuoted(simple_elems) => {
+                    if !self.add_simple_word_elem_expansions(exec, simple_elems, &mut ts, false, env, settings) {
+                        return false;
+                    }
+                },
+            }
+            if is_split {
+                let ifs = env.var("IFS").unwrap_or(String::from(" "));
+                let mut us: Vec<String> = Vec::new();
+                let is_space = ifs.chars().any(char::is_whitespace);
+                if !ifs.is_empty() {
+                    for t in &ts {
+                        let mut vs: Vec<String> = split_str_for_ifs(t.as_str(), ifs.as_str()).iter().map(|s| String::from(*s)).collect();
+                        match vs.last() {
+                            Some(s) if s.is_empty() => {
+                                vs.pop();
+                            },
+                            _ => (),
+                        }
+                        us.extend(vs);
+                    }
+                } else {
+                    for t in &ts {
+                        if !t.is_empty() {
+                            us.push(t.clone());
+                        }
+                    }
+                }
+                let mut tmp_ts: Vec<String> = Vec::new();
+                match ts.first() {
+                    Some(s) if is_space && is_first_space(s) && us.first().map(|t| !t.is_empty()).unwrap_or(false) => tmp_ts.push(String::new()),
+                    _ => (),
+                }
+                tmp_ts.extend(us);
+                match ts.last() {
+                    Some(s) if is_space && is_last_space(s) => {
+                        tmp_ts.push(String::new());
+                        is_last_s_to_pop = true;
+                    },
+                    _ => is_last_s_to_pop = false,
+                }
+                ts = tmp_ts;
+            }
+            if !ss.is_empty() {
+                if !ts.is_empty() {
+                    let ss_len = ss.len();
+                    ss[ss_len - 1].push_str(ts[0].as_str());
+                    ss.extend_from_slice(&ts[1..]);
+                }
+            } else {
+                ss.extend(ts);
+            }
+            is_first = false;
+        }
+        if is_last_s_to_pop {
+            ss.pop();
+        }
+        true
+    }
+    
     fn perform_var_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
-        None
+        let mut ss: Vec<String> = Vec::new();
+        if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+            return None;
+        }
+        let mut ts: Vec<String> = Vec::new();
+        for s in &ss {
+            let path_buf = unescape_path_pattern(s);
+            let t = if settings.strlossy_flag {
+                path_buf.to_string_lossy().into_owned()
+            } else {
+                match path_buf.to_str() {
+                    Some(t) => String::from(t),
+                    None => {
+                        eprintln!("Invalid UTF-8");
+                        return None;
+                    },
+                }
+            };
+            ts.push(t);
+        }
+        Some(ts.join(" "))
     }
 
     fn perform_pattern_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
-        None
+        let mut ss: Vec<String> = Vec::new();
+        if self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+            Some(ss.join(" "))
+        } else {
+            None
+        }
     }
 
+    fn perform_pattern_word_expansions_as_string(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<String>
+    {
+        let mut ss: Vec<String> = Vec::new();
+        for word in words.iter() {
+            if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+                return None;
+            }
+        }
+        Some(ss.join(" "))
+    }    
+    
     fn perform_word_expansion(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<Vec<String>>
     {
-        None
+        let mut ss: Vec<String> = Vec::new();
+        if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+            return None;
+        }
+        let mut ts: Vec<String> = Vec::new();
+        if add_glob_expansions(&ss, &mut ts, settings) {
+            Some(ts)
+        } else {
+            None
+        }
     }
         
     fn perform_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
        match self.perform_word_expansion(exec, word, env, settings) {
-           Some(ss) => {
-               let mut s = String::new();
-               let mut is_first = true;
-               for t in &ss {
-                   if !is_first { s.push(' '); }
-                   s.push_str(t.as_str());
-                   is_first = false;
-               }
-               Some(s)
-           },
+           Some(ss) => Some(ss.join(" ")),
            None => None,
        }
     }
 
     fn perform_word_expansions(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<Vec<String>>
     {
-        None
+        let mut ss: Vec<String> = Vec::new();
+        for word in words {
+            if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+                return None;
+            }
+        }
+        let mut ts: Vec<String> = Vec::new();
+        if add_glob_expansions(&ss, &mut ts, settings) {
+            Some(ts)
+        } else {
+            None
+        }
     }
     
     fn perform_word_expansions_as_string(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
        match self.perform_word_expansions(exec, words, env, settings) {
-           Some(ss) => {
-               let mut s = String::new();
-               let mut is_first = true;
-               for t in &ss {
-                   if !is_first { s.push(' '); }
-                   s.push_str(t.as_str());
-                   is_first = false;
-               }
-               Some(s)
-           },
+           Some(ss) => Some(ss.join(" ")),
            None => None,
        }
     }
 
     fn perform_here_doc_expansion(&mut self, exec: &mut Executor, here_doc: &HereDocument, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
-        None
+        let mut ss: Vec<String> = Vec::new();
+        if !self.add_simple_word_elem_expansions(exec, &here_doc.simple_word_elems, &mut ss, true, env, settings) {
+            return None;
+        }
+        let mut ts: Vec<String> = Vec::new();
+        for s in &ss {
+            let path_buf = unescape_path_pattern(s);
+            let t = if settings.strlossy_flag {
+                path_buf.to_string_lossy().into_owned()
+            } else {
+                match path_buf.to_str() {
+                    Some(t) => String::from(t),
+                    None => {
+                        eprintln!("Invalid UTF-8");
+                        return None;
+                    },
+                }
+            };
+            ts.push(t);
+        }
+        Some(ts.join(""))
     }
     
     fn interpret_redirects<F>(&mut self, exec: &mut Executor, redirects: &[Rc<Redirection>], env: &mut Environment, settings: &mut Settings, f: F) -> i32
@@ -386,7 +1093,7 @@ impl Interpreter
                             if is_io_number_str(fd_s.as_str()) {
                                 match fd_s.parse::<i32>() {
                                     Ok(fd) => interp_redirects.push(InterpreterRedirection::Duplicating(n.unwrap_or(0), fd)),
-                                    Err(err) => {
+                                    Err(_) => {
                                         eprintln!("{}: {}: too large I/O number", path, pos);
                                     },
                                 }
@@ -527,11 +1234,11 @@ impl Interpreter
                         for interp_redirect in &interp_redirects {
                             match interp_redirect {
                                 InterpreterRedirection::HereDocument(_, s) => {
-                                    let res = exec.create_process(false, settings, |exec, settings| {
+                                    let res = exec.create_process(false, settings, |exec, _| {
                                             let file = exec.pipes()[j].writing_file.clone();
                                             exec.clear_pipes();
-                                            let mut tmp_file = file.borrow_mut();
-                                            match tmp_file.write_all(s.as_bytes()) {
+                                            let mut file_r = file.borrow_mut();
+                                            match file_r.write_all(s.as_bytes()) {
                                                 Ok(()) => 0,
                                                 Err(err) => {
                                                     eprintln!("{}", err);
@@ -734,7 +1441,7 @@ impl Interpreter
                                         None => (),
                                     }
                                 },
-                                None => set_vars(vars.as_slice(), env, settings),
+                                None => (),
                             }
                         }
                         if is_success {
@@ -748,11 +1455,17 @@ impl Interpreter
                         if is_success {
                             match args.first() {
                                 Some(arg0) => {
+                                    if settings.xtrace_flag {
+                                        print_command_for_xtrace(vars.as_slice(), args.as_slice());
+                                    }
                                     self.interpret_redirects(exec, redirects.as_slice(), env, settings, |interp, exec, env, settings| {
                                             interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], env, settings)
                                     })
                                 },
                                 None => {
+                                    if settings.xtrace_flag {
+                                        print_command_for_xtrace(vars.as_slice(), &[]);
+                                    }
                                     set_vars(vars.as_slice(), env, settings);
                                     0
                                 },
@@ -765,6 +1478,9 @@ impl Interpreter
                 }
             },
             Some(None) => {
+                if settings.xtrace_flag {
+                    print_command_for_xtrace(vars.as_slice(), &[]);
+                }
                 set_vars(vars.as_slice(), env, settings);
                 0
             },
@@ -839,18 +1555,18 @@ impl Interpreter
                                 }
                         })
                     },
-                    CompoundCommand::Case(name_word, pairs) => {
+                    CompoundCommand::Case(value_word, pairs) => {
                         exec.interpret(|exec| {
                                 if settings.noexec_flag {
                                     return interp.last_status;
                                 }
-                                match interp.perform_word_expansion_as_string(exec, &(*name_word), env, settings) {
+                                match interp.perform_word_expansion_as_string(exec, &(*value_word), env, settings) {
                                     Some(value) => {
                                         let mut is_success = true;
                                         for pair in pairs.iter() {
                                             let mut is_matched = true;
-                                            for word_pattern in &pair.pattern_words {
-                                                match interp.perform_word_expansion_as_string(exec, &(*name_word), env, settings) {
+                                            for pattern_word in &pair.pattern_words {
+                                                match interp.perform_word_expansion_as_string(exec, &(*pattern_word), env, settings) {
                                                     Some(pattern) => {
                                                         is_matched = fnmatch(&pattern, &value, 0);
                                                         if is_matched { break; }
@@ -966,9 +1682,22 @@ impl Interpreter
         })
     }
 
-    fn interpret_fun_def(&mut self, exec: &mut Executor, name_word: &Word, fun_body: &FunctionBody, env: &mut Environment, settings: &mut Settings) -> i32
+    fn interpret_fun_def(&mut self, exec: &mut Executor, name_word: &Word, fun_body: &Rc<FunctionBody>, env: &mut Environment, settings: &mut Settings) -> i32
     {
-        0
+        if settings.noexec_flag {
+            return self.last_status;
+        }
+        match self.perform_word_expansion_as_string(exec, &(*name_word), env, settings) {
+            Some(name) => {
+                env.set_fun(name.as_str(), fun_body);
+                self.last_status = 0;
+                self.last_status
+            },
+            None => {
+                self.last_status = 1;
+                self.last_status
+            },
+        }
     }
     
     fn interpret_command(&mut self, exec: &mut Executor, command: &Command, env: &mut Environment, settings: &mut Settings) -> i32
@@ -976,7 +1705,7 @@ impl Interpreter
         match command {
             Command::Simple(_, _, simple_command) => self.interpret_simple_command(exec, &(*simple_command), env, settings),
             Command::Compound(_, _, compound_command, redirects) => self.interpret_compound_command(exec, &(*compound_command), redirects.as_slice(), env, settings),
-            Command::FunctionDefinition(_, _, name_word, fun_body) => self.interpret_fun_def(exec, &(*name_word), &(*fun_body), env, settings),
+            Command::FunctionDefinition(_, _, name_word, fun_body) => self.interpret_fun_def(exec, &(*name_word), fun_body, env, settings),
         }
     }
 
@@ -1112,7 +1841,9 @@ impl Interpreter
             if settings.noexec_flag { return self.last_status; }
             match exec.create_process(true, settings, f) {
                 Ok(Some(pid)) => {
-                    exec.add_job(&Job::new(pid, ""));
+                    self.last_job_pid = Some(pid);
+                    let job_id = exec.add_job(&Job::new(pid, ""));
+                    eprintln!("[{}] {}", job_id, pid);
                 },
                 Err(err) => eprintln!("{}", err),
                 _ => (),
@@ -1145,5 +1876,16 @@ impl Interpreter
             self.clear_return_state();
         }
         status
+    }
+}
+
+pub fn set_param(param_name: &ParameterName, s: &str, env: &mut Environment, settings: &Settings) -> bool
+{
+    match param_name {
+        ParameterName::Variable(name) => {
+            env.set_var(name.as_str(), s, settings);
+            true
+        },
+        _ => false,
     }
 }

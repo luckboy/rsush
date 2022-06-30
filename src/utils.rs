@@ -373,3 +373,19 @@ pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
     }
     fields
 }
+
+pub fn is_first_space(s: &str) -> bool
+{ s.chars().next().map(char::is_whitespace).unwrap_or(false) }
+
+pub fn is_last_space(s: &str) -> bool
+{
+    let mut char_iter = s.chars();
+    let mut last_c: Option<char> = None;
+    loop {
+        match char_iter.next() {
+            Some(c) => last_c = Some(c),
+            None    => break,
+        }
+    }
+    last_c.map(char::is_whitespace).unwrap_or(false)
+}
