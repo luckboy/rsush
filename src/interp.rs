@@ -165,7 +165,7 @@ fn add_glob_expansions(ss: &[String], ts: &mut Vec<String>, settings: &mut Setti
     false
 }
 
-fn assign_to_expr(expr: &ArithmeticExpression, x: i64, env: &mut Environment, settings: &Settings) -> Option<i64>
+fn assign_to_arith_expr(expr: &ArithmeticExpression, x: i64, env: &mut Environment, settings: &Settings) -> Option<i64>
 {
     match expr {
         ArithmeticExpression::Parameter(_, _, param_name) => {
@@ -982,13 +982,13 @@ impl Interpreter
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Assign, expr2) => {
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                assign_to_expr(&(*expr1), y, env, settings)
+                assign_to_arith_expr(&(*expr1), y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::MultiplyAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 match x.checked_mul(y) {
-                    Some(z) => assign_to_expr(&(*expr1), z, env, settings),
+                    Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
                     None => {
                         eprintln!("Overflow");
                         None
@@ -1000,7 +1000,7 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y != 0 {
                     match x.checked_div(y) {
-                        Some(z) => assign_to_expr(&(*expr1), z, env, settings),
+                        Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
                         None => {
                             eprintln!("Overflow");
                             None
@@ -1016,7 +1016,7 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y != 0 {
                     match x.checked_rem(y) {
-                        Some(z) => assign_to_expr(&(*expr1), z, env, settings),
+                        Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
                         None => {
                             eprintln!("Overflow");
                             None
@@ -1031,7 +1031,7 @@ impl Interpreter
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 match x.checked_add(y) {
-                    Some(z) => assign_to_expr(&(*expr1), z, env, settings),
+                    Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
                     None => {
                         eprintln!("Overflow");
                         None
@@ -1042,7 +1042,7 @@ impl Interpreter
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 match x.checked_sub(y) {
-                    Some(z) => assign_to_expr(&(*expr1), z, env, settings),
+                    Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
                     None => {
                         eprintln!("Overflow");
                         None
@@ -1054,7 +1054,7 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
-                        Some(z) => assign_to_expr(&(*expr1), z, env, settings),
+                        Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
                         None => {
                             eprintln!("Overflow");
                             None
@@ -1070,7 +1070,7 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
-                        Some(z) => assign_to_expr(&(*expr1), z, env, settings),
+                        Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
                         None => {
                             eprintln!("Overflow");
                             None
@@ -1084,17 +1084,17 @@ impl Interpreter
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::AndAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                assign_to_expr(&(*expr1), x & y, env, settings)
+                assign_to_arith_expr(&(*expr1), x & y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ExclusiveOrAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                assign_to_expr(&(*expr1), x ^ y, env, settings)
+                assign_to_arith_expr(&(*expr1), x ^ y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::OrAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                assign_to_expr(&(*expr1), x | y, env, settings)
+                assign_to_arith_expr(&(*expr1), x | y, env, settings)
             },
             ArithmeticExpression::Conditional(_, _, expr1, expr2, expr3) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
