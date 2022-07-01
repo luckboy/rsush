@@ -1862,7 +1862,9 @@ impl Interpreter
                 Ok(Some(pid)) => {
                     self.last_job_pid = Some(pid);
                     let job_id = exec.add_job(&Job::new(pid, ""));
-                    eprintln!("[{}] {}", job_id, pid);
+                    if settings.notify_flag {
+                        eprintln!("[{}] {}", job_id, pid);
+                    }
                 },
                 Err(err) => eprintln!("{}", err),
                 _ => (),

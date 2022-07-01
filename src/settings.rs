@@ -53,7 +53,7 @@ impl Settings
             noglob_flag: false,
             noexec_flag: false,
             nolog_flag: false,
-            notify_flag: false,
+            notify_flag: true,
             nounset_flag: false,
             verbose_flag: false,
             vi_flag: false,
