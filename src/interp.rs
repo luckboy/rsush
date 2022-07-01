@@ -903,7 +903,7 @@ impl Interpreter
                 }
                 let mut tmp_ts: Vec<String> = Vec::new();
                 match ts.first() {
-                    Some(s) if is_space && is_first_space(s) && us.first().map(|t| !t.is_empty()).unwrap_or(false) => tmp_ts.push(String::new()),
+                    Some(s) if !is_empty && is_space && is_first_space(s) && us.first().map(|t| !t.is_empty()).unwrap_or(false) => tmp_ts.push(String::new()),
                     _ => (),
                 }
                 tmp_ts.extend(us);
