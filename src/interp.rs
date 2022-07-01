@@ -703,8 +703,8 @@ impl Interpreter
                         is_success = false;
                     },
                 }
+                exec.set_pipes(pipes);
                 if is_success {
-                    exec.set_pipes(pipes);
                     let res = exec.create_process(false, settings, |exec, settings| {
                             exec.push_file(1, exec.pipes()[0].writing_file.clone());
                             exec.clear_pipes();
@@ -729,7 +729,10 @@ impl Interpreter
                             is_success = false;
                         },
                     }
+                    s = String::from(s.trim_end_matches('\n'));
                     self.last_status = self.wait_for_process(exec, pid);
+                } else {
+                    exec.clear_pipes();
                 }
                 if is_success {
                     Some(s)
@@ -1228,9 +1231,10 @@ impl Interpreter
             }
             i += 1;
         }
+        exec.set_pipes(pipes);
         let mut status = 1;
         if is_success {
-            if pipes.is_empty() {
+            if exec.pipes().is_empty() {
                 status = f(self, exec, env, settings);
             } else {
                 status = exec.interpret(|exec| {
@@ -1318,6 +1322,8 @@ impl Interpreter
                         }
                 });
             }
+        } else {
+            exec.clear_pipes();
         }
         for interp_redirect in &interp_redirects[(interp_redirects.len() - i)..] {
             match interp_redirect {
