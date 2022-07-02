@@ -89,6 +89,8 @@ fn set_vars(vars: &[(String, String)], env: &mut Environment, settings: &Setting
     }
 }
 
+const DEFAULT_IFS: &'static str = " \t\n";
+
 fn print_command_for_xtrace(vars: &[(String, String)], args: &[String])
 {
     eprint!("+");
@@ -422,7 +424,7 @@ impl Interpreter
         match self.param(exec, param_name, env, settings) {
             Some(Value::String(s)) => Some(s),
             Some(Value::AtArray(ss)) => {
-                let ifs = env.var("IFS").unwrap_or(String::from(" "));
+                let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
                 let sep = match ifs.chars().next() {
                     Some(c) => {
                         let mut tmp_sep = String::new();
@@ -434,7 +436,7 @@ impl Interpreter
                 Some(ss.join(sep.as_str()))
             },
             Some(Value::StarArray(ss)) => {
-                let ifs = env.var("IFS").unwrap_or(String::from(" "));
+                let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
                 let sep = match ifs.chars().next() {
                     Some(c) => {
                         let mut tmp_sep = String::new();
@@ -1158,7 +1160,7 @@ impl Interpreter
                 },
             }
             if is_join {
-                let ifs = env.var("IFS").unwrap_or(String::from(" "));
+                let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
                 let sep = match ifs.chars().next() {
                     Some(c) => {
                         let mut tmp_sep = String::new();
@@ -1250,9 +1252,10 @@ impl Interpreter
                 },
             }
             if is_split {
-                let ifs = env.var("IFS").unwrap_or(String::from(" "));
+                let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
                 let mut us: Vec<String> = Vec::new();
                 let is_space = ifs.chars().any(char::is_whitespace);
+                let spaces = ifs.replace(|c: char| !c.is_whitespace(), "");
                 if !ifs.is_empty() {
                     for t in &ts {
                         let mut vs: Vec<String> = split_str_for_ifs(t.as_str(), ifs.as_str()).iter().map(|s| String::from(*s)).collect();
@@ -1273,12 +1276,12 @@ impl Interpreter
                 }
                 let mut tmp_ts: Vec<String> = Vec::new();
                 match ts.first() {
-                    Some(s) if !is_empty && is_space && is_first_space(s) && us.first().map(|t| !t.is_empty()).unwrap_or(false) => tmp_ts.push(String::new()),
+                    Some(s) if !is_empty && is_space && is_first_char(s, spaces.as_str()) && us.first().map(|t| !t.is_empty()).unwrap_or(false) => tmp_ts.push(String::new()),
                     _ => (),
                 }
                 tmp_ts.extend(us);
                 match ts.last() {
-                    Some(s) if is_space && is_last_space(s) => {
+                    Some(s) if is_space && is_last_char(s, spaces.as_str()) => {
                         tmp_ts.push(String::new());
                         is_last_s_to_pop = true;
                     },

@@ -298,9 +298,10 @@ pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
 {
     let delims_without_spaces = delims.replace(char::is_whitespace, "");
     let is_space = delims.chars().any(char::is_whitespace);
+    let spaces = delims.replace(|c: char| !c.is_whitespace(), "");
     let mut fields: Vec<&'a str> = Vec::new();
     let t = if is_space {
-        s.trim()
+        s.trim_matches(|c: char| spaces.contains(c))
     } else {
         s
     };
@@ -313,7 +314,7 @@ pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
             let mut is_stop = false;
             loop {
                 match iter.next() {
-                    Some((k, c)) if is_space && c.is_whitespace() => {
+                    Some((k, c)) if is_space && spaces.contains(c) => {
                         if is_first { i = k; }
                         iter.undo((k, c));
                         j = k;
@@ -342,7 +343,7 @@ pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
             if is_space {
                 loop {
                     match iter.next() {
-                        Some((_, c)) if c.is_whitespace() => (),
+                        Some((_, c)) if spaces.contains(c) => (),
                         Some((k, c)) => {
                             iter.undo((k, c));
                             break;
@@ -356,7 +357,7 @@ pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
                     if is_space {
                         loop {
                             match iter.next() {
-                                Some((_, c2)) if c2.is_whitespace() => (),
+                                Some((_, c2)) if spaces.contains(c2) => (),
                                 Some((l, c2)) => {
                                     iter.undo((l, c2));
                                     break;
@@ -374,10 +375,10 @@ pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
     fields
 }
 
-pub fn is_first_space(s: &str) -> bool
-{ s.chars().next().map(char::is_whitespace).unwrap_or(false) }
+pub fn is_first_char(s: &str, delims: &str) -> bool
+{ s.chars().next().map(|c| delims.contains(c)).unwrap_or(false) }
 
-pub fn is_last_space(s: &str) -> bool
+pub fn is_last_char(s: &str, delims: &str) -> bool
 {
     let mut char_iter = s.chars();
     let mut last_c: Option<char> = None;
@@ -387,5 +388,5 @@ pub fn is_last_space(s: &str) -> bool
             None    => break,
         }
     }
-    last_c.map(char::is_whitespace).unwrap_or(false)
+    last_c.map(|c| delims.contains(c)).unwrap_or(false)
 }
