@@ -56,6 +56,7 @@ enum ReturnState
 {
     None,
     Break(usize),
+    Continue(usize),
     Return,
     Exit,
 }
@@ -231,26 +232,34 @@ impl Interpreter
     pub fn last_status(&self) -> i32
     { self.last_status }
 
-    pub fn has_break(&self) -> bool
-    { 
+    pub fn has_continue_with_one(&self) -> bool
+    {
         match self.return_state {
-            ReturnState::Break(_) => true,
+            ReturnState::Continue(1) => true,
             _ => false,
         }
     }
     
-    pub fn has_break_or_return(&self) -> bool
-    { 
+    pub fn has_break_or_continue(&self) -> bool
+    {
         match self.return_state {
-            ReturnState::Break(_) | ReturnState::Return => true,
+            ReturnState::Break(_) | ReturnState::Continue(_) => true,
             _ => false,
         }
     }
     
-    pub fn has_break_or_return_or_exit(&self) -> bool
-    { 
+    pub fn has_break_or_continue_or_return(&self) -> bool
+    {
         match self.return_state {
-            ReturnState::Break(_) | ReturnState::Return | ReturnState::Exit => true,
+            ReturnState::Break(_) | ReturnState::Continue(_) | ReturnState::Return => true,
+            _ => false,
+        }
+    }
+    
+    pub fn has_break_or_continue_or_return_or_exit(&self) -> bool
+    {
+        match self.return_state {
+            ReturnState::Break(_) |  ReturnState::Continue(_) | ReturnState::Return | ReturnState::Exit => true,
             _ => false,
         }
     }
@@ -272,10 +281,19 @@ impl Interpreter
         self.return_state = ReturnState::Break(n);
         0
     }
+    
+    pub fn cont(&mut self, n: usize) -> i32
+    {
+        self.return_state = ReturnState::Continue(n);
+        0
+    }
 
     pub fn set_break(&mut self, n: usize)
     { self.return_state = ReturnState::Break(n); }
 
+    pub fn set_continue(&mut self, n: usize)
+    { self.return_state = ReturnState::Continue(n); }
+    
     pub fn set_return(&mut self)
     { self.return_state = ReturnState::Return; }
     
@@ -285,10 +303,11 @@ impl Interpreter
     pub fn clear_return_state(&mut self)
     { self.return_state = ReturnState::None; }
 
-    pub fn clear_return_state_for_break(&mut self)
+    pub fn clear_return_state_for_break_or_continue(&mut self)
     {
         match self.return_state {
             ReturnState::Break(n) if n > 1 => self.return_state = ReturnState::Break(n - 1),
+            ReturnState::Continue(n) if n > 1 => self.return_state = ReturnState::Continue(n - 1),
             _ => self.return_state = ReturnState::None,
         }
     }
@@ -1923,13 +1942,17 @@ impl Interpreter
                                                     env.set_var(name.as_str(), elem.as_str(), settings);
                                                     if settings.noexec_flag { break; }
                                                     interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
-                                                    if interp.has_break_or_return_or_exit() {
+                                                    if interp.has_continue_with_one() {
+                                                        interp.clear_return_state();
+                                                        continue;
+                                                    }
+                                                    if interp.has_break_or_continue_or_return_or_exit() {
                                                         break;
                                                     }
                                                 }
                                                 interp.current_loop_count -= 1;
-                                                if interp.has_break() {
-                                                    interp.clear_return_state_for_break();
+                                                if interp.has_break_or_continue() {
+                                                    interp.clear_return_state_for_break_or_continue();
                                                 }
                                                 interp.last_status
                                             },
@@ -2033,7 +2056,11 @@ impl Interpreter
                                     if cond_status == 0 {
                                         if settings.noexec_flag { break; }
                                         interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
-                                        if interp.has_break_or_return_or_exit() {
+                                        if interp.has_continue_with_one() {
+                                            interp.clear_return_state();
+                                            continue;
+                                        }
+                                        if interp.has_break_or_continue_or_return_or_exit() {
                                             break;
                                         }
                                     } else {
@@ -2041,8 +2068,8 @@ impl Interpreter
                                     }
                                 }
                                 interp.current_loop_count -= 1;
-                                if interp.has_break() {
-                                    interp.clear_return_state_for_break();
+                                if interp.has_break_or_continue() {
+                                    interp.clear_return_state_for_break_or_continue();
                                 }
                                 interp.last_status
                         })
@@ -2056,7 +2083,11 @@ impl Interpreter
                                     interp.non_simple_comamnd_count -= 1;
                                     if cond_status != 0 {
                                         interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
-                                        if interp.has_break_or_return_or_exit() {
+                                        if interp.has_continue_with_one() {
+                                            interp.clear_return_state();
+                                            continue;
+                                        }
+                                        if interp.has_break_or_continue_or_return_or_exit() {
                                             break;
                                         }
                                     } else {
@@ -2064,8 +2095,8 @@ impl Interpreter
                                     }
                                 }
                                 interp.current_loop_count -= 1;
-                                if interp.has_break() {
-                                    interp.clear_return_state_for_break();
+                                if interp.has_break_or_continue() {
+                                    interp.clear_return_state_for_break_or_continue();
                                 }
                                 interp.last_status
                         })
@@ -2204,7 +2235,7 @@ impl Interpreter
                         if settings.noexec_flag { return self.last_status; }
                         self.non_simple_comamnd_count += 1;
                         let mut status = self.interpret_pipe_command(exec, &(*command.first_command), env, settings);
-                        if !self.has_break_or_return_or_exit() 
+                        if !self.has_break_or_continue_or_return_or_exit() 
                         {
                             for pair in &command.pairs {
                                 if settings.noexec_flag { break; }
@@ -2212,13 +2243,13 @@ impl Interpreter
                                     LogicalOperator::And => {
                                         if status == 0 {
                                             status = self.interpret_pipe_command(exec, &(*pair.command), env, settings);
-                                            if self.has_break_or_return_or_exit() { break; }
+                                            if self.has_break_or_continue_or_return_or_exit() { break; }
                                         }
                                     },
                                     LogicalOperator::Or => {
                                         if status != 0 {
                                             status = self.interpret_pipe_command(exec, &(*pair.command), env, settings);
-                                            if self.has_break_or_return_or_exit() { break; }
+                                            if self.has_break_or_continue_or_return_or_exit() { break; }
                                         }
                                     },
                                 }
@@ -2259,7 +2290,7 @@ impl Interpreter
                 for command in commands.iter() {
                     if settings.noexec_flag { break; }
                     status = self.interpret_logical_command(exec, &(**command), env, settings);
-                    if self.has_break_or_return_or_exit() { break; }
+                    if self.has_break_or_continue_or_return_or_exit() { break; }
                 }
                 status
         })
@@ -2270,7 +2301,7 @@ impl Interpreter
         self.push_loop_count(0);
         let status = self.interpret_compound_command(exec, &fun_body.command, fun_body.redirects.as_slice(), env, settings);
         self.pop_loop_count();
-        if self.has_break_or_return() {
+        if self.has_break_or_continue_or_return() {
             self.clear_return_state();
         }
         status
