@@ -2233,10 +2233,14 @@ impl Interpreter
             if settings.noexec_flag { return self.last_status; }
             match exec.create_process(true, settings, f) {
                 Ok(Some(pid)) => {
-                    self.last_job_pid = Some(pid);
-                    let job_id = exec.add_job(&Job::new(pid, ""));
-                    if settings.notify_flag {
-                        eprintln!("[{}] {}", job_id, pid);
+                    match exec.add_job(&Job::new(pid, "")) {
+                        Some(job_id) => {
+                            self.last_job_pid = Some(pid);
+                            if settings.notify_flag {
+                                eprintln!("[{}] {}", job_id, pid);
+                            }
+                        },
+                        None => eprintln!("No free job identifiers"),
                     }
                 },
                 Err(err) => eprintln!("{}", err),

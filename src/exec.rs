@@ -234,14 +234,14 @@ impl Executor
         }
     }
 
-    pub fn add_job(&mut self, job: &Job) -> u32
+    pub fn add_job(&mut self, job: &Job) -> Option<u32>
     {
         let mut job_id: u32 = 1;
         loop {
             if !self.jobs.contains_key(&job_id) {
                 break;
             }
-            job_id += 1;
+            job_id = job_id.checked_add(1)?;
         }
         match self.current_job_id.map(|id| self.jobs.get_mut(&id)).flatten() {
             Some(tmp_job) => tmp_job.next_job_id = Some(job_id),
@@ -251,7 +251,7 @@ impl Executor
         tmp_job.prev_job_id = self.current_job_id;
         self.jobs.insert(job_id, tmp_job);
         self.current_job_id = Some(job_id);
-        job_id
+        Some(job_id)
     }
     
     pub fn set_job_status(&mut self, job_id: u32, status: WaitStatus)
