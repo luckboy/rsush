@@ -460,7 +460,8 @@ impl Executor
         Ok(())
     }
     
-    pub fn execute(&mut self, interp: &mut Interpreter, vars: &[(String, String)], arg0: &str, args: &[String], env: &mut Environment, settings: &mut Settings) -> Result<WaitStatus>
+    pub fn execute<F>(&mut self, interp: &mut Interpreter, vars: &[(String, String)], arg0: &str, args: &[String], is_untraced: bool, env: &mut Environment, settings: &mut Settings, mut stop_f: F) -> Result<WaitStatus>
+        where F: FnMut(i32) -> bool
     {
         match env.builtin_fun(arg0) {
             Some(builtin_fun) => {
@@ -487,7 +488,14 @@ impl Executor
                                     settings.pop_args();
                                     status
                             })?;
-                            let wait_status = self.wait_for_process(pid, true, false)?;
+                            let wait_status = loop {
+                                match self.wait_for_process(pid, true, is_untraced)? {
+                                    tmp_wait_status @ WaitStatus::Stopped(sig) => {
+                                        if stop_f(sig) { break tmp_wait_status };
+                                    },
+                                    tmp_wait_status => break tmp_wait_status,
+                                }
+                            };
                             Ok(wait_status)
                         } else {
                             let mut tmp_args = Arguments::new();
@@ -518,7 +526,14 @@ impl Executor
                                     },
                                 }
                         })?;
-                        let wait_status = self.wait_for_process(pid, true, false)?;
+                        let wait_status = loop {
+                            match self.wait_for_process(pid, true, is_untraced)? {
+                                tmp_wait_status @ WaitStatus::Stopped(sig) => {
+                                    if stop_f(sig) { break tmp_wait_status };
+                                },
+                                tmp_wait_status => break tmp_wait_status,
+                            }
+                        };
                         Ok(wait_status)
                     },
                 }

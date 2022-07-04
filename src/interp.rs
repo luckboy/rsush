@@ -363,7 +363,7 @@ impl Interpreter
                 None => 0,
             }
         } else {
-            match exec.execute(self, vars, arg0, args, env, settings) {
+            match exec.execute(self, vars, arg0, args, false, env, settings, |_| true) {
                 Ok(WaitStatus::None) => panic!("wait status is none"),
                 Ok(WaitStatus::Exited(status)) => status,
                 Ok(WaitStatus::Signaled(sig, is_coredump)) => {
