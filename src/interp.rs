@@ -58,7 +58,7 @@ enum ReturnState
     Break(usize),
     Continue(usize),
     Return,
-    Exit,
+    Exit(bool),
 }
 
 #[derive(Clone)]
@@ -104,87 +104,8 @@ fn print_command_for_xtrace(vars: &[(String, String)], args: &[String])
     println!("");
 }
 
-fn add_glob_expansions(ss: &[String], ts: &mut Vec<String>, settings: &mut Settings) -> bool
-{
-    for s in ss.iter() {
-        if !settings.noglob_flag {
-            match glob(s, 0, None) {
-                GlobResult::Ok(path_bufs) => {
-                    for path_buf in &path_bufs {
-                        let t = if settings.strlossy_flag {
-                            path_buf.to_string_lossy().into_owned()
-                        } else {
-                            match path_buf.to_str() {
-                                Some(t) => String::from(t),
-                                None => {
-                                    eprintln!("Invalid UTF-8");
-                                    return false;
-                                },
-                            }
-                        };
-                        ts.push(t);
-                    }
-                },
-                GlobResult::Aborted => {
-                    eprintln!("Glob I/O error");
-                    return false;
-                },
-                GlobResult::NoMatch => {
-                    let path_buf = unescape_path_pattern(s);
-                    let t = if settings.strlossy_flag {
-                        path_buf.to_string_lossy().into_owned()
-                    } else {
-                        match path_buf.to_str() {
-                            Some(t) => String::from(t),
-                            None => {
-                                eprintln!("Invalid UTF-8");
-                                return false;
-                            },
-                        }
-                    };
-                    ts.push(t);
-                },
-                GlobResult::NoSpace => {
-                    eprintln!("Can't allocate memory");
-                    return false;
-                },
-            }
-        } else {
-            let path_buf = unescape_path_pattern(s);
-            let t = if settings.strlossy_flag {
-                path_buf.to_string_lossy().into_owned()
-            } else {
-                match path_buf.to_str() {
-                    Some(t) => String::from(t),
-                    None => {
-                        eprintln!("Invalid UTF-8");
-                        return false;
-                    },
-                }
-            };
-            ts.push(t);
-        }
-    }
-    false
-}
-
-fn assign_to_arith_expr(expr: &ArithmeticExpression, x: i64, env: &mut Environment, settings: &Settings) -> Option<i64>
-{
-    match expr {
-        ArithmeticExpression::Parameter(_, _, param_name) => {
-            if set_param(param_name, format!("{}", x).as_str(), env, settings) {
-                Some(x)
-            } else {
-                println!("{}: Can't set parameter", param_name);
-                None
-            }
-        },
-        _ => {
-            eprintln!("Can't assign to not parameter");
-            None
-        },
-    }
-}
+fn is_builtin_fun(name: &str, env: &Environment) -> bool
+{ env.builtin_fun(name).is_some() }
 
 impl Interpreter
 {
@@ -259,14 +180,30 @@ impl Interpreter
     pub fn has_break_or_continue_or_return_or_exit(&self) -> bool
     {
         match self.return_state {
-            ReturnState::Break(_) |  ReturnState::Continue(_) | ReturnState::Return | ReturnState::Exit => true,
+            ReturnState::Break(_) |  ReturnState::Continue(_) | ReturnState::Return | ReturnState::Exit(_) => true,
             _ => false,
         }
     }
     
-    pub fn exit(&mut self, status: i32) -> i32
+    pub fn has_exit(&self) -> bool
     {
-        self.return_state = ReturnState::Exit;
+        match self.return_state {
+            ReturnState::Exit(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn has_exit_with_interactive(&self) -> bool
+    {
+        match self.return_state {
+            ReturnState::Exit(true) => true,
+            _ => false,
+        }
+    }
+
+    pub fn exit(&mut self, status: i32, is_interactive: bool) -> i32
+    {
+        self.return_state = ReturnState::Exit(is_interactive);
         status
     }
 
@@ -297,8 +234,8 @@ impl Interpreter
     pub fn set_return(&mut self)
     { self.return_state = ReturnState::Return; }
     
-    pub fn set_exit(&mut self)
-    { self.return_state = ReturnState::Exit; }
+    pub fn set_exit(&mut self, is_interactive: bool)
+    { self.return_state = ReturnState::Exit(is_interactive); }
     
     pub fn clear_return_state(&mut self)
     { self.return_state = ReturnState::None; }
@@ -442,6 +379,7 @@ impl Interpreter
                             Some(None)
                         } else {
                             eprintln!("{}: Parameter not set", param_name);
+                            self.set_exit(false);
                             None
                         }
                     },
@@ -493,6 +431,7 @@ impl Interpreter
                                         Some(Some(Value::String(word)))
                                     } else {
                                         eprintln!("{}: Can't set parameter", param_name);
+                                        self.set_exit(false);
                                         None
                                     }
                                 }
@@ -502,6 +441,7 @@ impl Interpreter
                                     Some(Some(Value::String(word)))
                                 } else {
                                     eprintln!("{}: Can't set parameter", param_name);
+                                    self.set_exit(false);
                                     None
                                 }
                             },
@@ -526,6 +466,7 @@ impl Interpreter
                                     Some(Some(Value::String(word)))
                                 } else {
                                     eprintln!("{}: Can't set parameter", param_name);
+                                    self.set_exit(false);
                                     None
                                 }
                             },
@@ -548,7 +489,7 @@ impl Interpreter
                                         String::from("Parameter null or not set")
                                     };
                                     eprintln!("{}: {}", param_name, err);
-                                    self.set_exit();
+                                    self.set_exit(false);
                                     None
                                 }
                             },
@@ -559,7 +500,7 @@ impl Interpreter
                                     String::from("Parameter null or not set")
                                 };
                                 eprintln!("{}: {}", param_name, err);
-                                self.set_exit();
+                                self.set_exit(false);
                                 None
                             },
                         }
@@ -585,7 +526,7 @@ impl Interpreter
                                     String::from("Parameter not set")
                                 };
                                 eprintln!("{}: {}", param_name, err);
-                                self.set_exit();
+                                self.set_exit(false);
                                 None
                             },
                         }
@@ -674,7 +615,7 @@ impl Interpreter
         }
     }
 
-    fn perform_param_len_expansion(&self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<String>
+    fn perform_param_len_expansion(&mut self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<String>
     {
         match self.param_to_string(exec, param_name, env, settings) {
             Some(s) => Some(format!("{}", s.len())),
@@ -683,6 +624,7 @@ impl Interpreter
                     Some(String::from("0"))
                 } else {
                     eprintln!("{}: Parameter not set", param_name);
+                    self.set_exit(false);
                     None
                 }
             },
@@ -737,12 +679,33 @@ impl Interpreter
                 if is_success {
                     Some(s)
                 } else {
+                    self.set_exit(false);
                     None
                 }
         })
     }
-    
-    fn evaluate_arith_expr(&self, exec: &Executor, expr: &ArithmeticExpression, env: &mut Environment, settings: &Settings) -> Option<i64>
+
+    fn assign_to_arith_expr(&mut self, expr: &ArithmeticExpression, x: i64, env: &mut Environment, settings: &Settings) -> Option<i64>
+    {
+        match expr {
+            ArithmeticExpression::Parameter(_, _, param_name) => {
+                if set_param(param_name, format!("{}", x).as_str(), env, settings) {
+                    Some(x)
+                } else {
+                    println!("{}: Can't set parameter", param_name);
+                    self.set_exit(false);
+                    None
+                }
+            },
+            _ => {
+                eprintln!("Can't assign to not parameter");
+                self.set_exit(false);
+                None
+            },
+        }
+    }
+
+    fn evaluate_arith_expr(&mut self, exec: &Executor, expr: &ArithmeticExpression, env: &mut Environment, settings: &Settings) -> Option<i64>
     {
         match expr {
             ArithmeticExpression::Number(_, _, x) => Some(*x),
@@ -759,6 +722,7 @@ impl Interpreter
                                         } else {
                                             eprintln!("{}: Too small number", param_name);
                                         }
+                                        self.set_exit(false);
                                         None
                                     },
                                 }
@@ -775,6 +739,7 @@ impl Interpreter
                             Some(0)
                         } else {
                             eprintln!("{}: Parameter not set", param_name);
+                            self.set_exit(false);
                             None
                         }
                     },
@@ -786,6 +751,7 @@ impl Interpreter
                     Some(y) => Some(y),
                     None => {
                         eprintln!("Overflow");
+                        self.set_exit(false);
                         None
                     },
                 }
@@ -809,6 +775,7 @@ impl Interpreter
                     Some(z) => Some(z),
                     None => {
                         eprintln!("Overflow");
+                        self.set_exit(false);
                         None
                     },
                 }
@@ -821,11 +788,13 @@ impl Interpreter
                         Some(z) => Some(z),
                         None => {
                             eprintln!("Overflow");
+                            self.set_exit(false);
                             None
                         },
                     }
                 } else {
                     eprintln!("Division by zero");
+                    self.set_exit(false);
                     None
                 }
             },
@@ -837,11 +806,13 @@ impl Interpreter
                         Some(z) => Some(z),
                         None => {
                             eprintln!("Overflow");
+                            self.set_exit(false);
                             None
                         },
                     }
                 } else {
                     eprintln!("Division by zero");
+                    self.set_exit(false);
                     None
                 }
             },
@@ -852,6 +823,7 @@ impl Interpreter
                     Some(z) => Some(z),
                     None => {
                         eprintln!("Overflow");
+                        self.set_exit(false);
                         None
                     },
                 }
@@ -863,6 +835,7 @@ impl Interpreter
                     Some(z) => Some(z),
                     None => {
                         eprintln!("Overflow");
+                        self.set_exit(false);
                         None
                     },
                 }
@@ -875,11 +848,13 @@ impl Interpreter
                         Some(z) => Some(z),
                         None => {
                             eprintln!("Overflow");
+                            self.set_exit(false);
                             None
                         },
                     }
                 } else {
                     eprintln!("Overflow");
+                    self.set_exit(false);
                     None
                 }
             },
@@ -891,11 +866,13 @@ impl Interpreter
                         Some(z) => Some(z),
                         None => {
                             eprintln!("Overflow");
+                            self.set_exit(false);
                             None
                         },
                     }
                 } else {
                     eprintln!("Overflow");
+                    self.set_exit(false);
                     None
                 }
             },
@@ -964,15 +941,16 @@ impl Interpreter
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Assign, expr2) => {
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                assign_to_arith_expr(&(*expr1), y, env, settings)
+                self.assign_to_arith_expr(&(*expr1), y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::MultiplyAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 match x.checked_mul(y) {
-                    Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
+                    Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
                     None => {
                         eprintln!("Overflow");
+                        self.set_exit(false);
                         None
                     },
                 }
@@ -982,14 +960,16 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y != 0 {
                     match x.checked_div(y) {
-                        Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
+                        Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
                         None => {
                             eprintln!("Overflow");
+                            self.set_exit(false);
                             None
                         },
                     }
                 } else {
                     eprintln!("Division by zero");
+                    self.set_exit(false);
                     None
                 }
             },
@@ -998,14 +978,16 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y != 0 {
                     match x.checked_rem(y) {
-                        Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
+                        Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
                         None => {
                             eprintln!("Overflow");
+                            self.set_exit(false);
                             None
                         },
                     }
                 } else {
                     eprintln!("Division by zero");
+                    self.set_exit(false);
                     None
                 }
             },
@@ -1013,9 +995,10 @@ impl Interpreter
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 match x.checked_add(y) {
-                    Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
+                    Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
                     None => {
                         eprintln!("Overflow");
+                        self.set_exit(false);
                         None
                     },
                 }
@@ -1024,9 +1007,10 @@ impl Interpreter
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 match x.checked_sub(y) {
-                    Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
+                    Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
                     None => {
                         eprintln!("Overflow");
+                        self.set_exit(false);
                         None
                     },
                 }
@@ -1036,14 +1020,16 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
-                        Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
+                        Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
                         None => {
                             eprintln!("Overflow");
+                            self.set_exit(false);
                             None
                         },
                     }
                 } else {
                     eprintln!("Overflow");
+                    self.set_exit(false);
                     None
                 }
             },
@@ -1052,31 +1038,33 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
-                        Some(z) => assign_to_arith_expr(&(*expr1), z, env, settings),
+                        Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
                         None => {
                             eprintln!("Overflow");
+                            self.set_exit(false);
                             None
                         },
                     }
                 } else {
                     eprintln!("Overflow");
+                    self.set_exit(false);
                     None
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::AndAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                assign_to_arith_expr(&(*expr1), x & y, env, settings)
+                self.assign_to_arith_expr(&(*expr1), x & y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ExclusiveOrAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                assign_to_arith_expr(&(*expr1), x ^ y, env, settings)
+                self.assign_to_arith_expr(&(*expr1), x ^ y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::OrAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                assign_to_arith_expr(&(*expr1), x | y, env, settings)
+                self.assign_to_arith_expr(&(*expr1), x | y, env, settings)
             },
             ArithmeticExpression::Conditional(_, _, expr1, expr2, expr3) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
@@ -1089,7 +1077,7 @@ impl Interpreter
         }
     }
     
-    fn perform_arith_expansion(&self, exec: &Executor, expr: &ArithmeticExpression, env: &mut Environment, settings: &Settings) -> Option<String>
+    fn perform_arith_expansion(&mut self, exec: &Executor, expr: &ArithmeticExpression, env: &mut Environment, settings: &Settings) -> Option<String>
     {
         match self.evaluate_arith_expr(exec, expr, env, settings) {
             Some(x) => Some(format!("{}", x)),
@@ -1289,6 +1277,75 @@ impl Interpreter
         true
     }
     
+    fn add_glob_expansions(&mut self, ss: &[String], ts: &mut Vec<String>, settings: &mut Settings) -> bool
+    {
+        for s in ss.iter() {
+            if !settings.noglob_flag {
+                match glob(s, 0, None) {
+                    GlobResult::Ok(path_bufs) => {
+                        for path_buf in &path_bufs {
+                            let t = if settings.strlossy_flag {
+                                path_buf.to_string_lossy().into_owned()
+                            } else {
+                                match path_buf.to_str() {
+                                    Some(t) => String::from(t),
+                                    None => {
+                                        eprintln!("Invalid UTF-8");
+                                        self.set_exit(false);
+                                        return false;
+                                    },
+                                }
+                            };
+                            ts.push(t);
+                        }
+                    },
+                    GlobResult::Aborted => {
+                        eprintln!("Glob I/O error");
+                        self.set_exit(false);
+                        return false;
+                    },
+                    GlobResult::NoMatch => {
+                        let path_buf = unescape_path_pattern(s);
+                        let t = if settings.strlossy_flag {
+                            path_buf.to_string_lossy().into_owned()
+                        } else {
+                            match path_buf.to_str() {
+                                Some(t) => String::from(t),
+                                None => {
+                                    eprintln!("Invalid UTF-8");
+                                    self.set_exit(false);
+                                    return false;
+                                },
+                            }
+                        };
+                        ts.push(t);
+                    },
+                    GlobResult::NoSpace => {
+                        eprintln!("Can't allocate memory");
+                        self.set_exit(false);
+                        return false;
+                    },
+                }
+            } else {
+                let path_buf = unescape_path_pattern(s);
+                let t = if settings.strlossy_flag {
+                    path_buf.to_string_lossy().into_owned()
+                } else {
+                    match path_buf.to_str() {
+                        Some(t) => String::from(t),
+                        None => {
+                            eprintln!("Invalid UTF-8");
+                            self.set_exit(false);
+                            return false;
+                        },
+                    }
+                };
+                ts.push(t);
+            }
+        }
+        false
+    }
+
     fn perform_var_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
         let mut ss: Vec<String> = Vec::new();
@@ -1342,7 +1399,7 @@ impl Interpreter
             return None;
         }
         let mut ts: Vec<String> = Vec::new();
-        if add_glob_expansions(&ss, &mut ts, settings) {
+        if self.add_glob_expansions(&ss, &mut ts, settings) {
             Some(ts)
         } else {
             None
@@ -1366,7 +1423,7 @@ impl Interpreter
             }
         }
         let mut ts: Vec<String> = Vec::new();
-        if add_glob_expansions(&ss, &mut ts, settings) {
+        if self.add_glob_expansions(&ss, &mut ts, settings) {
             Some(ts)
         } else {
             None
@@ -1406,7 +1463,7 @@ impl Interpreter
         Some(ts.join(""))
     }
     
-    fn interpret_redirects<F>(&mut self, exec: &mut Executor, redirects: &[Rc<Redirection>], env: &mut Environment, settings: &mut Settings, f: F) -> i32
+    fn interpret_redirects<F>(&mut self, exec: &mut Executor, redirects: &[Rc<Redirection>], is_builtin_fun: bool, env: &mut Environment, settings: &mut Settings, f: F) -> i32
         where F: FnOnce(&mut Self, &mut Executor, &mut Environment, &mut Settings) -> i32
     {
         let mut is_success = true;
@@ -1503,6 +1560,7 @@ impl Interpreter
             }
         }
         if !is_success { return 1; }
+        let mut is_success_for_interp_redirects = true;
         let mut pipes: Vec<Pipe> = Vec::new();
         let mut i = 0;
         for interp_redirect in &interp_redirects {
@@ -1513,6 +1571,7 @@ impl Interpreter
                         Err(err) => {
                             eprintln!("{}: {}", path, err);
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1530,6 +1589,7 @@ impl Interpreter
                         Err(err) => {
                             eprintln!("{}: {}", path, err);
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1543,6 +1603,7 @@ impl Interpreter
                         Err(err) => {
                             eprintln!("{}: {}", path, err);
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1556,6 +1617,7 @@ impl Interpreter
                         Err(err) => {
                             eprintln!("{}: {}", path, err);
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1567,6 +1629,7 @@ impl Interpreter
                         None => {
                             eprintln!("{}: Bad fd number", *old_vfd);
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1577,6 +1640,7 @@ impl Interpreter
                         Err(err) => {
                             eprintln!("{}", err);
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         }
                     }
@@ -1688,7 +1752,15 @@ impl Interpreter
                 InterpreterRedirection::HereDocument(_, _) => (),
             }
         }
-        status
+        if is_success_for_interp_redirects {
+            status
+        } else {
+            if is_builtin_fun {
+                self.exit(status, false)
+            } else {
+                status
+            }
+        }
     }
     
     fn add_vars(&mut self, exec: &mut Executor, word_iter: &mut slice::Iter<'_, Rc<Word>>, vars: &mut Vec<(String, String)>,  env: &mut Environment, settings: &mut Settings) -> Option<Option<Rc<Word>>>
@@ -1823,7 +1895,7 @@ impl Interpreter
                                     if settings.xtrace_flag {
                                         print_command_for_xtrace(vars.as_slice(), args.as_slice());
                                     }
-                                    self.interpret_redirects(exec, redirects.as_slice(), env, settings, |interp, exec, env, settings| {
+                                    self.interpret_redirects(exec, redirects.as_slice(), is_builtin_fun(arg0.as_str(), env), env, settings, |interp, exec, env, settings| {
                                             interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], env, settings)
                                     })
                                 },
@@ -1853,7 +1925,7 @@ impl Interpreter
         };
         self.last_status = status;
         if settings.errexit_flag && self.non_simple_comamnd_count == 0 {
-            self.exit(status)
+            self.exit(status, true)
         } else {
             status
         }
@@ -1861,7 +1933,7 @@ impl Interpreter
 
     fn interpret_compound_command(&mut self, exec: &mut Executor, command: &CompoundCommand, redirects: &[Rc<Redirection>], env: &mut Environment, settings: &mut Settings) -> i32
     {
-        self.interpret_redirects(exec, redirects, env, settings, |interp, exec, env, settings| {
+        self.interpret_redirects(exec, redirects, false, env, settings, |interp, exec, env, settings| {
                 match command {
                     CompoundCommand::BraceGroup(commands) => {
                         exec.interpret_or(commands.len() > 1, |exec| {
