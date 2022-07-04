@@ -2235,8 +2235,7 @@ impl Interpreter
                         if settings.noexec_flag { return self.last_status; }
                         self.non_simple_comamnd_count += 1;
                         let mut status = self.interpret_pipe_command(exec, &(*command.first_command), env, settings);
-                        if !self.has_break_or_continue_or_return_or_exit() 
-                        {
+                        if !self.has_break_or_continue_or_return_or_exit() {
                             for pair in &command.pairs {
                                 if settings.noexec_flag { break; }
                                 match pair.op {
