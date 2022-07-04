@@ -1343,7 +1343,7 @@ impl Interpreter
                 ts.push(t);
             }
         }
-        false
+        true
     }
 
     fn perform_var_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
