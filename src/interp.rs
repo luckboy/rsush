@@ -344,56 +344,17 @@ impl Interpreter
 
     fn execute(&mut self, exec: &mut Executor, vars: &[(String, String)], arg0: &str, args: &[String], env: &mut Environment, settings: &mut Settings) -> i32
     {
-        if arg0 == "." {
-            for (name, value) in vars.iter() {
-                env.unset_unexported_var(name.as_str());
-                env.set_exported_var(name.as_str(), value.as_str());
-            }
-            match args.first() {
-                Some(path) => {
-                    match File::open(path) {
-                        Ok(mut file) => {
-                            let mut br = BufReader::new(&mut file);
-                            let mut cr = CharReader::new(&mut br);
-                            let mut lexer = Lexer::new(path, &Position::new(0, 0), &mut cr, 0, false);
-                            let mut parser = Parser::new();
-                            loop {
-                                match parser.parse_logical_commands_for_line(&mut lexer, settings) {
-                                    Ok(None) => break self.last_status,
-                                    Ok(Some(commands)) => {
-                                        if settings.verbose_flag {
-                                            eprint!("{}", lexer.content_for_verbose());
-                                        }
-                                        self.interpret_logical_commands(exec, &commands, env, settings);
-                                    },
-                                    Err(err) => {
-                                        eprintln!("{}", err);
-                                        break 1;
-                                    },
-                                }
-                            }
-                        },
-                        Err(err) => {
-                            eprintln!("{}", err);
-                            1
-                        },
-                    }
-                },
-                None => 0,
-            }
-        } else {
-            match exec.execute(self, vars, arg0, args, false, env, settings, |_| true) {
-                Ok(WaitStatus::None) => panic!("wait status is none"),
-                Ok(WaitStatus::Exited(status)) => status,
-                Ok(WaitStatus::Signaled(sig, is_coredump)) => {
-                    eprintln!("{}", self.signal_string(sig, is_coredump));
-                    sig + 128
-                },
-                Ok(WaitStatus::Stopped(_)) => panic!("wait status is stopped"),
-                Err(err) => {
-                    eprintln!("{}", err);
-                    1
-                }
+        match exec.execute(self, vars, arg0, args, false, env, settings, |_| true) {
+            Ok(WaitStatus::None) => panic!("wait status is none"),
+            Ok(WaitStatus::Exited(status)) => status,
+            Ok(WaitStatus::Signaled(sig, is_coredump)) => {
+                eprintln!("{}", self.signal_string(sig, is_coredump));
+                sig + 128
+            },
+            Ok(WaitStatus::Stopped(_)) => panic!("wait status is stopped"),
+            Err(err) => {
+                eprintln!("{}", err);
+                1
             }
         }
     }
