@@ -466,9 +466,7 @@ impl Executor
         match env.builtin_fun(arg0) {
             Some(builtin_fun) => {
                 let mut tmp_args = vec![String::from(arg0)];
-                for arg in args.iter() {
-                    tmp_args.push(arg.clone());
-                }
+                tmp_args.extend_from_slice(args);
                 let status = builtin_fun(vars, tmp_args.as_slice(), interp, self, env, settings);
                 Ok(WaitStatus::Exited(status))
             },
