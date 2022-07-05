@@ -20,4 +20,4 @@ use crate::exec::*;
 use crate::interp::*;
 use crate::settings::*;
 
-pub type BuiltinFunction = fn(&[String], &mut Interpreter, &mut Executor, &mut Environment, &mut Settings) -> i32;
+pub type BuiltinFunction = fn(&[(String, String)], &[String], &mut Interpreter, &mut Executor, &mut Environment, &mut Settings) -> i32;

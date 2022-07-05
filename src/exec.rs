@@ -469,7 +469,7 @@ impl Executor
                 for arg in args.iter() {
                     tmp_args.push(arg.clone());
                 }
-                let status = builtin_fun(tmp_args.as_slice(), interp, self, env, settings);
+                let status = builtin_fun(vars, tmp_args.as_slice(), interp, self, env, settings);
                 Ok(WaitStatus::Exited(status))
             },
             None => {
