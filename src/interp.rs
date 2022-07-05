@@ -31,6 +31,8 @@ use crate::parser::*;
 use crate::settings::*;
 use crate::utils::*;
 
+pub const DEFAULT_IFS: &'static str = " \t\n";
+
 #[derive(Clone, Debug)]
 pub enum Value
 {
@@ -89,8 +91,6 @@ fn set_vars(vars: &[(String, String)], env: &mut Environment, settings: &Setting
         env.set_var(name.as_str(), value.as_str(), settings);
     }
 }
-
-const DEFAULT_IFS: &'static str = " \t\n";
 
 fn print_command_for_xtrace(vars: &[(String, String)], args: &[String])
 {
