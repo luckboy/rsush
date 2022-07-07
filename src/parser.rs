@@ -1613,8 +1613,10 @@ impl Parser
                         };
                         match lexer.next_token(settings)? {
                             (Token::LParen, pos2) => {
+                                lexer.push_initial();
                                 match lexer.next_token(settings)? {
                                     (Token::RParen, _) => {
+                                        lexer.pop_state();
                                         lexer.push_first_word();
                                         self.has_first_word_or_third_word = true;
                                         self.skip_newlines(lexer, settings)?;
@@ -1631,6 +1633,7 @@ impl Parser
                                         }
                                     },
                                     (token3, pos3) => {
+                                        lexer.pop_state();
                                         lexer.undo_token(&token3, &pos3);
                                         lexer.undo_token(&Token::LParen, &pos2);
                                         lexer.undo_token(&Token::Word(word_elems), &pos);
