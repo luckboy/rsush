@@ -2296,7 +2296,7 @@ impl Interpreter
             if settings.noexec_flag { return self.last_status; }
             match exec.create_process(true, settings, f) {
                 Ok(Some(pid)) => {
-                    match exec.add_job(&Job::new(pid, "")) {
+                    match exec.add_job(&Job::new(pid, format!("{}", command).as_str())) {
                         Some(job_id) => {
                             self.last_job_pid = Some(pid);
                             if settings.notify_flag {
