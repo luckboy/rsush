@@ -38,6 +38,39 @@ enum State
     InArithmeticExpressionAndParentheses,
 }
 
+fn fmt_str(s: &str, f: &mut fmt::Formatter<'_>, is_double_quote: bool, is_here_doc: bool) -> fmt::Result
+{
+    for c in s.chars() {
+        if !is_double_quote {
+            if !is_here_doc {
+                if c == ' ' || c == '\'' || c == '"' {
+                    write!(f, "\\")?;
+                }
+            }
+        } else {
+            if !is_here_doc {
+                if c == '"' {
+                    write!(f, "\\")?;
+                }
+            }
+        }
+        if c == '$' || c == '`' {
+            write!(f, "\\")?;
+        }
+        write!(f, "{}", c)?;
+    }
+    Ok(())
+}
+
+#[derive(Copy, Clone)]
+pub struct HereDocumentWordStr<'a>(pub &'a str);
+
+impl<'a> fmt::Display for HereDocumentWordStr<'a>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    { fmt_str(self.0, f, false, false) }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SpecialParameterName
 {
@@ -83,6 +116,27 @@ pub enum ParameterModifier
     HashHash,
 }
 
+impl fmt::Display for ParameterModifier
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            ParameterModifier::ColonMinus => write!(f, ":-"),
+            ParameterModifier::Minus => write!(f, "-"),
+            ParameterModifier::ColonEqual => write!(f, ":="),
+            ParameterModifier::Equal => write!(f, "="),
+            ParameterModifier::ColonQues => write!(f, ":?"),
+            ParameterModifier::Ques => write!(f, "?"),
+            ParameterModifier::ColonPlus => write!(f, ":+"),
+            ParameterModifier::Plus => write!(f, "+"),
+            ParameterModifier::Perc => write!(f, "%"),
+            ParameterModifier::PercPerc => write!(f, "%%"),
+            ParameterModifier::Hash => write!(f, "#"),
+            ParameterModifier::HashHash => write!(f, "##"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParameterName
 {
@@ -113,12 +167,83 @@ pub enum SimpleWordElement
     ArithmeticExpression(ArithmeticExpression),
 }
 
+impl fmt::Display for SimpleWordElement
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            SimpleWordElement::String(s) => fmt_str(s.as_str(), f, true, false),
+            SimpleWordElement::Parameter(ParameterName::Special(special_param_name), None) => write!(f, "${}", special_param_name),
+            SimpleWordElement::Parameter(param_name, None) => write!(f, "${{{}}}", param_name),
+            SimpleWordElement::Parameter(param_name, Some((modifier, words))) => {
+                write!(f, "${{{}{}", param_name, modifier)?;
+                let mut is_first = true;
+                for word in words {
+                    if !is_first { 
+                        write!(f, " ")?;
+                    }
+                    write!(f, "{}", word)?;
+                    is_first = false;
+                }
+                write!(f, "}}")
+            },
+            SimpleWordElement::ParameterLength(param_name) => write!(f, "${{#{}}}", param_name),
+            SimpleWordElement::Command(commands) => {
+                let s = format!("{}", LogicalCommandSlice(commands.as_slice()));
+                write!(f, "$(")?;
+                if s.chars().next().map(|c| c == '(').unwrap_or(false) {
+                    write!(f, " ")?;
+                }
+                write!(f, "{}", s)?;
+                if s.chars().last().map(|c| c == ')').unwrap_or(false) {
+                    write!(f, " ")?;
+                }
+                write!(f, ")")
+            },
+            SimpleWordElement::ArithmeticExpression(expr) => write!(f, "{}", expr),
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct HereDocumentSimpleWordElement<'a>(pub &'a SimpleWordElement);
+
+impl<'a> fmt::Display for HereDocumentSimpleWordElement<'a>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self.0 {
+            SimpleWordElement::String(s) => fmt_str(s.as_str(), f, false, true),
+            simple_word_elem => write!(f, "{}", simple_word_elem),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum WordElement
 {
     Simple(SimpleWordElement),
     SinglyQuoted(String),
     DoublyQuoted(Vec<SimpleWordElement>),
+}
+
+impl fmt::Display for WordElement
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            WordElement::Simple(SimpleWordElement::String(s)) => fmt_str(s.as_str(), f, false, false),
+            WordElement::Simple(simple_word_elem) => write!(f, "{}", simple_word_elem),
+            WordElement::SinglyQuoted(s) => write!(f, "'{}'", s),
+            WordElement::DoublyQuoted(simple_word_elems) => {
+                write!(f, "\"")?;
+                for simple_word_elem in simple_word_elems {
+                    write!(f, "{}", simple_word_elem)?;
+                }
+                write!(f, "\"")
+            },
+        }
+    }
 }
 
 #[derive(Clone)]

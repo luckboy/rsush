@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 use std::cell::*;
+use std::collections::HashSet;
 use std::fmt;
 use std::io::*;
 use std::rc::*;
@@ -31,12 +32,68 @@ pub struct Word
     pub word_elems: Vec<WordElement>,
 }
 
+impl fmt::Display for Word
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        for word_elem in self.word_elems.iter() {
+            write!(f, "{}", word_elem)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct FirstWord<'a>(pub &'a Word);
+
+impl<'a> fmt::Display for FirstWord<'a>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        if self.0.word_elems.len() == 1 {
+            let mut first_keywords: HashSet<String> = HashSet::new();
+            first_keywords.insert(String::from("!"));
+            first_keywords.insert(String::from("{"));
+            first_keywords.insert(String::from("}"));
+            first_keywords.insert(String::from("case"));
+            first_keywords.insert(String::from("do"));
+            first_keywords.insert(String::from("done"));
+            first_keywords.insert(String::from("elif"));
+            first_keywords.insert(String::from("else"));
+            first_keywords.insert(String::from("esac"));
+            first_keywords.insert(String::from("fi"));
+            first_keywords.insert(String::from("for"));
+            first_keywords.insert(String::from("if"));
+            first_keywords.insert(String::from("then"));
+            first_keywords.insert(String::from("until"));
+            first_keywords.insert(String::from("while"));
+            match &(self.0.word_elems[0]) {
+                WordElement::Simple(SimpleWordElement::String(s)) if first_keywords.contains(s) => write!(f, "\\{}", self.0),
+                _ => write!(f, "{}", self.0),
+            }
+        } else {
+            write!(f, "{}", self.0)
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct HereDocument
 {
     pub delim: String,
     pub has_minus: bool,
     pub simple_word_elems: Vec<SimpleWordElement>,
+}
+
+impl fmt::Display for HereDocument
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        for simple_word_elem in &self.simple_word_elems {
+            write!(f, "{}", HereDocumentSimpleWordElement(simple_word_elem))?;
+        }
+        write!(f, "{}\n", self.delim)
+    }
 }
 
 #[derive(Clone)]
@@ -78,6 +135,87 @@ impl Redirection
             Redirection::HereDocument(_, pos, _, _) => *pos,
         }
     }
+
+    fn fmt_and_add_here_doc(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    {
+        match self {
+            Redirection::Input(_, _, n, word) => {
+                match n {
+                    Some(n) => write!(f, "{}", n)?,
+                    None => (),
+                }
+                write!(f, "< {}", word)
+            },
+            Redirection::Output(_, _, n, word, is_bar) => {
+                match n {
+                    Some(n) => write!(f, "{}", n)?,
+                    None => (),
+                }
+                if !is_bar {
+                    write!(f, "> {}", word)
+                } else {
+                    write!(f, ">| {}", word)
+                }
+            },
+            Redirection::InputAndOutput(_, _, n, word) => {
+                match n {
+                    Some(n) => write!(f, "{}", n)?,
+                    None => (),
+                }
+                write!(f, "<> {}", word)
+            },
+            Redirection::Appending(_, _, n, word) => {
+                match n {
+                    Some(n) => write!(f, "{}", n)?,
+                    None => (),
+                }
+                write!(f, ">> {}", word)
+            },
+            Redirection::InputDuplicating(_, _, n, word) => {
+                match n {
+                    Some(n) => write!(f, "{}", n)?,
+                    None => (),
+                }
+                write!(f, "<& {}", word)
+            },
+            Redirection::OutputDuplicating(_, _, n, word) => {
+                match n {
+                    Some(n) => write!(f, "{}", n)?,
+                    None => (),
+                }
+                write!(f, ">& {}", word)
+            },
+            Redirection::HereDocument(_, _, n, here_doc) => {
+                match n {
+                    Some(n) => write!(f, "{}", n)?,
+                    None => (),
+                }
+                if !here_doc.borrow().has_minus {
+                    write!(f, "<< {}", HereDocumentWordStr(here_doc.borrow().delim.as_str()))?;
+                } else {
+                    write!(f, "<<- {}", HereDocumentWordStr(here_doc.borrow().delim.as_str()))?;
+                }
+                here_docs.push(here_doc.clone());
+                Ok(())
+            },
+        }
+    }
+}
+
+impl fmt::Display for Redirection
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_doc(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -85,6 +223,53 @@ pub struct SimpleCommand
 {
     pub words: Vec<Rc<Word>>,
     pub redirects: Vec<Rc<Redirection>>,
+}
+
+impl SimpleCommand
+{
+    fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    {
+        let mut is_first = true;
+        for word in &self.words {
+            if !is_first {
+                write!(f, " ")?;
+            }
+            if is_first {
+                write!(f, "{}", FirstWord(&(*word)))?;
+            } else {
+                write!(f, "{}", word)?;
+            }
+            is_first = false;
+        }
+        if !self.words.is_empty() && !self.redirects.is_empty() {
+            write!(f, " ")?;
+        }
+        is_first = true;
+        for redirect in &self.redirects {
+            if !is_first {
+                write!(f, " ")?;
+            }
+            redirect.fmt_and_add_here_doc(f, here_docs)?;
+            is_first = false;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for SimpleCommand
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_docs(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -113,6 +298,97 @@ pub enum CompoundCommand
     Until(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>),
 }
 
+impl CompoundCommand
+{
+    fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    {
+        match self {
+            CompoundCommand::BraceGroup(commands) => {
+                write!(f, "{{ ")?;
+                LogicalCommandSliceWithLastSemicolon(commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                write!(f, "}}")
+            },
+            CompoundCommand::Subshell(commands) => {
+                write!(f, "(")?;
+                LogicalCommandSlice(commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                write!(f, ")")
+            },
+            CompoundCommand::For(name_word, words, commands) => {
+                write!(f, "for {} in", name_word)?;
+                for word in words {
+                    write!(f, " {}", word)?;
+                }
+                write!(f, "; do ")?;
+                LogicalCommandSliceWithLastSemicolon(commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                write!(f, "done")
+            },
+            CompoundCommand::Case(word, pairs) => {
+                write!(f, "case {} in ", word)?;
+                for pair in pairs.iter() {
+                    let is_first = true;
+                    for pattern_word in &pair.pattern_words {
+                        if !is_first {
+                            write!(f, "|")?;
+                        }
+                        write!(f, "{}", pattern_word)?;
+                    }
+                    write!(f, ") ")?;
+                    LogicalCommandSlice(pair.commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                    write!(f, ";; ")?;
+                }
+                write!(f, "esac")
+            },
+            CompoundCommand::If(cond_commands, commands, pairs, else_commands) => {
+                write!(f, "if ")?;
+                LogicalCommandSliceWithLastSemicolon(cond_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                write!(f, "then ")?;
+                LogicalCommandSliceWithLastSemicolon(commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                for pair in pairs.iter() {
+                    write!(f, "elif ")?;
+                    LogicalCommandSliceWithLastSemicolon(pair.cond_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                    write!(f, "then ")?;
+                    LogicalCommandSliceWithLastSemicolon(pair.cond_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                }
+                match else_commands {
+                    Some(else_commands) => LogicalCommandSliceWithLastSemicolon(else_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?,
+                    None => (),
+                }
+                write!(f, "fi")
+            },
+            CompoundCommand::While(cond_commands, commands) => {
+                write!(f, "while ")?;
+                LogicalCommandSliceWithLastSemicolon(cond_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                write!(f, "do ")?;
+                LogicalCommandSliceWithLastSemicolon(commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                write!(f, "done")
+            },
+            CompoundCommand::Until(cond_commands, commands) => {
+                write!(f, "until ")?;
+                LogicalCommandSliceWithLastSemicolon(cond_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                write!(f, "do ")?;
+                LogicalCommandSliceWithLastSemicolon(commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                write!(f, "done")
+            },
+        }
+    }
+}
+
+impl fmt::Display for CompoundCommand
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_docs(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone)]
 pub struct FunctionBody
 {
@@ -120,6 +396,35 @@ pub struct FunctionBody
     pub pos: Position,
     pub command: CompoundCommand,
     pub redirects: Vec<Rc<Redirection>>,
+}
+
+impl FunctionBody
+{
+    fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    {
+        self.command.fmt_and_add_here_docs(f, here_docs)?;
+        for redirect in &self.redirects {
+            write!(f, " ")?;
+            redirect.fmt_and_add_here_doc(f, here_docs)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for FunctionBody
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_docs(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -149,6 +454,41 @@ impl Command
             Command::FunctionDefinition(_, pos, _, _) => *pos,
         }
     }
+
+    fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    {
+        match self {
+            Command::Simple(_, _, simple_command) => simple_command.fmt_and_add_here_docs(f, here_docs),
+            Command::Compound(_, _, compound_command, redirects) => {
+                compound_command.fmt_and_add_here_docs(f, here_docs)?;
+                for redirect in redirects.iter() {
+                    write!(f, " ")?;
+                    redirect.fmt_and_add_here_doc(f, here_docs)?;
+                }
+                Ok(())
+            },
+            Command::FunctionDefinition(_, _, name_word, fun_body) => {
+                write!(f, "{}() ", name_word)?;
+                fun_body.fmt_and_add_here_docs(f, here_docs)
+            },
+        }
+    }
+}
+
+impl fmt::Display for Command
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_docs(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -160,11 +500,60 @@ pub struct PipeCommand
     pub commands: Vec<Rc<Command>>,
 }
 
+impl PipeCommand
+{
+    fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    {
+        if self.is_negative {
+            write!(f, "!")?;
+            if !self.commands.is_empty() {
+                write!(f, " ")?;
+            }
+        }
+        let mut is_first = true;
+        for command in &self.commands {
+            if !is_first {
+                write!(f, " | ")?;
+            }
+            command.fmt_and_add_here_docs(f, here_docs)?;
+            is_first = false;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for PipeCommand
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_docs(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum LogicalOperator
 {
     And,
     Or,
+}
+
+impl fmt::Display for LogicalOperator
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            LogicalOperator::And => write!(f, "&&"),
+            LogicalOperator::Or => write!(f, "||"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -184,6 +573,114 @@ pub struct LogicalCommand
     pub is_in_background: bool,
 }
 
+impl LogicalCommand
+{
+    fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    {
+        self.first_command.fmt_and_add_here_docs(f, here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for pair in &self.pairs {
+            write!(f, " {}", pair.op)?; 
+            pair.command.fmt_and_add_here_docs(f, here_docs)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for LogicalCommand
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_docs(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct LogicalCommandSlice<'a>(pub &'a [Rc<LogicalCommand>]);
+
+impl<'a> LogicalCommandSlice<'a>
+{
+    fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    {
+        for (i, command) in self.0.iter().enumerate() {
+            command.fmt_and_add_here_docs(f, here_docs)?;
+            if i < self.0.len() - 1 {
+                if command.is_in_background {
+                    write!(f, "& ")?;
+                } else {
+                    write!(f, "; ")?;
+                }
+            } else {
+                if command.is_in_background {
+                    write!(f, "&")?;
+                }                
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'a> fmt::Display for LogicalCommandSlice<'a>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_docs(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct LogicalCommandSliceWithLastSemicolon<'a>(pub &'a [Rc<LogicalCommand>]);
+
+impl<'a> LogicalCommandSliceWithLastSemicolon<'a>
+{
+    fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    {
+        for command in self.0.iter() {
+            command.fmt_and_add_here_docs(f, here_docs)?;
+            if command.is_in_background {
+                write!(f, "& ")?;
+            } else {
+                write!(f, "; ")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'a> fmt::Display for LogicalCommandSliceWithLastSemicolon<'a>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_docs(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone)]
 pub struct AliasCommand
 {
@@ -192,12 +689,46 @@ pub struct AliasCommand
     pub command: SimpleCommand,
 }
 
+impl AliasCommand
+{
+    fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
+    { self.command.fmt_and_add_here_docs(f, here_docs) }
+}
+
+impl fmt::Display for AliasCommand
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        let mut here_docs: Vec<Rc<RefCell<HereDocument>>> = Vec::new();
+        self.fmt_and_add_here_docs(f, &mut here_docs)?;
+        if !here_docs.is_empty() {
+            write!(f, "\n")?;
+        }
+        for here_doc in &here_docs {
+            write!(f, "{}", here_doc.borrow())?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum UnaryOperator
 {
     Negate,
     Not,
     LogicalNot,
+}
+
+impl fmt::Display for UnaryOperator
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            UnaryOperator::Negate => write!(f, "-"),
+            UnaryOperator::Not => write!(f, "~"),
+            UnaryOperator::LogicalNot => write!(f, "!"),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -234,6 +765,44 @@ pub enum BinaryOperator
     OrAssign,
 }
 
+impl fmt::Display for BinaryOperator
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            BinaryOperator::Multiply => write!(f, "*"),
+            BinaryOperator::Divide => write!(f, "/"),
+            BinaryOperator::Module => write!(f, "%"),
+            BinaryOperator::Add => write!(f, "+"),
+            BinaryOperator::Substract => write!(f, "-"),
+            BinaryOperator::ShiftLeft => write!(f, "<<"),
+            BinaryOperator::ShiftRight => write!(f, ">>"),
+            BinaryOperator::LessThan => write!(f, "<"),
+            BinaryOperator::GreaterEqual => write!(f, ">="),
+            BinaryOperator::GreaterThan => write!(f, ">"),
+            BinaryOperator::LessEqual => write!(f, "<="),
+            BinaryOperator::Equal => write!(f, "=="),
+            BinaryOperator::NotEqual => write!(f, "!="),
+            BinaryOperator::And => write!(f, "&"),
+            BinaryOperator::ExclusiveOr => write!(f, "^"),
+            BinaryOperator::Or => write!(f, "|"),
+            BinaryOperator::LogicalAnd => write!(f, "&&"),
+            BinaryOperator::LogicalOr => write!(f, "||"),
+            BinaryOperator::Assign => write!(f, "="),
+            BinaryOperator::MultiplyAssign => write!(f, "*="),
+            BinaryOperator::DivideAssign => write!(f, "/="),
+            BinaryOperator::ModuleAssign => write!(f, "%="),
+            BinaryOperator::AddAssign => write!(f, "+="),
+            BinaryOperator::SubstractAssign => write!(f, "-="),
+            BinaryOperator::ShiftLeftAssign => write!(f, "<<="),
+            BinaryOperator::ShiftRightAssign => write!(f, ">>="),
+            BinaryOperator::AndAssign => write!(f, "&="),
+            BinaryOperator::ExclusiveOrAssign => write!(f, "^="),
+            BinaryOperator::OrAssign => write!(f, "|="),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum ArithmeticExpression
 {
@@ -267,6 +836,90 @@ impl ArithmeticExpression
             ArithmeticExpression::Conditional(_, pos, _, _, _) => *pos,
         }
     }
+
+    fn fmt_with_prec(&self, f: &mut fmt::Formatter<'_>, expected_prec: i32) -> fmt::Result
+    {
+        let (prec, is_left_to_right) = match self {
+            ArithmeticExpression::Number(_, _, _) => (0, true),
+            ArithmeticExpression::Parameter(_, _, _) => (0, true),
+            ArithmeticExpression::Unary(_, _, UnaryOperator::Negate, _) => (1, false),
+            ArithmeticExpression::Unary(_, _, UnaryOperator::Not, _) => (1, false),
+            ArithmeticExpression::Unary(_, _, UnaryOperator::LogicalNot, _) => (1, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Multiply, _) => (2, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Divide, _) => (2, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Module, _) => (2, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Add, _) => (3, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Substract, _) => (3, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::ShiftLeft, _) => (4, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::ShiftRight, _) => (4, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::LessThan, _) => (5, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::GreaterEqual, _) => (5, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::GreaterThan, _) => (5, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::LessEqual, _) => (5, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Equal, _) => (6, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::NotEqual, _) => (6, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::And, _) => (7, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::ExclusiveOr, _) => (8, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Or, _) => (9, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::LogicalAnd, _) => (10, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::LogicalOr, _) => (11, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Assign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::MultiplyAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::DivideAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::ModuleAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::AddAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::SubstractAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::ShiftLeftAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::ShiftRightAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::AndAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::ExclusiveOrAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::OrAssign, _) => (12, false),
+            ArithmeticExpression::Conditional(_, _, _, _, _) => (12, false),
+        };
+        if expected_prec < prec {
+            write!(f, "(")?;
+        }
+        match self {
+            ArithmeticExpression::Number(_, _, n) => write!(f, "{}", n)?,
+            ArithmeticExpression::Parameter(_, _, param_name) => write!(f, "${}", param_name)?,
+            ArithmeticExpression::Unary(_, _, op, expr1) => {
+                write!(f, "{}", op)?;
+                expr1.fmt_with_prec(f, prec)?;
+            },
+            ArithmeticExpression::Binary(_, _, expr1, op, expr2) => {
+                let prec1 = if is_left_to_right {
+                    prec
+                } else {
+                    prec - 1
+                };
+                let prec2 = if is_left_to_right {
+                    prec - 1
+                } else {
+                    prec
+                };
+                expr1.fmt_with_prec(f, prec1)?;
+                write!(f, " {} ", op)?;
+                expr2.fmt_with_prec(f, prec2)?;
+            },
+            ArithmeticExpression::Conditional(_, _, expr1, expr2, expr3) => {
+                expr1.fmt_with_prec(f, prec - 1)?;
+                write!(f, " ? ")?;
+                expr2.fmt_with_prec(f, prec)?;
+                write!(f, " : ")?;
+                expr3.fmt_with_prec(f, prec)?;
+            },
+        }
+        if expected_prec < prec {
+            write!(f, ")")?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for ArithmeticExpression
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    { self.fmt_with_prec(f, 12) }
 }
 
 pub struct Parser
