@@ -379,14 +379,4 @@ pub fn is_first_char(s: &str, delims: &str) -> bool
 { s.chars().next().map(|c| delims.contains(c)).unwrap_or(false) }
 
 pub fn is_last_char(s: &str, delims: &str) -> bool
-{
-    let mut char_iter = s.chars();
-    let mut last_c: Option<char> = None;
-    loop {
-        match char_iter.next() {
-            Some(c) => last_c = Some(c),
-            None    => break,
-        }
-    }
-    last_c.map(|c| delims.contains(c)).unwrap_or(false)
-}
+{ s.chars().last().map(|c| delims.contains(c)).unwrap_or(false) }
