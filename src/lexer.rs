@@ -43,13 +43,23 @@ fn fmt_str(s: &str, f: &mut fmt::Formatter<'_>, is_double_quote: bool, is_here_d
     for c in s.chars() {
         if !is_double_quote {
             if !is_here_doc {
-                if c == ' ' || c == '\'' || c == '"' {
+                match c {
+                    '\'' | '"' | ';' | '<' | '>' | '&' | '|' | '(' | ')' =>  write!(f, "\\")?,
+                    c if c.is_whitespace() => write!(f, "\\")?,
+                    _ => (),
+                }
+            } else {
+                if c == '\\' {
                     write!(f, "\\")?;
                 }
             }
         } else {
             if !is_here_doc {
-                if c == '"' {
+                if c == '"' || c == '\\' {
+                    write!(f, "\\")?;
+                }
+            } else {
+                if c == '\\' {
                     write!(f, "\\")?;
                 }
             }
