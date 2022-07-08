@@ -190,11 +190,7 @@ impl Redirection
                     Some(n) => write!(f, "{}", n)?,
                     None => (),
                 }
-                if !here_doc.borrow().has_minus {
-                    write!(f, "<< {}", HereDocumentWordStr(here_doc.borrow().delim.as_str()))?;
-                } else {
-                    write!(f, "<<- {}", HereDocumentWordStr(here_doc.borrow().delim.as_str()))?;
-                }
+                write!(f, "<< {}", HereDocumentWordStr(here_doc.borrow().delim.as_str()))?;
                 here_docs.push(here_doc.clone());
                 Ok(())
             },
