@@ -4566,3 +4566,659 @@ fn test_lexer_next_arith_token_complains_on_no_hexadecimal_digits()
     }
     assert_eq!(String::new(), lexer.content_for_verbose);
 }
+
+#[test]
+fn test_format_with_word_element_formats_word_element()
+{
+    let s = "abc";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("abc"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_escapes()
+{
+    let s = "\\a\\b\\c\\ \\\t\\'\\\"\\;\\<\\>\\&\\|\\(\\)\\$\\`";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("abc\\ \\\t\\'\\\"\\;\\<\\>\\&\\|\\(\\)\\$\\`"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_variable()
+{
+    let s = "$var";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_argument()
+{
+    let s = "$12";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${12}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_at_spacial_parameter()
+{
+    let s = "$@";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$@"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_star_spacial_parameter()
+{
+    let s = "$*";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$*"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_hash_spacial_parameter()
+{
+    let s = "$#";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$#"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_ques_spacial_parameter()
+{
+    let s = "$?";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$?"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_minus_spacial_parameter()
+{
+    let s = "$-";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$-"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_dolar_spacial_parameter()
+{
+    let s = "$$";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$$"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_excl_spacial_parameter()
+{
+    let s = "$!";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$!"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_colon_minus_modifier()
+{
+    let s = "${var:-abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var:-abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_minus_modifier()
+{
+    let s = "${var-abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var-abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_colon_equal_modifier()
+{
+    let s = "${var:=abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var:=abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_equal_modifier()
+{
+    let s = "${var=abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var=abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_colon_ques_modifier()
+{
+    let s = "${var:?abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var:?abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_ques_modifier()
+{
+    let s = "${var?abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var?abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_colon_plus_modifier()
+{
+    let s = "${var:+abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var:+abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_plus_modifier()
+{
+    let s = "${var+abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var+abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_perc_modifier()
+{
+    let s = "${var%abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var%abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_perc_perc_modifier()
+{
+    let s = "${var%%abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var%%abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_hash_modifier()
+{
+    let s = "${var#abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var#abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_with_hash_hash_modifier()
+{
+    let s = "${var##abc def}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${var##abc def}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_parameter_length()
+{
+    let s = "${#var}";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("${#var}"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_command()
+{
+    let s = "$(echo abc def)";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$(echo abc def)"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_command_with_first_subshell()
+{
+    let s = "$( (echo abc; echo def); echo ghi)";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$( (echo abc; echo def); echo ghi)"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_command_with_last_subshell()
+{
+    let s = "$(echo abc; (echo def; echo ghi) )";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$(echo abc; (echo def; echo ghi) )"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_arithmetic_exprssion()
+{
+    let s = "$((1 + 2))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("$((1 + 2))"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_command_in_doubly_quoted_string()
+{
+    let s = "\"$(echo abc def)\"";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("\"$(echo abc def)\""), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_arithmetic_exprssion_in_doubly_quoted_string()
+{
+    let s = "\"$((1 + 2))\"";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("\"$((1 + 2))\""), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_singly_quoted_string()
+{
+    let s = "'abc def'";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("'abc def'"), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_doubly_quoted_string()
+{
+    let s = "\"abc$var\"";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("\"abc${var}\""), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_word_element_formats_word_element_with_doubly_quoted_string_with_escapes()
+{
+    let s = "\"abc\\\\ \t'\\\";<>&|()\\$\\`\"";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), _)) => {
+            assert_eq!(1, word_elems.len());
+            assert_eq!(String::from("\"abc\\\\ \t'\\\";<>&|()\\$\\`\""), format!("{}", word_elems[0]));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_here_document_word_str_formats_here_document_word_string()
+{
+    let s = "abc$var";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::HereDocumentWord);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDocWord(s), _)) => {
+            assert_eq!(String::from("abc\\$var"), format!("{}", HereDocumentWordStr(s.as_str())));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_here_document_simple_word_element_formats_here_document_simple_word()
+{
+    let s = "
+abcdef
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false));
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDoc(simple_word_elems, _), _)) => {
+            assert_eq!(String::from("abcdef\n"), format!("{}", HereDocumentSimpleWordElement(&simple_word_elems[0])));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_here_document_simple_word_element_formats_here_document_simple_word_with_escapes()
+{
+    let s = "
+abc\\\\ \t'\";<>&|()\\$\\`
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false));
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDoc(simple_word_elems, _), _)) => {
+            assert_eq!(String::from("abc\\\\ \t'\";<>&|()\\$\\`\n"), format!("{}", HereDocumentSimpleWordElement(&simple_word_elems[0])));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}

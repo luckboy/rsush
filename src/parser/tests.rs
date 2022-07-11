@@ -9285,3 +9285,1504 @@ fn test_parser_parse_arith_expr_complains_on_unexpected_token()
         _ => assert!(false),
     }
 }
+
+#[test]
+fn test_format_with_logical_command_formats_command()
+{
+    let s = "echo abc def";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc def"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_command_with_here_document()
+{
+    let s = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_slice_formats_command_with_here_document()
+{
+    let s = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            let s3 = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", LogicalCommandSlice(logical_commands.as_slice())));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_pipe_command_formats_command_with_here_document()
+{
+    let s = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", logical_commands[0].first_command));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_command_formats_command_with_here_document()
+{
+    let s = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            let s3 = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", logical_commands[0].first_command.commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_command_formats_brace_group_with_here_document()
+{
+    let s = "
+{
+    echo abc
+    echo def
+} << EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            let s3 = "
+{ echo abc; echo def; } << EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", logical_commands[0].first_command.commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_command_formats_function_definition_with_here_document()
+{
+    let s = "
+f() {
+    cat
+} << EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            let s3 = "
+f() { cat; } << EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", logical_commands[0].first_command.commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_simple_command_formats_command_with_here_document()
+{
+    let s = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::Simple(_, _, simple_command) => {
+                    let s3 = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+                    assert_eq!(String::from(&s3[1..]), format!("{}", simple_command));
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_function_body_formats_function_body_with_here_document()
+{
+    let s = "
+f() {
+    cat
+} << EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(1, logical_commands[0].first_command.commands.len());
+            match &(*logical_commands[0].first_command.commands[0]) {
+                Command::FunctionDefinition(_, _, _, fun_body) => {
+                    let s3 = "
+{ cat; } << EOT
+abcdef
+ghijkl
+EOT
+";
+                    assert_eq!(String::from(&s3[1..]), format!("{}", &(*fun_body)));
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_command_with_excl_keyword()
+{
+    let s = "\\!";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("\\!"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_command_with_for_keyword()
+{
+    let s = "\\for";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("\\for"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_logical_operators()
+{
+    let s = "echo abc && echo def || echo ghi";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc && echo def || echo ghi"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_pipe_operators()
+{
+    let s = "echo abc | cat | tee xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc | cat | tee xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_which_are_negative()
+{
+    let s = "! echo abc | cat";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("! echo abc | cat"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_redirections()
+{
+    let s = "echo abc > xxx 2>> yyy";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc > xxx 2>> yyy"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_input_redirection()
+{
+    let s = "echo abc < xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc < xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_output_redirection()
+{
+    let s = "echo abc > xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc > xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_output_redirection_with_bar()
+{
+    let s = "echo abc >| xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc >| xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_input_and_output_redirection()
+{
+    let s = "echo abc <> xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc <> xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_appeding_redirection()
+{
+    let s = "echo abc >> xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc >> xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_input_duplicating_redirection()
+{
+    let s = "echo abc <& 2";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc <& 2"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_output_duplicating_redirection()
+{
+    let s = "echo abc >& 2";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc >& 2"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_command_with_here_document_redirection()
+{
+    let s = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_command_with_here_document_redirection_with_minus()
+{
+    let s = "
+cat <<- EOT
+\tabcdef
+\t\tghijkl
+\tEOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "
+cat << EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_input_redirection_with_number()
+{
+    let s = "echo abc 2< xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc 2< xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_output_redirection_with_number()
+{
+    let s = "echo abc 2> xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc 2> xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_output_redirection_with_number_and_bar()
+{
+    let s = "echo abc 2>| xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc 2>| xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_input_and_output_redirection_with_number()
+{
+    let s = "echo abc 2<> xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc 2<> xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_appeding_redirection_with_number()
+{
+    let s = "echo abc 2>> xxx";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc 2>> xxx"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_input_duplicating_redirection_with_number()
+{
+    let s = "echo abc 1<& 2";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc 1<& 2"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_commands_with_output_duplicating_redirection_with_number()
+{
+    let s = "echo abc 1>& 2";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            assert_eq!(String::from("echo abc 1>& 2"), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_command_with_here_document_redirection_with_number()
+{
+    let s = "
+cat 2<< EOT
+abcdef
+ghijkl
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "
+cat 2<< EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_command_with_here_document_redirection_with_number_and_minus()
+{
+    let s = "
+cat 2<<- EOT
+\tabcdef
+\t\tghijkl
+\tEOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "
+cat 2<< EOT
+abcdef
+ghijkl
+EOT
+";
+            assert_eq!(String::from(&s3[1..]), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_brace_group()
+{
+    let s = "
+{
+    echo abc
+    echo def
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "{ echo abc; echo def; }";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_brace_group_with_background_command()
+{
+    let s = "
+{
+    echo abc
+    echo def&
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "{ echo abc; echo def& }";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_subshell()
+{
+    let s = "
+(
+    echo abc
+    echo def
+)
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "(echo abc; echo def)";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_subshell_with_background_command()
+{
+    let s = "
+(
+    echo abc
+    echo def&
+)
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "(echo abc; echo def&)";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_for_clause()
+{
+    let s = "
+for i in 1 2 3; do
+    echo $i
+    echo abc
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "for i in 1 2 3; do echo ${i}; echo abc; done";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_for_clause_without_words()
+{
+    let s = "
+for i in; do
+    echo $i
+    echo abc
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "for i in; do echo ${i}; echo abc; done";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_case_clause()
+{
+    let s = "
+case abc in
+    abc | def) echo abc;;
+    ghi | jkl) echo ghi;;
+esac
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "case abc in abc|def) echo abc;; ghi|jkl) echo ghi;; esac";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_if_clause()
+{
+    let s = "
+if echo abc
+    true; then
+    echo def
+    echo ghi
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "if echo abc; true; then echo def; echo ghi; fi";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_if_clause_with_elif_keywords()
+{
+    let s = "
+if true; then
+    echo abc
+elif false; then
+    echo def
+elif true; then
+    echo ghi
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "if true; then echo abc; elif false; then echo def; elif true; then echo ghi; fi";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_if_clause_with_else_keyword()
+{
+    let s = "
+if echo abc
+    true; then
+    echo def
+    echo ghi
+else
+    echo jkl
+    echo mno
+fi
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "if echo abc; true; then echo def; echo ghi; else echo jkl; echo mno; fi";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_while_clause()
+{
+    let s = "
+while echo abc
+    true; do
+    echo def
+    echo ghi
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "while echo abc; true; do echo def; echo ghi; done";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_logical_command_formats_until_clause()
+{
+    let s = "
+until echo abc
+    false; do
+    echo def
+    echo ghi
+done
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            assert_eq!(1, logical_commands.len());
+            let s3 = "until echo abc; false; do echo def; echo ghi; done";
+            assert_eq!(String::from(s3), format!("{}", logical_commands[0]));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression()
+{
+    let s = "1 + 2))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 + 2"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression_with_nested_expressions()
+{
+    let s = "1 * 2 + 4 / 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 * 2 + 4 / 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression_with_nested_expressions_and_parentheses()
+{
+    let s = "(1 + 2) * (4 - 3)))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("(1 + 2) * (4 - 3)"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression_with_nested_expression_and_same_precedence_and_parentheses()
+{
+    let s = "1 + (3 - 2)))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 + (3 - 2)"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_number()
+{
+    let s = "123))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("123"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_variable()
+{
+    let s = "x))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$x"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_argument()
+{
+    let s = "$12))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$12"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_at_special_parameter()
+{
+    let s = "$@))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$@"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_star_special_parameter()
+{
+    let s = "$*))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$*"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_hash_special_parameter()
+{
+    let s = "$#))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$#"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_ques_special_parameter()
+{
+    let s = "$?))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$?"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_minus_special_parameter()
+{
+    let s = "$-))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$-"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_dolar_special_parameter()
+{
+    let s = "$$))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$$"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_excl_special_parameter()
+{
+    let s = "$!))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$!"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression12()
+{
+    let s = "~-1))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("~-1"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression11()
+{
+    let s = "1 * 2 / 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 * 2 / 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression10()
+{
+    let s = "1 + 2 - 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 + 2 - 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression9()
+{
+    let s = "1 << 2 >> 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 << 2 >> 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression8()
+{
+    let s = "1 < 2 > 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 < 2 > 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression7()
+{
+    let s = "1 == 2 != 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 == 2 != 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression6()
+{
+    let s = "1 & 2 & 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 & 2 & 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression5()
+{
+    let s = "1 ^ 2 ^ 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 ^ 2 ^ 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression4()
+{
+    let s = "1 | 2 | 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 | 2 | 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression3()
+{
+    let s = "1 && 2 && 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 && 2 && 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression2()
+{
+    let s = "1 || 2 || 3))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 || 2 || 3"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression1()
+{
+    let s = "x = y *= 2))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("$x = $y *= 2"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_format_with_arithmetic_expression_formats_expression1_with_conditionals()
+{
+    let s = "1 ? 2 ? 3 : 4 : 5 ? 6 : 7))";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(expr) => assert_eq!(String::from("1 ? 2 ? 3 : 4 : 5 ? 6 : 7"), format!("{}", expr)),
+        _ => assert!(false),
+    }
+}
