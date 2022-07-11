@@ -210,7 +210,7 @@ impl fmt::Display for SimpleWordElement
                 }
                 write!(f, ")")
             },
-            SimpleWordElement::ArithmeticExpression(expr) => write!(f, "{}", expr),
+            SimpleWordElement::ArithmeticExpression(expr) => write!(f, "$(({}))", expr),
         }
     }
 }

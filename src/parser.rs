@@ -321,12 +321,13 @@ impl CompoundCommand
             CompoundCommand::Case(word, pairs) => {
                 write!(f, "case {} in ", word)?;
                 for pair in pairs.iter() {
-                    let is_first = true;
+                    let mut is_first = true;
                     for pattern_word in &pair.pattern_words {
                         if !is_first {
                             write!(f, "|")?;
                         }
                         write!(f, "{}", pattern_word)?;
+                        is_first = false;
                     }
                     write!(f, ") ")?;
                     LogicalCommandSlice(pair.commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
@@ -343,10 +344,13 @@ impl CompoundCommand
                     write!(f, "elif ")?;
                     LogicalCommandSliceWithLastSemicolon(pair.cond_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
                     write!(f, "then ")?;
-                    LogicalCommandSliceWithLastSemicolon(pair.cond_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                    LogicalCommandSliceWithLastSemicolon(pair.commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
                 }
                 match else_commands {
-                    Some(else_commands) => LogicalCommandSliceWithLastSemicolon(else_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?,
+                    Some(else_commands) => {
+                        write!(f, "else ")?;
+                        LogicalCommandSliceWithLastSemicolon(else_commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
+                    },
                     None => (),
                 }
                 write!(f, "fi")
@@ -574,11 +578,8 @@ impl LogicalCommand
     fn fmt_and_add_here_docs(&self, f: &mut fmt::Formatter<'_>, here_docs: &mut Vec<Rc<RefCell<HereDocument>>>) -> fmt::Result
     {
         self.first_command.fmt_and_add_here_docs(f, here_docs)?;
-        if !here_docs.is_empty() {
-            write!(f, "\n")?;
-        }
         for pair in &self.pairs {
-            write!(f, " {}", pair.op)?; 
+            write!(f, " {} ", pair.op)?; 
             pair.command.fmt_and_add_here_docs(f, here_docs)?;
         }
         Ok(())
