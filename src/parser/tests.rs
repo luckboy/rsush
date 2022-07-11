@@ -10071,7 +10071,7 @@ fn test_format_with_logical_command_formats_brace_group()
 }
 
 #[test]
-fn test_format_with_logical_command_formats_brace_group_with_background_command()
+fn test_format_with_logical_command_formats_brace_group_with_command_in_background()
 {
     let s = "
 {
@@ -10121,7 +10121,7 @@ fn test_format_with_logical_command_formats_subshell()
 }
 
 #[test]
-fn test_format_with_logical_command_formats_subshell_with_background_command()
+fn test_format_with_logical_command_formats_subshell_with_command_in_background()
 {
     let s = "
 (
