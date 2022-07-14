@@ -32,6 +32,8 @@ mod iter;
 #[allow(dead_code)]
 mod lexer;
 #[allow(dead_code)]
+mod macros;
+#[allow(dead_code)]
 mod parser;
 #[allow(dead_code)]
 mod settings;
