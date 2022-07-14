@@ -84,3 +84,53 @@ impl<R: BufRead> BufRead for CharReader<R>
 
 impl<R: BufRead> CharRead for CharReader<R>
 {}
+
+pub trait LineRead: Read
+{
+    fn read_line(&mut self, buf: &mut String) -> Result<usize>
+    {
+        let mut line_buf: Vec<u8> = Vec::new();
+        loop {
+            let mut byte_buf: [u8; 1] = [0; 1];
+            match self.read(&mut byte_buf) {
+                Ok(0) => break,
+                Ok(_) => {
+                    line_buf.push(byte_buf[0]);
+                    if byte_buf[0] == b'\n' {
+                        break;
+                    }
+                },
+                Err(err) if err.kind() == ErrorKind::Interrupted => (),
+                Err(err) => return Err(err),
+            }
+        }
+        let size = line_buf.len();
+        match String::from_utf8(line_buf) {
+            Ok(s) => {
+                buf.push_str(s.as_str());
+                Ok(size)
+            },
+            Err(_) => Err(Error::new(ErrorKind::InvalidData, "stream did not contain valid UTF-8")),
+        }
+    }
+}
+
+pub struct LineReader<R: Read>
+{
+    reader: R,
+}
+
+impl<R: Read> LineReader<R>
+{
+    pub fn new(reader: R) -> LineReader<R>
+    { LineReader { reader, } }
+}
+
+impl<R: Read> Read for LineReader<R>
+{
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize>
+    { self.reader.read(buf) }
+}
+
+impl<R: Read> LineRead for LineReader<R>
+{}
