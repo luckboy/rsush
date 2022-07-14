@@ -197,10 +197,10 @@ impl Executor
         }
     }
     
-    pub fn current_file(&mut self, vfd: i32) -> Option<&Rc<RefCell<File>>>
+    pub fn current_file(&self, vfd: i32) -> Option<&Rc<RefCell<File>>>
     { self.virtual_files.get(&vfd).map(|vf| &vf.current_file) }
     
-    pub fn saved_file(&mut self, vfd: i32) -> Option<&Rc<RefCell<File>>>
+    pub fn saved_file(&self, vfd: i32) -> Option<&Rc<RefCell<File>>>
     {
         match self.virtual_files.get(&vfd) {
             Some(virtual_file) => virtual_file.saved_file.as_ref(),

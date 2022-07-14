@@ -24,6 +24,8 @@ mod env;
 #[allow(dead_code)]
 mod exec;
 #[allow(dead_code)]
+mod exec_utils;
+#[allow(dead_code)]
 mod interp;
 #[allow(dead_code)]
 mod io;
