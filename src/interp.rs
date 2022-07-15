@@ -1613,6 +1613,7 @@ impl Interpreter
                 return 1;
             }
         }
+        let mut is_success_for_interp_redirects = true;
         let mut pipes: Vec<Pipe> = Vec::new();
         let mut i = 0;
         for interp_redirect in &interp_redirects {
@@ -1627,6 +1628,7 @@ impl Interpreter
                                 xcfprintln!(exec, 2, "{}: {}", path, err);
                             }
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1648,6 +1650,7 @@ impl Interpreter
                                 xcfprintln!(exec, 2, "{}: {}", path, err);
                             }
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1665,6 +1668,7 @@ impl Interpreter
                                 xcfprintln!(exec, 2, "{}: {}", path, err);
                             }
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1682,6 +1686,7 @@ impl Interpreter
                                 xcfprintln!(exec, 2, "{}: {}", path, err);
                             }
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1697,6 +1702,7 @@ impl Interpreter
                                 xcfprintln!(exec, 2, "{}: Bad fd number", *old_vfd);
                             }
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1707,6 +1713,7 @@ impl Interpreter
                         Err(err) => {
                             eprintln!("{}", err);
                             is_success = false;
+                            is_success_for_interp_redirects = false;
                             break;
                         }
                     }
@@ -1752,6 +1759,7 @@ impl Interpreter
                                                 xcfprintln!(exec, 2, "{}", err);
                                             }
                                             is_success = false;
+                                            is_success_for_interp_redirects = false;
                                             break;
                                         },
                                     }
@@ -1801,13 +1809,20 @@ impl Interpreter
                         }
                         exec.clear_pipes();
                         interp_redirects.reverse();
+                        let mut tmp_is_success = true;
                         for interp_redirect in &interp_redirects[(interp_redirects.len() - k)..] {
                             match interp_redirect {
                                 InterpreterRedirection::HereDocument(_, _) => {
                                     j -= 1;
                                     match self.wait_for_process(exec, pids[j], is_special_builtin_fun) {
-                                        Some(tmp_status) if tmp_status != 0 => is_success = false,
-                                        None => is_success = false,
+                                        Some(tmp_status) if tmp_status != 0 => {
+                                            tmp_is_success = false;
+                                            is_success_for_interp_redirects = false;
+                                        },
+                                        None => {
+                                            tmp_is_success = false;
+                                            is_success_for_interp_redirects = false;
+                                        },
                                         _ => (),
                                     }
                                 },
@@ -1816,7 +1831,10 @@ impl Interpreter
                         }
                         if is_success {
                             match self.wait_for_process(exec, pid, is_special_builtin_fun) {
-                                Some(tmp_status) => tmp_status,
+                                Some(tmp_status) => {
+                                    is_success &= tmp_is_success;
+                                    tmp_status
+                                },
                                 None => {
                                     is_success = false;
                                     1
@@ -1840,7 +1858,7 @@ impl Interpreter
                 InterpreterRedirection::HereDocument(_, _) => (),
             }
         }
-        if is_success {
+        if is_success_for_interp_redirects {
             status
         } else {
             if is_special_builtin_fun {
