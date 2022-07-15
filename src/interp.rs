@@ -1970,14 +1970,14 @@ impl Interpreter
                                                                 redirects.extend(alias_command.command.redirects);
                                                             }
                                                         },
-                                                        Some(None) => {
-                                                        },
+                                                        Some(None) => redirects.extend(alias_command.command.redirects),
                                                         None => is_success = false,
                                                     }
                                                 },
                                                 Err(err) => {
-                                                    xcfprintln!(exec, 2, "{}", err);
-                                                    is_success = false;
+                                                    eprintln!("{}", err);
+                                                    self.last_status = 1;
+                                                    return self.exit(1, false);
                                                 },
                                             }
                                         },
@@ -2009,7 +2009,9 @@ impl Interpreter
                                     if settings.xtrace_flag {
                                         print_command_for_xtrace(vars.as_slice(), &[]);
                                     }
-                                    set_vars(exec, vars.as_slice(), env, settings)
+                                    self.interpret_redirects(exec, redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
+                                            set_vars(exec, vars.as_slice(), env, settings)
+                                    })
                                 },
                             }
                         } else {
@@ -2023,12 +2025,14 @@ impl Interpreter
                 if settings.xtrace_flag {
                     print_command_for_xtrace(vars.as_slice(), &[]);
                 }
-                set_vars(exec, vars.as_slice(), env, settings)
+                self.interpret_redirects(exec, command.redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
+                        set_vars(exec, vars.as_slice(), env, settings)
+                })
             },
             None => 1,
         };
         self.last_status = status;
-        if settings.errexit_flag && self.non_simple_comamnd_count == 0 {
+        if status != 0 && settings.errexit_flag && self.non_simple_comamnd_count == 0 {
             self.exit(status, true)
         } else {
             status
