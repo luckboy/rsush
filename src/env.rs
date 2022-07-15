@@ -16,6 +16,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::env;
 use std::rc::*;
 use crate::builtins::*;
@@ -26,6 +27,7 @@ use crate::settings::*;
 pub struct Environment
 {
     unexported_vars: HashMap<String, String>,
+    read_only_var_attrs: HashSet<String>,
     builtin_funs: HashMap<String, BuiltinFunction>,
     funs: HashMap<String, Rc<FunctionBody>>,
     aliases: HashMap<String, String>,
@@ -37,6 +39,7 @@ impl Environment
     {
         Environment {
             unexported_vars: HashMap::new(),
+            read_only_var_attrs: HashSet::new(),
             builtin_funs: HashMap::new(),
             funs: HashMap::new(),
             aliases: HashMap::new(),
@@ -87,6 +90,15 @@ impl Environment
         self.unset_exported_var(name);
     }
 
+    pub fn read_only_var_attr(&self, name: &str) -> bool
+    { self.read_only_var_attrs.contains(&String::from(name)) }
+
+    pub fn set_read_only_var_attr(&mut self, name: &str)
+    { self.read_only_var_attrs.insert(String::from(name)); }
+
+    pub fn unset_read_only_var_attr(&mut self, name: &str)
+    { self.read_only_var_attrs.remove(&String::from(name)); }
+    
     pub fn builtin_fun(&self, name: &str) -> Option<BuiltinFunction>
     { self.builtin_funs.get(&String::from(name)).map(|bf| *bf) }
 

@@ -86,11 +86,16 @@ pub struct Interpreter
     signal_names: HashMap<i32, String>,
 }
 
-fn set_vars(vars: &[(String, String)], env: &mut Environment, settings: &Settings)
+fn set_vars(exec: &Executor, vars: &[(String, String)], env: &mut Environment, settings: &Settings) -> i32
 {
     for (name, value) in vars.iter() {
+        if env.read_only_var_attr(name) {
+            xcfprintln!(exec, 2, "{}: Is read only", name);
+            return 1;
+        }
         env.set_var(name.as_str(), value.as_str(), settings);
     }
+    0
 }
 
 fn print_command_for_xtrace(vars: &[(String, String)], args: &[String])
@@ -437,7 +442,11 @@ impl Interpreter
                                     if set_param(param_name, word.as_str(), env, settings) {
                                         Some(Some(Value::String(word)))
                                     } else {
-                                        eprintln!("{}: Can't set parameter", param_name);
+                                        if is_read_only_param(param_name, env) {
+                                            eprintln!("{}: Is read only", param_name);
+                                        } else {
+                                            eprintln!("{}: Can't set parameter", param_name);
+                                        }
                                         self.set_exit(false);
                                         None
                                     }
@@ -447,7 +456,11 @@ impl Interpreter
                                 if set_param(param_name, word.as_str(), env, settings) {
                                     Some(Some(Value::String(word)))
                                 } else {
-                                    eprintln!("{}: Can't set parameter", param_name);
+                                    if is_read_only_param(param_name, env) {
+                                        eprintln!("{}: Is read only", param_name);
+                                    } else {
+                                        eprintln!("{}: Can't set parameter", param_name);
+                                    }
                                     self.set_exit(false);
                                     None
                                 }
@@ -472,7 +485,11 @@ impl Interpreter
                                 if set_param(param_name, word.as_str(), env, settings) {
                                     Some(Some(Value::String(word)))
                                 } else {
-                                    eprintln!("{}: Can't set parameter", param_name);
+                                    if is_read_only_param(param_name, env) {
+                                        eprintln!("{}: Is read only", param_name);
+                                    } else {
+                                        eprintln!("{}: Can't set parameter", param_name);
+                                    }
                                     self.set_exit(false);
                                     None
                                 }
@@ -702,7 +719,11 @@ impl Interpreter
                 if set_param(param_name, format!("{}", x).as_str(), env, settings) {
                     Some(x)
                 } else {
-                    println!("{}: Can't set parameter", param_name);
+                    if is_read_only_param(param_name, env) {
+                        eprintln!("{}: Is read only", param_name);
+                    } else {
+                        println!("{}: Can't set parameter", param_name);
+                    }
                     self.set_exit(false);
                     None
                 }
@@ -1970,8 +1991,7 @@ impl Interpreter
                                     if settings.xtrace_flag {
                                         print_command_for_xtrace(vars.as_slice(), &[]);
                                     }
-                                    set_vars(vars.as_slice(), env, settings);
-                                    0
+                                    set_vars(exec, vars.as_slice(), env, settings)
                                 },
                             }
                         } else {
@@ -1985,8 +2005,7 @@ impl Interpreter
                 if settings.xtrace_flag {
                     print_command_for_xtrace(vars.as_slice(), &[]);
                 }
-                set_vars(vars.as_slice(), env, settings);
-                0
+                set_vars(exec, vars.as_slice(), env, settings)
             },
             None => 1,
         };
@@ -2039,6 +2058,11 @@ impl Interpreter
                                             Some(elems) => {
                                                 interp.current_loop_count += 1;
                                                 for elem in elems {
+                                                    if env.read_only_var_attr(name.as_str()) {
+                                                        xcfprintln!(exec, 2, "{}: Is read only", name);
+                                                        interp.last_status = 1;
+                                                        break;
+                                                    }
                                                     env.set_var(name.as_str(), elem.as_str(), settings);
                                                     if settings.noexec_flag { break; }
                                                     interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
@@ -2412,9 +2436,21 @@ pub fn set_param(param_name: &ParameterName, s: &str, env: &mut Environment, set
 {
     match param_name {
         ParameterName::Variable(name) => {
-            env.set_var(name.as_str(), s, settings);
-            true
+            if !env.read_only_var_attr(name) {
+                env.set_var(name.as_str(), s, settings);
+                true
+            } else {
+                false
+            }
         },
+        _ => false,
+    }
+}
+
+pub fn is_read_only_param(param_name: &ParameterName, env: &Environment) -> bool
+{
+    match param_name {
+        ParameterName::Variable(name) => env.read_only_var_attr(name),
         _ => false,
     }
 }
