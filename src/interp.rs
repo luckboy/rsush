@@ -1830,7 +1830,7 @@ impl Interpreter
                             }
                         }
                         if is_success {
-                            match self.wait_for_process(exec, pid, is_special_builtin_fun) {
+                            match self.wait_for_process(exec, pid, false) {
                                 Some(tmp_status) => {
                                     is_success &= tmp_is_success;
                                     tmp_status
