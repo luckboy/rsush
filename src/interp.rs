@@ -30,6 +30,7 @@ use crate::lexer::*;
 use crate::parser::*;
 use crate::settings::*;
 use crate::utils::*;
+use crate::xcfprintln;
 
 pub const DEFAULT_IFS: &'static str = " \t\n";
 
@@ -279,38 +280,44 @@ impl Interpreter
         format!("{}{}", self.signal_name(sig).unwrap_or("Unknown signal"), coredump_s)
     }
 
-    fn execute(&mut self, exec: &mut Executor, vars: &[(String, String)], arg0: &str, args: &[String], env: &mut Environment, settings: &mut Settings) -> i32
+    fn execute(&mut self, exec: &mut Executor, vars: &[(String, String)], arg0: &str, args: &[String], is_exit_for_err: bool, env: &mut Environment, settings: &mut Settings) -> Option<i32>
     {
         match exec.execute(self, vars, arg0, args, false, env, settings, |_| true) {
             Ok(WaitStatus::None) => panic!("wait status is none"),
-            Ok(WaitStatus::Exited(status)) => status,
+            Ok(WaitStatus::Exited(status)) => Some(status),
             Ok(WaitStatus::Signaled(sig, is_coredump)) => {
-                eprintln!("{}", self.signal_string(sig, is_coredump));
-                sig + 128
+                if is_exit_for_err {
+                    eprintln!("{}", self.signal_string(sig, is_coredump));
+                } else {
+                    xcfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
+                }
+                Some(sig + 128)
             },
             Ok(WaitStatus::Stopped(_)) => panic!("wait status is stopped"),
             Err(err) => {
-                eprintln!("{}", err);
-                1
+                xcfprintln!(exec, 2, "{}", err);
+                None
             }
         }
     }
     
-    fn wait_for_process(&mut self, exec: &mut Executor, pid: Option<i32>) -> i32
+    fn wait_for_process(&mut self, exec: &mut Executor, pid: Option<i32>, is_exit_for_err: bool) -> Option<i32>
     {
         match exec.wait_for_process(pid, true, false) {
             Ok(WaitStatus::None) => panic!("wait status is none"),
-            Ok(WaitStatus::Exited(status)) => {
-                status
-            },
+            Ok(WaitStatus::Exited(status)) => Some(status),
             Ok(WaitStatus::Signaled(sig, is_coredump)) => {
-                eprintln!("{}", self.signal_string(sig, is_coredump));
-                sig + 128
+                if is_exit_for_err {
+                    eprintln!("{}", self.signal_string(sig, is_coredump));
+                } else {
+                    xcfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
+                }
+                Some(sig + 128)
             },
             Ok(WaitStatus::Stopped(_)) => panic!("wait status is stopped"),
             Err(err) => {
-                eprintln!("{}", err);
-                1
+                xcfprintln!(exec, 2, "{}", err);
+                None
             },
         }
     }
@@ -672,7 +679,10 @@ impl Interpreter
                         },
                     }
                     s = String::from(s.trim_end_matches('\n'));
-                    self.last_status = self.wait_for_process(exec, pid);
+                    match self.wait_for_process(exec, pid, true) {
+                        Some(status) => self.last_status = status,
+                        None => is_success = false,
+                    }
                 } else {
                     exec.clear_pipes();
                 }
@@ -1463,7 +1473,7 @@ impl Interpreter
         Some(ts.join(""))
     }
     
-    fn interpret_redirects<F>(&mut self, exec: &mut Executor, redirects: &[Rc<Redirection>], is_builtin_fun: bool, env: &mut Environment, settings: &mut Settings, f: F) -> i32
+    fn interpret_redirects<F>(&mut self, exec: &mut Executor, redirects: &[Rc<Redirection>], is_special_builtin_fun: bool, env: &mut Environment, settings: &mut Settings, f: F) -> i32
         where F: FnOnce(&mut Self, &mut Executor, &mut Environment, &mut Settings) -> i32
     {
         let mut is_success = true;
@@ -1513,11 +1523,19 @@ impl Interpreter
                                 match fd_s.parse::<i32>() {
                                     Ok(fd) => interp_redirects.push(InterpreterRedirection::Duplicating(n.unwrap_or(0), fd)),
                                     Err(_) => {
-                                        eprintln!("{}: {}: too large I/O number", path, pos);
+                                        if is_special_builtin_fun {
+                                            eprintln!("{}: {}: too large I/O number", path, pos);
+                                        } else {
+                                            xcfprintln!(exec, 2, "{}: {}: too large I/O number", path, pos);
+                                        }
                                     },
                                 }
                             } else {
-                                eprintln!("{}: {}: invalid I/O number", path, pos);
+                                if is_special_builtin_fun {
+                                    eprintln!("{}: {}: invalid I/O number", path, pos);
+                                } else {
+                                    xcfprintln!(exec, 2, "{}: {}: invalid I/O number", path, pos);
+                                }
                                 is_success = false;
                             }
                         },
@@ -1534,11 +1552,19 @@ impl Interpreter
                                 match fd_s.parse::<i32>() {
                                     Ok(fd) => interp_redirects.push(InterpreterRedirection::Duplicating(n.unwrap_or(1), fd)),
                                     Err(_) => {
-                                        eprintln!("{}: {}: too large I/O number", path, pos);
+                                        if is_special_builtin_fun {
+                                            eprintln!("{}: {}: too large I/O number", path, pos);
+                                        } else {
+                                            xcfprintln!(exec, 2, "{}: {}: too large I/O number", path, pos);
+                                        }
                                     },
                                 }
                             } else {
-                                eprintln!("{}: {}: invalid I/O number", path, pos);
+                                if is_special_builtin_fun {
+                                    eprintln!("{}: {}: invalid I/O number", path, pos);
+                                } else {
+                                    xcfprintln!(exec, 2, "{}: {}: invalid I/O number", path, pos);
+                                }
                                 is_success = false;
                             }
                         },
@@ -1559,8 +1585,13 @@ impl Interpreter
                 },
             }
         }
-        if !is_success { return 1; }
-        let mut is_success_for_interp_redirects = true;
+        if !is_success {
+            if is_special_builtin_fun {
+                return self.exit(1, false);
+            } else {
+                return 1;
+            }
+        }
         let mut pipes: Vec<Pipe> = Vec::new();
         let mut i = 0;
         for interp_redirect in &interp_redirects {
@@ -1569,9 +1600,12 @@ impl Interpreter
                     match File::open(path) {
                         Ok(file) => exec.push_file(*vfd, Rc::new(RefCell::new(file))),
                         Err(err) => {
-                            eprintln!("{}: {}", path, err);
+                            if is_special_builtin_fun {
+                                eprintln!("{}: {}", path, err);
+                            } else {
+                                xcfprintln!(exec, 2, "{}: {}", path, err);
+                            }
                             is_success = false;
-                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1587,9 +1621,12 @@ impl Interpreter
                     match open_opts.open(path) {
                         Ok(file) => exec.push_file(*vfd, Rc::new(RefCell::new(file))),
                         Err(err) => {
-                            eprintln!("{}: {}", path, err);
+                            if is_special_builtin_fun {
+                                eprintln!("{}: {}", path, err);
+                            } else {
+                                xcfprintln!(exec, 2, "{}: {}", path, err);
+                            }
                             is_success = false;
-                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1601,9 +1638,12 @@ impl Interpreter
                     match open_opts.open(path) {
                         Ok(file) => exec.push_file(*vfd, Rc::new(RefCell::new(file))),
                         Err(err) => {
-                            eprintln!("{}: {}", path, err);
+                            if is_special_builtin_fun {
+                                eprintln!("{}: {}", path, err);
+                            } else {
+                                xcfprintln!(exec, 2, "{}: {}", path, err);
+                            }
                             is_success = false;
-                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1615,9 +1655,12 @@ impl Interpreter
                     match open_opts.open(path) {
                         Ok(file) => exec.push_file(*vfd, Rc::new(RefCell::new(file))),
                         Err(err) => {
-                            eprintln!("{}: {}", path, err);
+                            if is_special_builtin_fun {
+                                eprintln!("{}: {}", path, err);
+                            } else {
+                                xcfprintln!(exec, 2, "{}: {}", path, err);
+                            }
                             is_success = false;
-                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1627,9 +1670,12 @@ impl Interpreter
                     match old_file {
                         Some(file) => exec.push_file(*new_vfd, file),
                         None => {
-                            eprintln!("{}: Bad fd number", *old_vfd);
+                            if is_special_builtin_fun {
+                                eprintln!("{}: Bad fd number", *old_vfd);
+                            } else {
+                                xcfprintln!(exec, 2, "{}: Bad fd number", *old_vfd);
+                            }
                             is_success = false;
-                            is_success_for_interp_redirects = false;
                             break;
                         },
                     }
@@ -1640,7 +1686,6 @@ impl Interpreter
                         Err(err) => {
                             eprintln!("{}", err);
                             is_success = false;
-                            is_success_for_interp_redirects = false;
                             break;
                         }
                     }
@@ -1668,7 +1713,11 @@ impl Interpreter
                                             match file_r.write_all(s.as_bytes()) {
                                                 Ok(()) => 0,
                                                 Err(err) => {
-                                                    eprintln!("{}", err);
+                                                    if is_special_builtin_fun {
+                                                        eprintln!("{}", err);
+                                                    } else {
+                                                        xcfprintln!(exec, 2, "{}", err);
+                                                    }
                                                     1
                                                 },
                                             }
@@ -1676,9 +1725,13 @@ impl Interpreter
                                     match res {
                                         Ok(pid) => pids.push(pid),
                                         Err(err) => {
-                                            eprintln!("{}", err);
+                                            if is_special_builtin_fun {
+                                                eprintln!("{}", err);
+                                            } else {
+                                                xcfprintln!(exec, 2, "{}", err);
+                                            }
                                             is_success = false;
-                                            break
+                                            break;
                                         },
                                     }
                                     j += 1;
@@ -1716,7 +1769,11 @@ impl Interpreter
                             match res {
                                 Ok(tmp_pid) => pid = tmp_pid,
                                 Err(err) => {
-                                    eprintln!("{}", err);
+                                    if is_special_builtin_fun {
+                                        eprintln!("{}", err);
+                                    } else {
+                                        xcfprintln!(exec, 2, "{}", err);
+                                    }
                                     is_success = false;
                                 },
                             }
@@ -1727,13 +1784,23 @@ impl Interpreter
                             match interp_redirect {
                                 InterpreterRedirection::HereDocument(_, _) => {
                                     j -= 1;
-                                    self.wait_for_process(exec, pids[j]);
+                                    match self.wait_for_process(exec, pids[j], is_special_builtin_fun) {
+                                        Some(tmp_status) if tmp_status != 0 => is_success = false,
+                                        None => is_success = false,
+                                        _ => (),
+                                    }
                                 },
                                 _ => (),
                             }
                         }
                         if is_success {
-                            self.wait_for_process(exec, pid)
+                            match self.wait_for_process(exec, pid, is_special_builtin_fun) {
+                                Some(tmp_status) => tmp_status,
+                                None => {
+                                    is_success = false;
+                                    1
+                                },
+                            }
                         } else {
                             1
                         }
@@ -1752,10 +1819,10 @@ impl Interpreter
                 InterpreterRedirection::HereDocument(_, _) => (),
             }
         }
-        if is_success_for_interp_redirects {
+        if is_success {
             status
         } else {
-            if is_builtin_fun {
+            if is_special_builtin_fun {
                 self.exit(status, false)
             } else {
                 status
@@ -1870,7 +1937,7 @@ impl Interpreter
                                                     }
                                                 },
                                                 Err(err) => {
-                                                    eprintln!("{}", err);
+                                                    xcfprintln!(exec, 2, "{}", err);
                                                     is_success = false;
                                                 },
                                             }
@@ -1896,7 +1963,7 @@ impl Interpreter
                                         print_command_for_xtrace(vars.as_slice(), args.as_slice());
                                     }
                                     self.interpret_redirects(exec, redirects.as_slice(), is_builtin_fun(arg0.as_str(), env), env, settings, |interp, exec, env, settings| {
-                                            interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], env, settings)
+                                            interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], false, env, settings).unwrap_or(1)
                                     })
                                 },
                                 None => {
@@ -1951,7 +2018,7 @@ impl Interpreter
                         });
                         match res {
                             Ok(pid) => {
-                                let status = interp.wait_for_process(exec, pid);
+                                let status = interp.wait_for_process(exec, pid, false).unwrap_or(1);
                                 interp.last_status = status;
                                 status
                             },
@@ -2189,7 +2256,7 @@ impl Interpreter
                         match pipe_with_cloexec() {
                             Ok(pipe_fds) => pipes.push(unsafe { Pipe::from_pipe_fds(&pipe_fds) }),
                             Err(err) => {
-                                eprintln!("{}", err);
+                                xcfprintln!(exec, 2, "{}", err);
                                 is_success = false;
                             }
                         }
@@ -2225,7 +2292,8 @@ impl Interpreter
                         match res {
                             Ok(pid) => pids.push(pid),
                             Err(err) => {
-                                eprintln!("{}", err);
+                                xcfprintln!(exec, 2, "{}", err);
+                                break;
                             },
                         }
                     }
@@ -2233,7 +2301,7 @@ impl Interpreter
                     exec.clear_pipes();
                     status = 1;
                     for (i, pid) in pids.iter().enumerate() {
-                        let tmp_status = self.wait_for_process(exec, *pid);
+                        let tmp_status = self.wait_for_process(exec, *pid, false).unwrap_or(1);
                         if i == command.commands.len() - 1 {
                             status = tmp_status;
                         }
@@ -2303,10 +2371,10 @@ impl Interpreter
                                 eprintln!("[{}] {}", job_id, pid);
                             }
                         },
-                        None => eprintln!("No free job identifiers"),
+                        None => xcfprintln!(exec, 2, "No free job identifiers"),
                     }
                 },
-                Err(err) => eprintln!("{}", err),
+                Err(err) => xcfprintln!(exec, 2, "{}", err),
                 _ => (),
             }
             self.last_status

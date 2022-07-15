@@ -17,6 +17,7 @@
 //
 use std::fmt::Arguments;
 use std::io::*;
+use crate::exec::*;
 
 pub fn fprint_args<W: Write>(w: &mut W, args: Arguments<'_>)
 {
@@ -34,24 +35,68 @@ pub fn fprintln_args<W: Write>(w: &mut W, args: Arguments<'_>)
     }
 }
 
+pub fn xcfprint_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
+{
+    match exec.current_file(vfd) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            fprint_args(&mut *file_r, args);
+        },
+        None => eprintln!("No file"),
+    }
+}
+
+pub fn xcfprintln_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
+{
+    match exec.current_file(vfd) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            fprintln_args(&mut *file_r, args);
+        },
+        None => eprintln!("No file"),
+    }
+}
+
 #[macro_export]
 macro_rules! fprint
 {
-    ($w: expr) => {
+    ($w: expr) => ({
         $crate::fprint_args($w, std::format_args!());
-    };
-    ($w: expr, $($arg: tt)*) => {
+    });
+    ($w: expr, $($arg: tt)*) => ({
         $crate::fprint_args($w, std::format_args!($($arg)*));
-    };
+    });
 }
 
 #[macro_export]
 macro_rules! fprintln
 {
-    ($w: expr) => {
-        $crate::fprintln_args($w, std::format_args!());
-    };
-    ($w: expr, $($arg: tt)*) => {
-        $crate::fprintln_args($w, std::format_args!($($arg)*));
-    };
+    ($w: expr) => ({
+        $crate::macros::fprintln_args($w, std::format_args!());
+    });
+    ($w: expr, $($arg: tt)*) => ({
+        $crate::macros::fprintln_args($w, std::format_args!($($arg)*));
+    });
+}
+
+#[macro_export]
+macro_rules! xcfprint
+{
+    ($exec: expr, $vfd: expr) => ({
+        $crate::macros::xcfprint_args($exec, $vfd, std::format_args!());
+    });
+    ($exec: expr, $vfd: expr, $($arg: tt)*) => ({
+        $crate::macros::xcfprint_args($exec, $vfd, std::format_args!($($arg)*));
+    });
+}
+
+#[macro_export]
+macro_rules! xcfprintln
+{
+    ($exec: expr, $vfd: expr) => ({
+        $crate::macros::xcfprintln_args($exec, $vfd, std::format_args!());
+    });
+    ($exec: expr, $vfd: expr, $($arg: tt)*) => ({
+        $crate::macros::xcfprintln_args($exec, $vfd, std::format_args!($($arg)*));
+    });
 }
