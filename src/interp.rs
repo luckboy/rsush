@@ -2273,6 +2273,7 @@ impl Interpreter
     
     fn interpret_command(&mut self, exec: &mut Executor, command: &Command, env: &mut Environment, settings: &mut Settings) -> i32
     {
+        env.set_var("LINENO", format!("{}", command.pos().line).as_str(), settings);
         match command {
             Command::Simple(_, _, simple_command) => self.interpret_simple_command(exec, &(*simple_command), env, settings),
             Command::Compound(_, _, compound_command, redirects) => self.interpret_compound_command(exec, &(*compound_command), redirects.as_slice(), env, settings),
