@@ -1798,22 +1798,17 @@ impl Interpreter
                             match res {
                                 Ok(tmp_pid) => pid = tmp_pid,
                                 Err(err) => {
-                                    if is_special_builtin_fun {
-                                        eprintln!("{}", err);
-                                    } else {
-                                        xcfprintln!(exec, 2, "{}", err);
-                                    }
+                                    xcfprintln!(exec, 2, "{}", err);
                                     is_success = false;
                                 },
                             }
                         }
                         exec.clear_pipes();
-                        interp_redirects.reverse();
                         let mut tmp_is_success = true;
-                        for interp_redirect in &interp_redirects[(interp_redirects.len() - k)..] {
+                        j = 0;
+                        for interp_redirect in &interp_redirects[0..k] {
                             match interp_redirect {
                                 InterpreterRedirection::HereDocument(_, _) => {
-                                    j -= 1;
                                     match self.wait_for_process(exec, pids[j], is_special_builtin_fun) {
                                         Some(tmp_status) if tmp_status != 0 => {
                                             tmp_is_success = false;
@@ -1825,6 +1820,7 @@ impl Interpreter
                                         },
                                         _ => (),
                                     }
+                                    j += 1;
                                 },
                                 _ => (),
                             }
@@ -1848,6 +1844,7 @@ impl Interpreter
         } else {
             exec.clear_pipes();
         }
+        interp_redirects.reverse();
         for interp_redirect in &interp_redirects[(interp_redirects.len() - i)..] {
             match interp_redirect {
                 InterpreterRedirection::Input(vfd, _) => exec.pop_file(*vfd),
