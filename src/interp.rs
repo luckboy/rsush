@@ -102,12 +102,12 @@ fn print_command_for_xtrace(vars: &[(String, String)], args: &[String])
 {
     eprint!("+");
     for (name, value) in vars.iter() {
-        print!(" {}={}", name, value);
+        eprint!(" {}={}", name, value);
     }
     for arg in args.iter() {
-        print!(" {}", arg);
+        eprint!(" {}", arg);
     }
-    println!("");
+    eprintln!("");
 }
 
 fn is_builtin_fun(name: &str, env: &Environment) -> bool
@@ -674,7 +674,12 @@ impl Interpreter
                     let res = exec.create_process(false, settings, |exec, settings| {
                             exec.push_file(1, exec.pipes()[0].writing_file.clone());
                             exec.clear_pipes();
-                            self.interpret_logical_commands(exec, commands, env, settings)
+                            self.push_loop_count(0);
+                            let status = exec.interpret_or(commands.len() > 1, |exec| {
+                                    self.interpret_logical_commands(exec, commands, env, settings)
+                            });
+                            self.pop_loop_count();
+                            status
                     });
                     match res {
                         Ok(tmp_pid) => pid = tmp_pid,
@@ -722,7 +727,7 @@ impl Interpreter
                     if is_read_only_param(param_name, env) {
                         eprintln!("{}: Is read only", param_name);
                     } else {
-                        println!("{}: Can't set parameter", param_name);
+                        eprintln!("{}: Can't set parameter", param_name);
                     }
                     self.set_exit(false);
                     None
