@@ -42,7 +42,7 @@ pub fn xcfprint_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
             let mut file_r = file.borrow_mut();
             fprint_args(&mut *file_r, args);
         },
-        None => eprintln!("No file"),
+        None => eprintln!("No current file"),
     }
 }
 
@@ -53,7 +53,7 @@ pub fn xcfprintln_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
             let mut file_r = file.borrow_mut();
             fprintln_args(&mut *file_r, args);
         },
-        None => eprintln!("No file"),
+        None => eprintln!("No current file"),
     }
 }
 
@@ -64,7 +64,7 @@ pub fn xsfprint_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
             let mut file_r = file.borrow_mut();
             fprint_args(&mut *file_r, args);
         },
-        None => eprintln!("No file"),
+        None => eprintln!("No saved file"),
     }
 }
 
@@ -75,7 +75,7 @@ pub fn xsfprintln_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
             let mut file_r = file.borrow_mut();
             fprintln_args(&mut *file_r, args);
         },
-        None => eprintln!("No file"),
+        None => eprintln!("No saved file"),
     }
 }
 
