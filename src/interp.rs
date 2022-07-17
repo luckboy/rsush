@@ -31,6 +31,8 @@ use crate::parser::*;
 use crate::settings::*;
 use crate::utils::*;
 use crate::xcfprintln;
+use crate::xsfprint;
+use crate::xsfprintln;
 
 pub const DEFAULT_IFS: &'static str = " \t\n";
 
@@ -98,16 +100,16 @@ fn set_vars(exec: &Executor, vars: &[(String, String)], env: &mut Environment, s
     0
 }
 
-fn print_command_for_xtrace(vars: &[(String, String)], args: &[String])
+fn print_command_for_xtrace(exec: &Executor, vars: &[(String, String)], args: &[String])
 {
-    eprint!("+");
+    xsfprint!(exec, 2, "+");
     for (name, value) in vars.iter() {
-        eprint!(" {}={}", name, value);
+        xsfprint!(exec, 2, " {}={}", name, value);
     }
     for arg in args.iter() {
-        eprint!(" {}", arg);
+        xsfprint!(exec, 2, " {}", arg);
     }
-    eprintln!("");
+    xsfprintln!(exec, 2, "");
 }
 
 fn is_builtin_fun(name: &str, env: &Environment) -> bool
@@ -292,7 +294,7 @@ impl Interpreter
             Ok(WaitStatus::Exited(status)) => Some(status),
             Ok(WaitStatus::Signaled(sig, is_coredump)) => {
                 if is_exit_for_err {
-                    eprintln!("{}", self.signal_string(sig, is_coredump));
+                    xsfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
                 } else {
                     xcfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
                 }
@@ -313,7 +315,7 @@ impl Interpreter
             Ok(WaitStatus::Exited(status)) => Some(status),
             Ok(WaitStatus::Signaled(sig, is_coredump)) => {
                 if is_exit_for_err {
-                    eprintln!("{}", self.signal_string(sig, is_coredump));
+                    xsfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
                 } else {
                     xcfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
                 }
@@ -390,7 +392,7 @@ impl Interpreter
                         if !settings.nounset_flag {
                             Some(None)
                         } else {
-                            eprintln!("{}: Parameter not set", param_name);
+                            xsfprintln!(exec, 2, "{}: Parameter not set", param_name);
                             self.set_exit(false);
                             None
                         }
@@ -443,9 +445,9 @@ impl Interpreter
                                         Some(Some(Value::String(word)))
                                     } else {
                                         if is_read_only_param(param_name, env) {
-                                            eprintln!("{}: Is read only", param_name);
+                                            xsfprintln!(exec, 2, "{}: Is read only", param_name);
                                         } else {
-                                            eprintln!("{}: Can't set parameter", param_name);
+                                            xsfprintln!(exec, 2, "{}: Can't set parameter", param_name);
                                         }
                                         self.set_exit(false);
                                         None
@@ -457,9 +459,9 @@ impl Interpreter
                                     Some(Some(Value::String(word)))
                                 } else {
                                     if is_read_only_param(param_name, env) {
-                                        eprintln!("{}: Is read only", param_name);
+                                        xsfprintln!(exec, 2, "{}: Is read only", param_name);
                                     } else {
-                                        eprintln!("{}: Can't set parameter", param_name);
+                                        xsfprintln!(exec, 2, "{}: Can't set parameter", param_name);
                                     }
                                     self.set_exit(false);
                                     None
@@ -486,9 +488,9 @@ impl Interpreter
                                     Some(Some(Value::String(word)))
                                 } else {
                                     if is_read_only_param(param_name, env) {
-                                        eprintln!("{}: Is read only", param_name);
+                                        xsfprintln!(exec, 2, "{}: Is read only", param_name);
                                     } else {
-                                        eprintln!("{}: Can't set parameter", param_name);
+                                        xsfprintln!(exec, 2, "{}: Can't set parameter", param_name);
                                     }
                                     self.set_exit(false);
                                     None
@@ -512,7 +514,7 @@ impl Interpreter
                                     } else {
                                         String::from("Parameter null or not set")
                                     };
-                                    eprintln!("{}: {}", param_name, err);
+                                    xsfprintln!(exec, 2, "{}: {}", param_name, err);
                                     self.set_exit(false);
                                     None
                                 }
@@ -523,7 +525,7 @@ impl Interpreter
                                 } else {
                                     String::from("Parameter null or not set")
                                 };
-                                eprintln!("{}: {}", param_name, err);
+                                xsfprintln!(exec, 2, "{}: {}", param_name, err);
                                 self.set_exit(false);
                                 None
                             },
@@ -549,7 +551,7 @@ impl Interpreter
                                 } else {
                                     String::from("Parameter not set")
                                 };
-                                eprintln!("{}: {}", param_name, err);
+                                xsfprintln!(exec, 2, "{}: {}", param_name, err);
                                 self.set_exit(false);
                                 None
                             },
@@ -647,7 +649,7 @@ impl Interpreter
                 if !settings.nounset_flag {
                     Some(String::from("0"))
                 } else {
-                    eprintln!("{}: Parameter not set", param_name);
+                    xsfprintln!(exec, 2, "{}: Parameter not set", param_name);
                     self.set_exit(false);
                     None
                 }
@@ -665,7 +667,7 @@ impl Interpreter
                 match pipe_with_cloexec() {
                     Ok(pipe_fds) => pipes.push(unsafe { Pipe::from_pipe_fds(&pipe_fds) }),
                     Err(err) => {
-                        eprintln!("{}", err);
+                        xsfprintln!(exec, 2, "{}", err);
                         is_success = false;
                     },
                 }
@@ -684,7 +686,7 @@ impl Interpreter
                     match res {
                         Ok(tmp_pid) => pid = tmp_pid,
                         Err(err) => {
-                            eprintln!("{}", err);
+                            xsfprintln!(exec, 2, "{}", err);
                             is_success = false;
                         },
                     }
@@ -696,7 +698,7 @@ impl Interpreter
                     match file_r.read_to_string(&mut s) {
                         Ok(_) => (),
                         Err(err) => {
-                            eprintln!("{}", err);
+                            xsfprintln!(exec, 2, "{}", err);
                             is_success = false;
                         },
                     }
@@ -717,7 +719,7 @@ impl Interpreter
         })
     }
 
-    fn assign_to_arith_expr(&mut self, expr: &ArithmeticExpression, x: i64, env: &mut Environment, settings: &Settings) -> Option<i64>
+    fn assign_to_arith_expr(&mut self, exec: &Executor, expr: &ArithmeticExpression, x: i64, env: &mut Environment, settings: &Settings) -> Option<i64>
     {
         match expr {
             ArithmeticExpression::Parameter(_, _, param_name) => {
@@ -725,16 +727,16 @@ impl Interpreter
                     Some(x)
                 } else {
                     if is_read_only_param(param_name, env) {
-                        eprintln!("{}: Is read only", param_name);
+                        xsfprintln!(exec, 2, "{}: Is read only", param_name);
                     } else {
-                        eprintln!("{}: Can't set parameter", param_name);
+                        xsfprintln!(exec, 2, "{}: Can't set parameter", param_name);
                     }
                     self.set_exit(false);
                     None
                 }
             },
             _ => {
-                eprintln!("Can't assign to not parameter");
+                xsfprintln!(exec, 2, "Can't assign to not parameter");
                 self.set_exit(false);
                 None
             },
@@ -754,16 +756,16 @@ impl Interpreter
                                     Ok(x) => Some(x),
                                     Err(_) => {
                                         if !s.starts_with('-') {
-                                            eprintln!("{}: Too large number", param_name);
+                                            xsfprintln!(exec, 2, "{}: Too large number", param_name);
                                         } else {
-                                            eprintln!("{}: Too small number", param_name);
+                                            xsfprintln!(exec, 2, "{}: Too small number", param_name);
                                         }
                                         self.set_exit(false);
                                         None
                                     },
                                 }
                             } else {
-                                eprintln!("{}: Invalid number", param_name);
+                                xsfprintln!(exec, 2, "{}: Invalid number", param_name);
                                 None
                             }
                         } else {
@@ -774,7 +776,7 @@ impl Interpreter
                         if !settings.nounset_flag {
                             Some(0)
                         } else {
-                            eprintln!("{}: Parameter not set", param_name);
+                            xsfprintln!(exec, 2, "{}: Parameter not set", param_name);
                             self.set_exit(false);
                             None
                         }
@@ -786,7 +788,7 @@ impl Interpreter
                 match x.checked_neg() {
                     Some(y) => Some(y),
                     None => {
-                        eprintln!("Overflow");
+                        xsfprintln!(exec, 2, "Overflow");
                         self.set_exit(false);
                         None
                     },
@@ -810,7 +812,7 @@ impl Interpreter
                 match x.checked_mul(y) {
                     Some(z) => Some(z),
                     None => {
-                        eprintln!("Overflow");
+                        xsfprintln!(exec, 2, "Overflow");
                         self.set_exit(false);
                         None
                     },
@@ -823,13 +825,13 @@ impl Interpreter
                     match x.checked_div(y) {
                         Some(z) => Some(z),
                         None => {
-                            eprintln!("Overflow");
+                            xsfprintln!(exec, 2, "Overflow");
                             self.set_exit(false);
                             None
                         },
                     }
                 } else {
-                    eprintln!("Division by zero");
+                    xsfprintln!(exec, 2, "Division by zero");
                     self.set_exit(false);
                     None
                 }
@@ -841,13 +843,13 @@ impl Interpreter
                     match x.checked_rem(y) {
                         Some(z) => Some(z),
                         None => {
-                            eprintln!("Overflow");
+                            xsfprintln!(exec, 2, "Overflow");
                             self.set_exit(false);
                             None
                         },
                     }
                 } else {
-                    eprintln!("Division by zero");
+                    xsfprintln!(exec, 2, "Division by zero");
                     self.set_exit(false);
                     None
                 }
@@ -858,7 +860,7 @@ impl Interpreter
                 match x.checked_add(y) {
                     Some(z) => Some(z),
                     None => {
-                        eprintln!("Overflow");
+                        xsfprintln!(exec, 2, "Overflow");
                         self.set_exit(false);
                         None
                     },
@@ -870,7 +872,7 @@ impl Interpreter
                 match x.checked_sub(y) {
                     Some(z) => Some(z),
                     None => {
-                        eprintln!("Overflow");
+                        xsfprintln!(exec, 2, "Overflow");
                         self.set_exit(false);
                         None
                     },
@@ -883,13 +885,13 @@ impl Interpreter
                     match x.checked_shl(y as u32) {
                         Some(z) => Some(z),
                         None => {
-                            eprintln!("Overflow");
+                            xsfprintln!(exec, 2, "Overflow");
                             self.set_exit(false);
                             None
                         },
                     }
                 } else {
-                    eprintln!("Overflow");
+                    xsfprintln!(exec, 2, "Overflow");
                     self.set_exit(false);
                     None
                 }
@@ -901,13 +903,13 @@ impl Interpreter
                     match x.checked_shl(y as u32) {
                         Some(z) => Some(z),
                         None => {
-                            eprintln!("Overflow");
+                            xsfprintln!(exec, 2, "Overflow");
                             self.set_exit(false);
                             None
                         },
                     }
                 } else {
-                    eprintln!("Overflow");
+                    xsfprintln!(exec, 2, "Overflow");
                     self.set_exit(false);
                     None
                 }
@@ -977,15 +979,15 @@ impl Interpreter
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Assign, expr2) => {
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                self.assign_to_arith_expr(&(*expr1), y, env, settings)
+                self.assign_to_arith_expr(exec, &(*expr1), y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::MultiplyAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 match x.checked_mul(y) {
-                    Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
+                    Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                     None => {
-                        eprintln!("Overflow");
+                        xsfprintln!(exec, 2, "Overflow");
                         self.set_exit(false);
                         None
                     },
@@ -996,15 +998,15 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y != 0 {
                     match x.checked_div(y) {
-                        Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
+                        Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                         None => {
-                            eprintln!("Overflow");
+                            xsfprintln!(exec, 2, "Overflow");
                             self.set_exit(false);
                             None
                         },
                     }
                 } else {
-                    eprintln!("Division by zero");
+                    xsfprintln!(exec, 2, "Division by zero");
                     self.set_exit(false);
                     None
                 }
@@ -1014,15 +1016,15 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y != 0 {
                     match x.checked_rem(y) {
-                        Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
+                        Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                         None => {
-                            eprintln!("Overflow");
+                            xsfprintln!(exec, 2, "Overflow");
                             self.set_exit(false);
                             None
                         },
                     }
                 } else {
-                    eprintln!("Division by zero");
+                    xsfprintln!(exec, 2, "Division by zero");
                     self.set_exit(false);
                     None
                 }
@@ -1031,9 +1033,9 @@ impl Interpreter
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 match x.checked_add(y) {
-                    Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
+                    Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                     None => {
-                        eprintln!("Overflow");
+                        xsfprintln!(exec, 2, "Overflow");
                         self.set_exit(false);
                         None
                     },
@@ -1043,9 +1045,9 @@ impl Interpreter
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 match x.checked_sub(y) {
-                    Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
+                    Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                     None => {
-                        eprintln!("Overflow");
+                        xsfprintln!(exec, 2, "Overflow");
                         self.set_exit(false);
                         None
                     },
@@ -1056,15 +1058,15 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
-                        Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
+                        Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                         None => {
-                            eprintln!("Overflow");
+                            xsfprintln!(exec, 2, "Overflow");
                             self.set_exit(false);
                             None
                         },
                     }
                 } else {
-                    eprintln!("Overflow");
+                    xsfprintln!(exec, 2, "Overflow");
                     self.set_exit(false);
                     None
                 }
@@ -1074,15 +1076,15 @@ impl Interpreter
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
-                        Some(z) => self.assign_to_arith_expr(&(*expr1), z, env, settings),
+                        Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                         None => {
-                            eprintln!("Overflow");
+                            xsfprintln!(exec, 2, "Overflow");
                             self.set_exit(false);
                             None
                         },
                     }
                 } else {
-                    eprintln!("Overflow");
+                    xsfprintln!(exec, 2, "Overflow");
                     self.set_exit(false);
                     None
                 }
@@ -1090,17 +1092,17 @@ impl Interpreter
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::AndAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                self.assign_to_arith_expr(&(*expr1), x & y, env, settings)
+                self.assign_to_arith_expr(exec, &(*expr1), x & y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ExclusiveOrAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                self.assign_to_arith_expr(&(*expr1), x ^ y, env, settings)
+                self.assign_to_arith_expr(exec, &(*expr1), x ^ y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::OrAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
-                self.assign_to_arith_expr(&(*expr1), x | y, env, settings)
+                self.assign_to_arith_expr(exec, &(*expr1), x | y, env, settings)
             },
             ArithmeticExpression::Conditional(_, _, expr1, expr2, expr3) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
@@ -1313,7 +1315,7 @@ impl Interpreter
         true
     }
     
-    fn add_glob_expansions(&mut self, ss: &[String], ts: &mut Vec<String>, settings: &mut Settings) -> bool
+    fn add_glob_expansions(&mut self, exec: &Executor, ss: &[String], ts: &mut Vec<String>, settings: &mut Settings) -> bool
     {
         for s in ss.iter() {
             if !settings.noglob_flag {
@@ -1326,7 +1328,7 @@ impl Interpreter
                                 match path_buf.to_str() {
                                     Some(t) => String::from(t),
                                     None => {
-                                        eprintln!("Invalid UTF-8");
+                                        xsfprintln!(exec, 2, "Invalid UTF-8");
                                         self.set_exit(false);
                                         return false;
                                     },
@@ -1336,7 +1338,7 @@ impl Interpreter
                         }
                     },
                     GlobResult::Aborted => {
-                        eprintln!("Glob I/O error");
+                        xsfprintln!(exec, 2, "Glob I/O error");
                         self.set_exit(false);
                         return false;
                     },
@@ -1348,7 +1350,7 @@ impl Interpreter
                             match path_buf.to_str() {
                                 Some(t) => String::from(t),
                                 None => {
-                                    eprintln!("Invalid UTF-8");
+                                    xsfprintln!(exec, 2, "Invalid UTF-8");
                                     self.set_exit(false);
                                     return false;
                                 },
@@ -1357,7 +1359,7 @@ impl Interpreter
                         ts.push(t);
                     },
                     GlobResult::NoSpace => {
-                        eprintln!("Can't allocate memory");
+                        xsfprintln!(exec, 2, "Can't allocate memory");
                         self.set_exit(false);
                         return false;
                     },
@@ -1370,7 +1372,7 @@ impl Interpreter
                     match path_buf.to_str() {
                         Some(t) => String::from(t),
                         None => {
-                            eprintln!("Invalid UTF-8");
+                            xsfprintln!(exec, 2, "Invalid UTF-8");
                             self.set_exit(false);
                             return false;
                         },
@@ -1397,7 +1399,7 @@ impl Interpreter
                 match path_buf.to_str() {
                     Some(t) => String::from(t),
                     None => {
-                        eprintln!("Invalid UTF-8");
+                        xsfprintln!(exec, 2, "Invalid UTF-8");
                         return None;
                     },
                 }
@@ -1435,7 +1437,7 @@ impl Interpreter
             return None;
         }
         let mut ts: Vec<String> = Vec::new();
-        if self.add_glob_expansions(&ss, &mut ts, settings) {
+        if self.add_glob_expansions(exec, &ss, &mut ts, settings) {
             Some(ts)
         } else {
             None
@@ -1459,7 +1461,7 @@ impl Interpreter
             }
         }
         let mut ts: Vec<String> = Vec::new();
-        if self.add_glob_expansions(&ss, &mut ts, settings) {
+        if self.add_glob_expansions(exec, &ss, &mut ts, settings) {
             Some(ts)
         } else {
             None
@@ -1489,7 +1491,7 @@ impl Interpreter
                 match path_buf.to_str() {
                     Some(t) => String::from(t),
                     None => {
-                        eprintln!("Invalid UTF-8");
+                        xsfprintln!(exec, 2, "Invalid UTF-8");
                         return None;
                     },
                 }
@@ -1550,7 +1552,7 @@ impl Interpreter
                                     Ok(fd) => interp_redirects.push(InterpreterRedirection::Duplicating(n.unwrap_or(0), fd)),
                                     Err(_) => {
                                         if is_special_builtin_fun {
-                                            eprintln!("{}: {}: too large I/O number", path, pos);
+                                            xsfprintln!(exec, 2, "{}: {}: too large I/O number", path, pos);
                                         } else {
                                             xcfprintln!(exec, 2, "{}: {}: too large I/O number", path, pos);
                                         }
@@ -1558,7 +1560,7 @@ impl Interpreter
                                 }
                             } else {
                                 if is_special_builtin_fun {
-                                    eprintln!("{}: {}: invalid I/O number", path, pos);
+                                    xsfprintln!(exec, 2, "{}: {}: invalid I/O number", path, pos);
                                 } else {
                                     xcfprintln!(exec, 2, "{}: {}: invalid I/O number", path, pos);
                                 }
@@ -1579,7 +1581,7 @@ impl Interpreter
                                     Ok(fd) => interp_redirects.push(InterpreterRedirection::Duplicating(n.unwrap_or(1), fd)),
                                     Err(_) => {
                                         if is_special_builtin_fun {
-                                            eprintln!("{}: {}: too large I/O number", path, pos);
+                                            xsfprintln!(exec, 2, "{}: {}: too large I/O number", path, pos);
                                         } else {
                                             xcfprintln!(exec, 2, "{}: {}: too large I/O number", path, pos);
                                         }
@@ -1587,7 +1589,7 @@ impl Interpreter
                                 }
                             } else {
                                 if is_special_builtin_fun {
-                                    eprintln!("{}: {}: invalid I/O number", path, pos);
+                                    xsfprintln!(exec, 2, "{}: {}: invalid I/O number", path, pos);
                                 } else {
                                     xcfprintln!(exec, 2, "{}: {}: invalid I/O number", path, pos);
                                 }
@@ -1628,7 +1630,7 @@ impl Interpreter
                         Ok(file) => exec.push_file(*vfd, Rc::new(RefCell::new(file))),
                         Err(err) => {
                             if is_special_builtin_fun {
-                                eprintln!("{}: {}", path, err);
+                                xsfprintln!(exec, 2, "{}: {}", path, err);
                             } else {
                                 xcfprintln!(exec, 2, "{}: {}", path, err);
                             }
@@ -1650,7 +1652,7 @@ impl Interpreter
                         Ok(file) => exec.push_file(*vfd, Rc::new(RefCell::new(file))),
                         Err(err) => {
                             if is_special_builtin_fun {
-                                eprintln!("{}: {}", path, err);
+                                xsfprintln!(exec, 2, "{}: {}", path, err);
                             } else {
                                 xcfprintln!(exec, 2, "{}: {}", path, err);
                             }
@@ -1668,7 +1670,7 @@ impl Interpreter
                         Ok(file) => exec.push_file(*vfd, Rc::new(RefCell::new(file))),
                         Err(err) => {
                             if is_special_builtin_fun {
-                                eprintln!("{}: {}", path, err);
+                                xsfprintln!(exec, 2, "{}: {}", path, err);
                             } else {
                                 xcfprintln!(exec, 2, "{}: {}", path, err);
                             }
@@ -1686,7 +1688,7 @@ impl Interpreter
                         Ok(file) => exec.push_file(*vfd, Rc::new(RefCell::new(file))),
                         Err(err) => {
                             if is_special_builtin_fun {
-                                eprintln!("{}: {}", path, err);
+                                xsfprintln!(exec, 2, "{}: {}", path, err);
                             } else {
                                 xcfprintln!(exec, 2, "{}: {}", path, err);
                             }
@@ -1702,7 +1704,7 @@ impl Interpreter
                         Some(file) => exec.push_file(*new_vfd, file),
                         None => {
                             if is_special_builtin_fun {
-                                eprintln!("{}: Bad fd number", *old_vfd);
+                                xsfprintln!(exec, 2, "{}: Bad fd number", *old_vfd);
                             } else {
                                 xcfprintln!(exec, 2, "{}: Bad fd number", *old_vfd);
                             }
@@ -1716,7 +1718,7 @@ impl Interpreter
                     match pipe_with_cloexec() {
                         Ok(pipe_fds) => pipes.push(unsafe { Pipe::from_pipe_fds(&pipe_fds) }),
                         Err(err) => {
-                            eprintln!("{}", err);
+                            xsfprintln!(exec, 2, "{}", err);
                             is_success = false;
                             is_success_for_interp_redirects = false;
                             break;
@@ -1747,7 +1749,7 @@ impl Interpreter
                                                 Ok(()) => 0,
                                                 Err(err) => {
                                                     if is_special_builtin_fun {
-                                                        eprintln!("{}", err);
+                                                        xsfprintln!(exec, 2, "{}", err);
                                                     } else {
                                                         xcfprintln!(exec, 2, "{}", err);
                                                     }
@@ -1759,7 +1761,7 @@ impl Interpreter
                                         Ok(pid) => pids.push(pid),
                                         Err(err) => {
                                             if is_special_builtin_fun {
-                                                eprintln!("{}", err);
+                                                xsfprintln!(exec, 2, "{}", err);
                                             } else {
                                                 xcfprintln!(exec, 2, "{}", err);
                                             }
@@ -1977,7 +1979,7 @@ impl Interpreter
                                                     }
                                                 },
                                                 Err(err) => {
-                                                    eprintln!("{}", err);
+                                                    xsfprintln!(exec, 2, "{}", err);
                                                     self.last_status = 1;
                                                     return self.exit(1, false);
                                                 },
@@ -2001,7 +2003,7 @@ impl Interpreter
                             match args.first() {
                                 Some(arg0) => {
                                     if settings.xtrace_flag {
-                                        print_command_for_xtrace(vars.as_slice(), args.as_slice());
+                                        print_command_for_xtrace(exec, vars.as_slice(), args.as_slice());
                                     }
                                     self.interpret_redirects(exec, redirects.as_slice(), is_builtin_fun(arg0.as_str(), env), env, settings, |interp, exec, env, settings| {
                                             interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], false, env, settings).unwrap_or(1)
@@ -2009,7 +2011,7 @@ impl Interpreter
                                 },
                                 None => {
                                     if settings.xtrace_flag {
-                                        print_command_for_xtrace(vars.as_slice(), &[]);
+                                        print_command_for_xtrace(exec, vars.as_slice(), &[]);
                                     }
                                     self.interpret_redirects(exec, redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                                             set_vars(exec, vars.as_slice(), env, settings)
@@ -2025,7 +2027,7 @@ impl Interpreter
             },
             Some(None) => {
                 if settings.xtrace_flag {
-                    print_command_for_xtrace(vars.as_slice(), &[]);
+                    print_command_for_xtrace(exec, vars.as_slice(), &[]);
                 }
                 self.interpret_redirects(exec, command.redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                         set_vars(exec, vars.as_slice(), env, settings)
@@ -2066,7 +2068,7 @@ impl Interpreter
                                 status
                             },
                             Err(err) => {
-                                eprintln!("{}", err);
+                                xcfprintln!(exec, 2, "{}", err);
                                 1
                             },
                         }
@@ -2417,7 +2419,7 @@ impl Interpreter
                         Some(job_id) => {
                             self.last_job_pid = Some(pid);
                             if settings.notify_flag {
-                                eprintln!("[{}] {}", job_id, pid);
+                                xsfprintln!(exec, 2, "[{}] {}", job_id, pid);
                             }
                         },
                         None => xcfprintln!(exec, 2, "No free job identifiers"),

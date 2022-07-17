@@ -57,6 +57,28 @@ pub fn xcfprintln_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
     }
 }
 
+pub fn xsfprint_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
+{
+    match exec.saved_file(vfd) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            fprint_args(&mut *file_r, args);
+        },
+        None => eprintln!("No file"),
+    }
+}
+
+pub fn xsfprintln_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
+{
+    match exec.saved_file(vfd) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            fprintln_args(&mut *file_r, args);
+        },
+        None => eprintln!("No file"),
+    }
+}
+
 #[macro_export]
 macro_rules! fprint
 {
@@ -98,5 +120,27 @@ macro_rules! xcfprintln
     });
     ($exec: expr, $vfd: expr, $($arg: tt)*) => ({
         $crate::macros::xcfprintln_args($exec, $vfd, std::format_args!($($arg)*));
+    });
+}
+
+#[macro_export]
+macro_rules! xsfprint
+{
+    ($exec: expr, $vfd: expr) => ({
+        $crate::macros::xsfprint_args($exec, $vfd, std::format_args!());
+    });
+    ($exec: expr, $vfd: expr, $($arg: tt)*) => ({
+        $crate::macros::xsfprint_args($exec, $vfd, std::format_args!($($arg)*));
+    });
+}
+
+#[macro_export]
+macro_rules! xsfprintln
+{
+    ($exec: expr, $vfd: expr) => ({
+        $crate::macros::xsfprintln_args($exec, $vfd, std::format_args!());
+    });
+    ($exec: expr, $vfd: expr, $($arg: tt)*) => ({
+        $crate::macros::xsfprintln_args($exec, $vfd, std::format_args!($($arg)*));
     });
 }

@@ -17,6 +17,7 @@
 //
 use std::fs::*;
 use crate::exec::*;
+use crate::xsfprintln;
 
 pub fn with_std_files<T, F>(exec: &Executor, f: F) -> Option<T>
     where F: FnOnce(&mut File, &mut File, &mut File) -> T
@@ -33,19 +34,19 @@ pub fn with_std_files<T, F>(exec: &Executor, f: F) -> Option<T>
                             Some(f(&mut *stdin_file_r, &mut *stdout_file_r, &mut *stderr_file_r))
                         },
                         None => {
-                            eprintln!("No standard error");
+                            xsfprintln!(exec, 2, "No standard error");
                             None
                         },
                     }
                 },
                 None => {
-                    eprintln!("No standard output");
+                    xsfprintln!(exec, 2, "No standard output");
                     None
                 },
             }
         },
         None => {
-            eprintln!("No standard input");
+            xsfprintln!(exec, 2, "No standard input");
             None
         },
     }

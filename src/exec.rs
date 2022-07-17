@@ -408,7 +408,7 @@ impl Executor
         }
     }
     
-    fn close_and_move_files_for_execute(&mut self) -> Result<()>
+    pub fn close_and_move_files_for_execute(&mut self) -> Result<()>
     {
         for (_, virtual_file) in self.virtual_files.iter_mut() {
             virtual_file.saved_file = None;
@@ -445,6 +445,9 @@ impl Executor
         }
         for (vfd, virtual_file) in self.virtual_files.iter_mut() {
             if *vfd != virtual_file.current_file.borrow().as_raw_fd() {
+                if is_fd(*vfd) {
+                    unsafe { close(*vfd) }?;
+                }
                 loop {
                     match unsafe { dup2(virtual_file.current_file.borrow().as_raw_fd(), *vfd) } {
                         Ok(()) => break,
