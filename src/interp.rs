@@ -83,8 +83,10 @@ pub struct Interpreter
     last_status: i32,
     non_simple_comamnd_count: usize,
     return_state: ReturnState,
+    exec_redirect_flag: bool,
     loop_count_stack: Vec<usize>,
     current_loop_count: usize,
+    fun_count: usize,
     last_job_pid: Option<i32>,
     signal_names: HashMap<i32, String>,
     special_builtin_fun_names: HashSet<String>,
@@ -165,8 +167,10 @@ impl Interpreter
             last_status: 0,
             non_simple_comamnd_count: 0,
             return_state: ReturnState::None,
+            exec_redirect_flag: false,
             loop_count_stack: Vec::new(),
             current_loop_count: 0,
+            fun_count: 0,
             last_job_pid: None,
             signal_names: sig_names,
             special_builtin_fun_names,
@@ -272,8 +276,14 @@ impl Interpreter
         }
     }
     
+    pub fn set_exec_redirect_flag(&mut self)
+    { self.exec_redirect_flag = true; }
+    
     pub fn is_in_loop(&self) -> bool
     { self.current_loop_count > 0 }
+    
+    pub fn is_in_fun(&self) -> bool
+    { self.fun_count > 0 }
     
     fn push_loop_count(&mut self, count: usize)
     {
@@ -1869,15 +1879,29 @@ impl Interpreter
         } else {
             exec.clear_pipes();
         }
-        interp_redirects.reverse();
-        for interp_redirect in &interp_redirects[(interp_redirects.len() - i)..] {
-            match interp_redirect {
-                InterpreterRedirection::Input(vfd, _) => exec.pop_file(*vfd),
-                InterpreterRedirection::Output(vfd, _, _) => exec.pop_file(*vfd),
-                InterpreterRedirection::InputAndOutput(vfd, _) => exec.pop_file(*vfd),
-                InterpreterRedirection::Appending(vfd, _) => exec.pop_file(*vfd),
-                InterpreterRedirection::Duplicating(vfd, _) => exec.pop_file(*vfd),
-                InterpreterRedirection::HereDocument(_, _) => (),
+        if is_success && self.exec_redirect_flag {
+            for interp_redirect in &interp_redirects {
+                match interp_redirect {
+                    InterpreterRedirection::Input(vfd, _) => exec.pop_penultimate_file(*vfd),
+                    InterpreterRedirection::Output(vfd, _, _) => exec.pop_penultimate_file(*vfd),
+                    InterpreterRedirection::InputAndOutput(vfd, _) => exec.pop_penultimate_file(*vfd),
+                    InterpreterRedirection::Appending(vfd, _) => exec.pop_penultimate_file(*vfd),
+                    InterpreterRedirection::Duplicating(vfd, _) => exec.pop_penultimate_file(*vfd),
+                    InterpreterRedirection::HereDocument(_, _) => (),
+                }
+            }
+            self.exec_redirect_flag = false;
+        } else {
+            interp_redirects.reverse();
+            for interp_redirect in &interp_redirects[(interp_redirects.len() - i)..] {
+                match interp_redirect {
+                    InterpreterRedirection::Input(vfd, _) => exec.pop_file(*vfd),
+                    InterpreterRedirection::Output(vfd, _, _) => exec.pop_file(*vfd),
+                    InterpreterRedirection::InputAndOutput(vfd, _) => exec.pop_file(*vfd),
+                    InterpreterRedirection::Appending(vfd, _) => exec.pop_file(*vfd),
+                    InterpreterRedirection::Duplicating(vfd, _) => exec.pop_file(*vfd),
+                    InterpreterRedirection::HereDocument(_, _) => (),
+                }
             }
         }
         if is_success_for_interp_redirects {
@@ -2467,9 +2491,11 @@ impl Interpreter
 
     pub fn interpret_fun_body(&mut self, exec: &mut Executor, fun_body: &FunctionBody, env: &mut Environment, settings: &mut Settings) -> i32
     {
+        self.fun_count += 1;
         self.push_loop_count(0);
         let status = self.interpret_compound_command(exec, &fun_body.command, fun_body.redirects.as_slice(), env, settings);
         self.pop_loop_count();
+        self.fun_count -= 1;
         if self.has_break_or_continue_or_return() {
             self.clear_return_state();
         }

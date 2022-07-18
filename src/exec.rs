@@ -197,6 +197,14 @@ impl Executor
         }
     }
     
+    pub fn pop_penultimate_file(&mut self, vfd: i32)
+    {
+        match self.virtual_files.get_mut(&vfd) {
+            Some(virtual_file) => { virtual_file.file_stack.pop(); },
+            None => (),
+        }
+    }
+    
     pub fn current_file(&self, vfd: i32) -> Option<&Rc<RefCell<File>>>
     { self.virtual_files.get(&vfd).map(|vf| &vf.current_file) }
     

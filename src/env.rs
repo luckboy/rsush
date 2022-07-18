@@ -54,6 +54,9 @@ impl Environment
 
     pub fn unset_unexported_var(&mut self, name: &str)
     { self.unexported_vars.remove(&String::from(name)); }
+    
+    pub fn unexported_vars(&self) -> &HashMap<String, String>
+    { &self.unexported_vars }
 
     pub fn exported_var(&self, name: &str) -> Option<String>
     { env::var(name).ok() }
@@ -63,6 +66,9 @@ impl Environment
 
     pub fn unset_exported_var(&mut self, name: &str)
     { env::remove_var(name); }
+    
+    pub fn exported_vars(&self) -> env::Vars
+    { env::vars() }
 
     pub fn var(&self, name: &str) -> Option<String>
     { self.unexported_var(name).or(self.exported_var(name)) }
@@ -98,6 +104,9 @@ impl Environment
 
     pub fn unset_read_only_var_attr(&mut self, name: &str)
     { self.read_only_var_attrs.remove(&String::from(name)); }
+    
+    pub fn read_only_var_attrs(&self) -> &HashSet<String>
+    { &self.read_only_var_attrs }
     
     pub fn builtin_fun(&self, name: &str) -> Option<BuiltinFunction>
     { self.builtin_funs.get(&String::from(name)).map(|bf| *bf) }
