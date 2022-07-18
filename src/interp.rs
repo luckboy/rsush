@@ -17,6 +17,7 @@
 //
 use std::cell::*;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::*;
 use std::io::*;
 use std::path;
@@ -86,6 +87,7 @@ pub struct Interpreter
     current_loop_count: usize,
     last_job_pid: Option<i32>,
     signal_names: HashMap<i32, String>,
+    special_builtin_fun_names: HashSet<String>,
 }
 
 fn set_vars(exec: &Executor, vars: &[(String, String)], env: &mut Environment, settings: &Settings) -> i32
@@ -111,9 +113,6 @@ fn print_command_for_xtrace(exec: &Executor, vars: &[(String, String)], args: &[
     }
     xsfprintln!(exec, 2, "");
 }
-
-fn is_builtin_fun(name: &str, env: &Environment) -> bool
-{ env.builtin_fun(name).is_some() }
 
 impl Interpreter
 {
@@ -147,6 +146,21 @@ impl Interpreter
         sig_names.insert(libc::SIGVTALRM, String::from("Virtual timer expired"));
         sig_names.insert(libc::SIGXCPU, String::from("CPU time limit exceeded"));
         sig_names.insert(libc::SIGXFSZ, String::from("File size limit exceeded"));
+        let mut special_builtin_fun_names: HashSet<String> = HashSet::new();
+        special_builtin_fun_names.insert(String::from("."));
+        special_builtin_fun_names.insert(String::from(":"));
+        special_builtin_fun_names.insert(String::from("break"));
+        special_builtin_fun_names.insert(String::from("continue"));
+        special_builtin_fun_names.insert(String::from("eval"));
+        special_builtin_fun_names.insert(String::from("exec"));
+        special_builtin_fun_names.insert(String::from("exit"));
+        special_builtin_fun_names.insert(String::from("export"));
+        special_builtin_fun_names.insert(String::from("readonly"));
+        special_builtin_fun_names.insert(String::from("return"));
+        special_builtin_fun_names.insert(String::from("set"));
+        special_builtin_fun_names.insert(String::from("times"));
+        special_builtin_fun_names.insert(String::from("trap"));
+        special_builtin_fun_names.insert(String::from("unset"));
         Interpreter {
             last_status: 0,
             non_simple_comamnd_count: 0,
@@ -155,6 +169,7 @@ impl Interpreter
             current_loop_count: 0,
             last_job_pid: None,
             signal_names: sig_names,
+            special_builtin_fun_names,
         }
     }
 
@@ -287,6 +302,9 @@ impl Interpreter
         format!("{}{}", self.signal_name(sig).unwrap_or("Unknown signal"), coredump_s)
     }
 
+    fn has_special_builtin_fun(&self, name: &str, env: &Environment) -> bool
+    { self.special_builtin_fun_names.contains(&String::from(name)) && env.builtin_fun(name).is_some() }
+    
     fn execute(&mut self, exec: &mut Executor, vars: &[(String, String)], arg0: &str, args: &[String], is_exit_for_err: bool, env: &mut Environment, settings: &mut Settings) -> Option<i32>
     {
         match exec.execute(self, vars, arg0, args, false, env, settings, |_| true) {
@@ -2005,7 +2023,7 @@ impl Interpreter
                                     if settings.xtrace_flag {
                                         print_command_for_xtrace(exec, vars.as_slice(), args.as_slice());
                                     }
-                                    self.interpret_redirects(exec, redirects.as_slice(), is_builtin_fun(arg0.as_str(), env), env, settings, |interp, exec, env, settings| {
+                                    self.interpret_redirects(exec, redirects.as_slice(), self.has_special_builtin_fun(arg0.as_str(), env), env, settings, |interp, exec, env, settings| {
                                             interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], false, env, settings).unwrap_or(1)
                                     })
                                 },
