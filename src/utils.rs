@@ -306,7 +306,7 @@ pub fn split_str_for_ifs<'a>(s: &'a str, delims: &str) -> Vec<&'a str>
         s
     };
     if !t.is_empty() {
-        let mut iter = PushbackIter::new(s.char_indices());
+        let mut iter = PushbackIter::new(t.char_indices());
         let mut i: usize = 0;
         let mut j: usize;
         loop {
@@ -398,3 +398,6 @@ pub fn singly_quote_str(s: &str) -> String
     new_s.push('\'');
     new_s
 }
+
+#[cfg(test)]
+mod tests;
