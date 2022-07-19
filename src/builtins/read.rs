@@ -100,7 +100,11 @@ pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpret
                 }
             }
             let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
-            let fields = split_str_for_ifs(s.as_str(), ifs.as_str());
+            let fields = if !ifs.is_empty() {
+                split_str_for_ifs(s.as_str(), ifs.as_str())
+            } else {
+                vec![s.as_str()]
+            };
             let mut status = 0;
             let names: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
             for (i, name) in names.iter().enumerate() {
