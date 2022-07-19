@@ -90,7 +90,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
                 let mut stdout_file_r = stdout_file.borrow_mut();
                 let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
                 for (name, value) in env.exported_vars() {
-                    fprintln!(&mut line_stdout, "export {}={}", name, value);
+                    fprintln!(&mut line_stdout, "export {}={}", name, singly_quote_str(value.as_str()));
                 }
             },
             None => {

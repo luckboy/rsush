@@ -134,4 +134,10 @@ impl Environment
 
     pub fn unset_alias(&mut self, name: &str)
     { self.aliases.remove(&String::from(name)); }
+    
+    pub fn aliases(&self) -> &HashMap<String, String>
+    { &self.aliases }
+    
+    pub fn unset_all_aliases(&mut self)
+    { self.aliases.clear(); }
 }

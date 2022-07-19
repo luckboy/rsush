@@ -380,3 +380,21 @@ pub fn is_first_char(s: &str, delims: &str) -> bool
 
 pub fn is_last_char(s: &str, delims: &str) -> bool
 { s.chars().last().map(|c| delims.contains(c)).unwrap_or(false) }
+
+pub fn str_without_newline(s: &str) -> &str
+{
+    if s.ends_with('\n') {
+        &s[0..(s.len() - 1)]
+    } else {
+        s
+    }
+}
+
+pub fn singly_quote_str(s: &str) -> String
+{
+    let mut new_s = String::new();
+    new_s.push('\'');
+    new_s.push_str(s.replace('\'', "'\\''").as_str());
+    new_s.push('\'');
+    new_s
+}

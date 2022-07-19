@@ -82,7 +82,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
                 let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
                 for name in env.read_only_var_attrs().iter() {
                     match env.var(name.as_str()) {
-                        Some(value) => fprintln!(&mut line_stdout, "readonly {}={}", name, value),
+                        Some(value) => fprintln!(&mut line_stdout, "readonly {}={}", name, singly_quote_str(value.as_str())),
                         None => fprintln!(&mut line_stdout, "readonly {}", name),
                     }
                 }
