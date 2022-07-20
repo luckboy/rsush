@@ -43,6 +43,7 @@ pub enum Value
     String(String),
     AtArray(Vec<String>),
     StarArray(Vec<String>),
+    ExpansionArray(Vec<String>),
 }
 
 impl Value
@@ -53,6 +54,7 @@ impl Value
             Value::String(s) => s.is_empty(),
             Value::AtArray(ss) => ss.is_empty(),
             Value::StarArray(ss) => ss.is_empty(),
+            Value::ExpansionArray(ss) => ss.is_empty(),
         }
     }
 }
@@ -406,6 +408,18 @@ impl Interpreter
                 };
                 Some(ss.join(sep.as_str()))
             },
+            Some(Value::ExpansionArray(ss)) => {
+                let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
+                let sep = match ifs.chars().next() {
+                    Some(c) => {
+                        let mut tmp_sep = String::new();
+                        tmp_sep.push(c);
+                        tmp_sep
+                    },
+                    None => String::new(),
+                };
+                Some(ss.join(sep.as_str()))
+            },
             None => None,
         }
     }
@@ -428,25 +442,25 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::ColonMinus, words)) => {
-                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
-                    Some(word) => {
+                match self.perform_word_expansions(exec, words.as_slice(), env, settings) {
+                    Some(new_words) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
                                 if !value.is_null() {
                                     Some(Some(value))
                                 } else {
-                                    Some(Some(Value::String(word)))
+                                    Some(Some(Value::ExpansionArray(new_words)))
                                 }
                             },
-                            None => Some(Some(Value::String(word))),
+                            None => Some(Some(Value::ExpansionArray(new_words))),
                         }
                     },
                     None => None,
                 }
             },
             Some((ParameterModifier::Minus, words)) => {
-                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
-                    Some(word) => {
+                match self.perform_word_expansions(exec, words.as_slice(), env, settings) {
+                    Some(new_words) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
                                 if !value.is_null() {
@@ -455,7 +469,7 @@ impl Interpreter
                                     Some(Some(Value::String(String::new())))
                                 }
                             },
-                            None => Some(Some(Value::String(word))),
+                            None => Some(Some(Value::ExpansionArray(new_words))),
                         }
                     },
                     None => None,
@@ -589,12 +603,12 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::ColonPlus, words)) => {
-                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
-                    Some(word) => {
+                match self.perform_word_expansions(exec, words.as_slice(), env, settings) {
+                    Some(new_words) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
                                 if !value.is_null() {
-                                    Some(Some(Value::String(word)))
+                                    Some(Some(Value::ExpansionArray(new_words)))
                                 } else {
                                     Some(Some(Value::String(String::new())))
                                 }
@@ -606,10 +620,10 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::Plus, words)) => {
-                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
-                    Some(word) => {
+                match self.perform_word_expansions(exec, words.as_slice(), env, settings) {
+                    Some(new_words) => {
                         match self.param(exec, param_name, env, settings) {
-                            Some(_) => Some(Some(Value::String(word))),
+                            Some(_) => Some(Some(Value::ExpansionArray(new_words))),
                             None => Some(Some(Value::String(String::new()))),
                         }
                     },
@@ -1170,6 +1184,10 @@ impl Interpreter
                             ts.extend(ss);
                             is_join = true;
                         },
+                        Some(Some(Value::ExpansionArray(ss))) => {
+                            ts.extend(ss);
+                            is_join = is_here_doc;
+                        },
                         Some(None) => (),
                         None => return false,
                     }
@@ -1249,13 +1267,22 @@ impl Interpreter
                 },
                 WordElement::Simple(SimpleWordElement::Parameter(param_name, modifier_and_words)) => {
                     match self.perform_param_expansion(exec, param_name, modifier_and_words, env, settings) {
-                        Some(Some(Value::String(s))) => ts.push(s.clone()),
-                        Some(Some(Value::AtArray(ss))) => ts.extend(ss),
-                        Some(Some(Value::StarArray(ss))) => ts.extend(ss),
-                        Some(None) => (),
+                        Some(Some(Value::String(s))) => {
+                            ts.push(s.clone());
+                            is_split = true;
+                        },
+                        Some(Some(Value::AtArray(ss))) => {
+                            ts.extend(ss);
+                            is_split = true;
+                        },
+                        Some(Some(Value::StarArray(ss))) => {
+                            ts.extend(ss);
+                            is_split = true;
+                        },
+                        Some(Some(Value::ExpansionArray(ss))) => ts.extend(ss),
+                        Some(None) => is_split = true,
                         None => return false,
                     }
-                    is_split = true;
                 },
                 WordElement::Simple(SimpleWordElement::ParameterLength(param_name)) => {
                     match self.perform_param_len_expansion(exec, param_name, env, settings) {
