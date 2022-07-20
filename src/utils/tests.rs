@@ -46,7 +46,7 @@ fn test_split_str_for_ifs_returns_fields_with_empty_last_field_for_delimiters_wi
 }
 
 #[test]
-fn test_split_str_for_ifs_returns_fields_for_empty_string_and_delimiters_without_space()
+fn test_split_str_for_ifs_returns_empty_vector_for_empty_string_and_delimiters_without_space()
 {
     let fields = split_str_for_ifs("", ",:");
     assert_eq!(Vec::<&str>::new(), fields);
@@ -123,14 +123,14 @@ fn test_split_str_for_ifs_returns_two_empty_fields_for_delimiters_with_spaces()
 }
 
 #[test]
-fn test_split_str_for_ifs_returns_fields_for_string_with_only_spaces_and_delimiters_with_spaces()
+fn test_split_str_for_ifs_returns_empty_vector_for_string_with_only_spaces_and_delimiters_with_spaces()
 {
     let fields = split_str_for_ifs("  ", ",: \t");
     assert_eq!(Vec::<&str>::new(), fields);
 }
 
 #[test]
-fn test_split_str_for_ifs_returns_fields_for_empty_string_and_delimiters_with_spaces()
+fn test_split_str_for_ifs_returns_empty_vector_for_empty_string_and_delimiters_with_spaces()
 {
     let fields = split_str_for_ifs("", ",: \t");
     assert_eq!(Vec::<&str>::new(), fields);
@@ -151,14 +151,14 @@ fn test_split_str_for_ifs_returns_fields_for_string_with_first_spaces_and_last_s
 }
 
 #[test]
-fn test_split_str_for_ifs_returns_fields_for_string_with_only_spaces_and_delimiters_with_only_spaces()
+fn test_split_str_for_ifs_returns_empty_vector_for_string_with_only_spaces_and_delimiters_with_only_spaces()
 {
     let fields = split_str_for_ifs("  ", " \t");
     assert_eq!(Vec::<&str>::new(), fields);
 }
 
 #[test]
-fn test_split_str_for_ifs_returns_fields_for_empty_string_and_delimiters_with_only_spaces()
+fn test_split_str_for_ifs_returns_empty_vector_for_empty_string_and_delimiters_with_only_spaces()
 {
     let fields = split_str_for_ifs("", " \t");
     assert_eq!(Vec::<&str>::new(), fields);
