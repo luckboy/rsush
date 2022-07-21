@@ -1223,7 +1223,9 @@ impl Interpreter
                 };
                 ts = vec![ts.join(sep.as_str())];
             }
-            ts = ts.iter().map(|s| escape_str(s.as_str())).collect();
+            if !is_here_doc {
+                ts = ts.iter().map(|s| escape_str(s.as_str())).collect();
+            }
             if !is_empty {
                 if !ts.is_empty() {
                     let ss_len = ss.len();
@@ -1307,8 +1309,12 @@ impl Interpreter
                 },
                 WordElement::SinglyQuoted(s) => ts.push(escape_str(s.as_str())),
                 WordElement::DoublyQuoted(simple_elems) => {
-                    if !self.add_simple_word_elem_expansions(exec, simple_elems, &mut ts, false, env, settings) {
-                        return false;
+                    if !simple_elems.is_empty() {
+                        if !self.add_simple_word_elem_expansions(exec, simple_elems, &mut ts, false, env, settings) {
+                            return false;
+                        }
+                    } else {
+                        ts.push(String::new());
                     }
                 },
             }
@@ -1537,23 +1543,7 @@ impl Interpreter
         if !self.add_simple_word_elem_expansions(exec, &here_doc.simple_word_elems, &mut ss, true, env, settings) {
             return None;
         }
-        let mut ts: Vec<String> = Vec::new();
-        for s in &ss {
-            let path_buf = unescape_path_pattern(s);
-            let t = if settings.strlossy_flag {
-                path_buf.to_string_lossy().into_owned()
-            } else {
-                match path_buf.to_str() {
-                    Some(t) => String::from(t),
-                    None => {
-                        xsfprintln!(exec, 2, "Invalid UTF-8");
-                        return None;
-                    },
-                }
-            };
-            ts.push(t);
-        }
-        Some(ts.join(""))
+        Some(ss.join(""))
     }
     
     fn interpret_redirects<F>(&mut self, exec: &mut Executor, redirects: &[Rc<Redirection>], is_special_builtin_fun: bool, env: &mut Environment, settings: &mut Settings, f: F) -> i32
