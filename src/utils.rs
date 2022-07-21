@@ -124,6 +124,9 @@ pub fn waitpid(pid: i32, status: Option<&mut i32>, opts: i32) -> Result<Option<i
     }
 }
 
+pub fn getppid() -> i32
+{ unsafe { libc::getppid() } }
+
 pub fn setpgid(pid: i32, pgid: i32) -> Result<()>
 {
     let res = unsafe { libc::setpgid(pid, pgid) };

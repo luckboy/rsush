@@ -15,36 +15,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-#[allow(dead_code)]
-mod args;
-#[allow(dead_code)]
-mod builtins;
-#[allow(dead_code)]
-mod env;
-#[allow(dead_code)]
-mod exec;
-#[allow(dead_code)]
-mod exec_utils;
-#[allow(dead_code)]
-mod interp;
-#[allow(dead_code)]
-mod io;
-#[allow(dead_code)]
-mod iter;
-#[allow(dead_code)]
-mod lexer;
-#[allow(dead_code)]
-mod macros;
-#[allow(dead_code)]
-mod parser;
-#[allow(dead_code)]
-mod settings;
-#[allow(dead_code)]
-mod utils;
-#[allow(dead_code)]
-mod vars;
+use crate::env::*;
+use crate::utils::*;
 
-fn main()
+pub fn initialize_vars(env: &mut Environment)
 {
-    println!("Hello, world!");
+    match std::env::current_dir() {
+        Ok(path_buf) => {
+            env.unset_unexported_var("PWD");
+            env.set_exported_var("PWD", path_buf.as_path().to_string_lossy().into_owned().as_str());
+        },
+        Err(_) => (),
+    }
+    env.unset_exported_var("PPID");
+    env.set_unexported_var("PPID", format!("{}", getppid()).as_str());
 }
