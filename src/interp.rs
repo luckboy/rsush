@@ -94,6 +94,27 @@ pub struct Interpreter
     special_builtin_fun_names: HashSet<String>,
 }
 
+fn unescape_strings(exec: &Executor, ss: &[String], settings: &Settings) -> Option<Vec<String>>
+{
+    let mut ts: Vec<String> = Vec::new();
+    for s in ss.iter() {
+        let path_buf = unescape_path_pattern(s);
+        let t = if settings.strlossy_flag {
+            path_buf.to_string_lossy().into_owned()
+        } else {
+            match path_buf.to_str() {
+                Some(t) => String::from(t),
+                None => {
+                    xsfprintln!(exec, 2, "Invalid UTF-8");
+                    return None;
+                },
+            }
+        };
+        ts.push(t);
+    }
+    Some(ts)
+}
+
 fn set_vars(exec: &Executor, vars: &[(String, String)], env: &mut Environment, settings: &Settings) -> i32
 {
     for (name, value) in vars.iter() {
@@ -442,7 +463,7 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::ColonMinus, words)) => {
-                match self.perform_word_expansions(exec, words.as_slice(), env, settings) {
+                match self.perform_pattern_word_expansions(exec, words.as_slice(), env, settings) {
                     Some(new_words) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
@@ -459,7 +480,7 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::Minus, words)) => {
-                match self.perform_word_expansions(exec, words.as_slice(), env, settings) {
+                match self.perform_pattern_word_expansions(exec, words.as_slice(), env, settings) {
                     Some(new_words) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
@@ -476,7 +497,7 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::ColonEqual, words)) => {
-                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                match self.perform_var_word_expansions_as_string(exec, words.as_slice(), env, settings) {
                     Some(word) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
@@ -515,7 +536,7 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::Equal, words)) => {
-                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                match self.perform_var_word_expansions_as_string(exec, words.as_slice(), env, settings) {
                     Some(word) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
@@ -544,7 +565,7 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::ColonQues, words)) => {
-                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                match self.perform_var_word_expansions_as_string(exec, words.as_slice(), env, settings) {
                     Some(word) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
@@ -577,7 +598,7 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::Ques, words)) => {
-                match self.perform_word_expansions_as_string(exec, words.as_slice(), env, settings) {
+                match self.perform_var_word_expansions_as_string(exec, words.as_slice(), env, settings) {
                     Some(word) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
@@ -603,7 +624,7 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::ColonPlus, words)) => {
-                match self.perform_word_expansions(exec, words.as_slice(), env, settings) {
+                match self.perform_pattern_word_expansions(exec, words.as_slice(), env, settings) {
                     Some(new_words) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(value) => {
@@ -620,7 +641,7 @@ impl Interpreter
                 }
             },
             Some((ParameterModifier::Plus, words)) => {
-                match self.perform_word_expansions(exec, words.as_slice(), env, settings) {
+                match self.perform_pattern_word_expansions(exec, words.as_slice(), env, settings) {
                     Some(new_words) => {
                         match self.param(exec, param_name, env, settings) {
                             Some(_) => Some(Some(Value::ExpansionArray(new_words))),
@@ -1444,32 +1465,33 @@ impl Interpreter
         }
         true
     }
-
+    
     fn perform_var_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
         let mut ss: Vec<String> = Vec::new();
         if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
             return None;
         }
-        let mut ts: Vec<String> = Vec::new();
-        for s in &ss {
-            let path_buf = unescape_path_pattern(s);
-            let t = if settings.strlossy_flag {
-                path_buf.to_string_lossy().into_owned()
-            } else {
-                match path_buf.to_str() {
-                    Some(t) => String::from(t),
-                    None => {
-                        xsfprintln!(exec, 2, "Invalid UTF-8");
-                        return None;
-                    },
-                }
-            };
-            ts.push(t);
+        match unescape_strings(exec, ss.as_slice(), settings) {
+            Some(ts) => Some(ts.join(" ")),
+            None => None,
         }
-        Some(ts.join(" "))
     }
 
+    fn perform_var_word_expansions_as_string(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<String>
+    {
+        let mut ss: Vec<String> = Vec::new();
+        for word in words.iter() {
+            if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+                return None;
+            }
+        }
+        match unescape_strings(exec, ss.as_slice(), settings) {
+            Some(ts) => Some(ts.join(" ")),
+            None => None,
+        }
+    }    
+    
     fn perform_pattern_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
         let mut ss: Vec<String> = Vec::new();
@@ -1480,7 +1502,7 @@ impl Interpreter
         }
     }
 
-    fn perform_pattern_word_expansions_as_string(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<String>
+    fn perform_pattern_word_expansions(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<Vec<String>>
     {
         let mut ss: Vec<String> = Vec::new();
         for word in words.iter() {
@@ -1488,7 +1510,15 @@ impl Interpreter
                 return None;
             }
         }
-        Some(ss.join(" "))
+        Some(ss)
+    }
+    
+    fn perform_pattern_word_expansions_as_string(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<String>
+    {
+        match self.perform_pattern_word_expansions(exec, words, env, settings) {
+            Some(ss) => Some(ss.join(" ")),
+            None => None,
+        }
     }    
     
     fn perform_word_expansion(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<Vec<String>>
@@ -1529,14 +1559,6 @@ impl Interpreter
         }
     }
     
-    fn perform_word_expansions_as_string(&mut self, exec: &mut Executor, words: &[Rc<Word>], env: &mut Environment, settings: &mut Settings) -> Option<String>
-    {
-       match self.perform_word_expansions(exec, words, env, settings) {
-           Some(ss) => Some(ss.join(" ")),
-           None => None,
-       }
-    }
-
     fn perform_here_doc_expansion(&mut self, exec: &mut Executor, here_doc: &HereDocument, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
         let mut ss: Vec<String> = Vec::new();
