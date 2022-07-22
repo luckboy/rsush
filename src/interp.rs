@@ -1192,6 +1192,8 @@ impl Interpreter
         for elem in elems.iter() {
             let mut ts: Vec<String> = Vec::new();
             let mut is_join = false;
+            let mut is_escaping = true;
+            let mut is_unescaping = false;
             match elem {
                 SimpleWordElement::String(s) => ts.push(s.clone()),
                 SimpleWordElement::Parameter(param_name, modifier_and_words) => {
@@ -1208,6 +1210,8 @@ impl Interpreter
                         Some(Some(Value::ExpansionArray(ss))) => {
                             ts.extend(ss);
                             is_join = is_here_doc;
+                            is_escaping = false;
+                            is_unescaping = is_here_doc;
                         },
                         Some(None) => (),
                         None => return false,
@@ -1232,6 +1236,12 @@ impl Interpreter
                     }
                 },
             }
+            if is_unescaping {
+                match unescape_strings(exec, ts.as_slice(), settings) {
+                    Some(us) => ts = us,
+                    None => return false,
+                }
+            }
             if is_join {
                 let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
                 let sep = match ifs.chars().next() {
@@ -1244,7 +1254,7 @@ impl Interpreter
                 };
                 ts = vec![ts.join(sep.as_str())];
             }
-            if !is_here_doc {
+            if !is_here_doc && is_escaping {
                 ts = ts.iter().map(|s| escape_str(s.as_str())).collect();
             }
             if !is_empty {
