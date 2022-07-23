@@ -94,27 +94,6 @@ pub struct Interpreter
     special_builtin_fun_names: HashSet<String>,
 }
 
-fn unescape_strings(exec: &Executor, ss: &[String], settings: &Settings) -> Option<Vec<String>>
-{
-    let mut ts: Vec<String> = Vec::new();
-    for s in ss.iter() {
-        let path_buf = unescape_path_pattern(s);
-        let t = if settings.strlossy_flag {
-            path_buf.to_string_lossy().into_owned()
-        } else {
-            match path_buf.to_str() {
-                Some(t) => String::from(t),
-                None => {
-                    xsfprintln!(exec, 2, "Invalid UTF-8");
-                    return None;
-                },
-            }
-        };
-        ts.push(t);
-    }
-    Some(ts)
-}
-
 fn set_vars(exec: &Executor, vars: &[(String, String)], env: &mut Environment, settings: &Settings) -> i32
 {
     for (name, value) in vars.iter() {
@@ -401,10 +380,10 @@ impl Interpreter
         }
     }
     
-    fn param_to_string(&self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<String>
+    fn param_to_string(&mut self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<Option<String>>
     {
         match self.param(exec, param_name, env, settings) {
-            Some(Value::String(s)) => Some(s),
+            Some(Value::String(s)) => Some(Some(s)),
             Some(Value::AtArray(ss)) => {
                 let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
                 let sep = match ifs.chars().next() {
@@ -415,7 +394,7 @@ impl Interpreter
                     },
                     None => String::new(),
                 };
-                Some(ss.join(sep.as_str()))
+                Some(Some(ss.join(sep.as_str())))
             },
             Some(Value::StarArray(ss)) => {
                 let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
@@ -427,9 +406,10 @@ impl Interpreter
                     },
                     None => String::new(),
                 };
-                Some(ss.join(sep.as_str()))
+                Some(Some(ss.join(sep.as_str())))
             },
             Some(Value::ExpansionArray(ss)) => {
+                let ts = self.unescape_strings(exec, ss.as_slice(), settings)?;
                 let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
                 let sep = match ifs.chars().next() {
                     Some(c) => {
@@ -439,9 +419,9 @@ impl Interpreter
                     },
                     None => String::new(),
                 };
-                Some(ss.join(sep.as_str()))
+                Some(Some(ts.join(sep.as_str())))
             },
-            None => None,
+            None => Some(None),
         }
     }
     
@@ -654,7 +634,7 @@ impl Interpreter
             Some((modifier @ (ParameterModifier::Perc | ParameterModifier::PercPerc), words)) => {
                 match self.perform_pattern_word_expansions_as_string(exec, words.as_slice(), env, settings) {
                     Some(pattern) => {
-                        let s = self.param_to_string(exec, param_name, env, settings).unwrap_or(String::new());
+                        let s = (self.param_to_string(exec, param_name, env, settings)?).unwrap_or(String::new());
                         if !s.is_empty() {
                             let mut is: Vec<usize> = s.char_indices().map(|p| p.0).collect();
                             is.push(s.len());
@@ -679,7 +659,7 @@ impl Interpreter
             Some((modifier @ (ParameterModifier::Hash | ParameterModifier::HashHash), words)) => {
                 match self.perform_pattern_word_expansions_as_string(exec, words.as_slice(), env, settings) {
                     Some(pattern) => {
-                        let s = self.param_to_string(exec, param_name, env, settings).unwrap_or(String::new());
+                        let s = (self.param_to_string(exec, param_name, env, settings)?).unwrap_or(String::new());
                         if !s.is_empty() {
                             let mut is: Vec<usize> = s.char_indices().map(|p| p.0).collect();
                             is.push(s.len());
@@ -707,8 +687,8 @@ impl Interpreter
     fn perform_param_len_expansion(&mut self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<String>
     {
         match self.param_to_string(exec, param_name, env, settings) {
-            Some(s) => Some(format!("{}", s.len())),
-            None => {
+            Some(Some(s)) => Some(format!("{}", s.len())),
+            Some(None) => {
                 if !settings.nounset_flag {
                     Some(String::from("0"))
                 } else {
@@ -717,6 +697,7 @@ impl Interpreter
                     None
                 }
             },
+            None => None,
         }
     }
     
@@ -811,7 +792,7 @@ impl Interpreter
         match expr {
             ArithmeticExpression::Number(_, _, x) => Some(*x),
             ArithmeticExpression::Parameter(_, _, param_name) => {
-                match self.param_to_string(exec, param_name, env, settings) {
+                match self.param_to_string(exec, param_name, env, settings)? {
                     Some(s) => {
                         if !s.is_empty() {
                             if is_number_str(s.as_str()) {
@@ -1237,7 +1218,7 @@ impl Interpreter
                 },
             }
             if is_unescaping {
-                match unescape_strings(exec, ts.as_slice(), settings) {
+                match self.unescape_strings(exec, ts.as_slice(), settings) {
                     Some(us) => ts = us,
                     None => return false,
                 }
@@ -1475,6 +1456,28 @@ impl Interpreter
         }
         true
     }
+
+    fn unescape_strings(&mut self, exec: &Executor, ss: &[String], settings: &Settings) -> Option<Vec<String>>
+    {
+        let mut ts: Vec<String> = Vec::new();
+        for s in ss.iter() {
+            let path_buf = unescape_path_pattern(s);
+            let t = if settings.strlossy_flag {
+                path_buf.to_string_lossy().into_owned()
+            } else {
+                match path_buf.to_str() {
+                    Some(t) => String::from(t),
+                    None => {
+                        xsfprintln!(exec, 2, "Invalid UTF-8");
+                        self.set_exit(false);
+                        return None;
+                    },
+                }
+            };
+            ts.push(t);
+        }
+        Some(ts)
+    }    
     
     fn perform_var_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
@@ -1482,7 +1485,7 @@ impl Interpreter
         if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
             return None;
         }
-        match unescape_strings(exec, ss.as_slice(), settings) {
+        match self.unescape_strings(exec, ss.as_slice(), settings) {
             Some(ts) => Some(ts.join(" ")),
             None => None,
         }
@@ -1496,7 +1499,7 @@ impl Interpreter
                 return None;
             }
         }
-        match unescape_strings(exec, ss.as_slice(), settings) {
+        match self.unescape_strings(exec, ss.as_slice(), settings) {
             Some(ts) => Some(ts.join(" ")),
             None => None,
         }
