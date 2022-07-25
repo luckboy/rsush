@@ -15,43 +15,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-#[allow(dead_code)]
-mod args;
-#[allow(dead_code)]
-mod builtins;
-#[allow(dead_code)]
-mod env;
-#[allow(dead_code)]
-mod exec;
-#[allow(dead_code)]
-mod exec_utils;
-#[allow(dead_code)]
-mod interp;
-#[allow(dead_code)]
-mod io;
-#[allow(dead_code)]
-mod iter;
-#[allow(dead_code)]
-mod lexer;
-#[allow(dead_code)]
-mod macros;
-#[allow(dead_code)]
-mod parser;
-#[allow(dead_code)]
-mod settings;
-#[allow(dead_code)]
-mod utils;
-#[allow(dead_code)]
-mod vars;
+use std::io::*;
+use crate::env::*;
+use crate::exec::*;
+use crate::exec_utils::*;
+use crate::interp::*;
+use crate::settings::*;
+use crate::fprintln;
 
-#[allow(dead_code)]
-#[cfg(test)]
-mod test_builtins;
-#[allow(dead_code)]
-#[cfg(test)]
-mod test_helpers;
-
-fn main()
+pub fn main(vars: &[(String, String)], args: &[String], _interp: &mut Interpreter, exec: &mut Executor, _env: &mut Environment, _settings: &mut Settings) -> i32
 {
-    println!("Hello, world!");
+    with_std_files(exec, |_, stdout, stderr| {
+            let mut line_stdout = LineWriter::new(stdout);
+            if args.len() < 1 {
+                fprintln!(stderr, "No built-in function name");
+                return 1;
+            }
+            for (name, value) in vars.iter() {
+                fprintln!(&mut line_stdout, "{}={}", name, value);
+            }
+            0
+    }).unwrap_or(1)
 }

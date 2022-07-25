@@ -113,7 +113,7 @@ pub fn waitpid(pid: i32, status: Option<&mut i32>, opts: i32) -> Result<Option<i
         Some(status) => unsafe { libc::waitpid(pid, status as *mut i32, opts) },
         None         => unsafe { libc::waitpid(pid, null_mut() as *mut i32, opts) },
     };
-    if res == -1 {
+    if res != -1 {
         if res == 0 {
             Ok(None)
         } else {

@@ -29,7 +29,7 @@ pub fn fprint_args<W: Write>(w: &mut W, args: Arguments<'_>)
 
 pub fn fprintln_args<W: Write>(w: &mut W, args: Arguments<'_>)
 {
-    match write!(w, "{}", args) {
+    match writeln!(w, "{}", args) {
         Ok(())   => (),
         Err(err) => eprintln!("{}", err),
     }

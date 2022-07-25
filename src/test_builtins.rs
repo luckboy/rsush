@@ -15,43 +15,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-#[allow(dead_code)]
-mod args;
-#[allow(dead_code)]
-mod builtins;
-#[allow(dead_code)]
-mod env;
-#[allow(dead_code)]
-mod exec;
-#[allow(dead_code)]
-mod exec_utils;
-#[allow(dead_code)]
-mod interp;
-#[allow(dead_code)]
-mod io;
-#[allow(dead_code)]
-mod iter;
-#[allow(dead_code)]
-mod lexer;
-#[allow(dead_code)]
-mod macros;
-#[allow(dead_code)]
-mod parser;
-#[allow(dead_code)]
-mod settings;
-#[allow(dead_code)]
-mod utils;
-#[allow(dead_code)]
-mod vars;
+use crate::env::*;
 
-#[allow(dead_code)]
-#[cfg(test)]
-mod test_builtins;
-#[allow(dead_code)]
-#[cfg(test)]
-mod test_helpers;
+mod test_builtin_args;
+mod test_builtin_env;
+mod test_builtin_exit;
+mod test_builtin_vars;
 
-fn main()
+pub fn initialize_test_builtin_funs(env: &mut Environment)
 {
-    println!("Hello, world!");
+    env.set_builtin_fun("test_builtin_args", test_builtin_args::main);
+    env.set_builtin_fun("test_builtin_env", test_builtin_env::main);
+    env.set_builtin_fun("test_builtin_exit", test_builtin_exit::main);
+    env.set_builtin_fun("test_builtin_vars", test_builtin_vars::main);
 }

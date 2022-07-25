@@ -553,3 +553,6 @@ impl Executor
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
