@@ -216,6 +216,9 @@ impl Executor
         }
     }
     
+    pub fn clear_files(&mut self)
+    { self.virtual_files.clear(); }
+    
     pub fn pipes(&self) -> &[Pipe]
     { self.pipes.as_slice() }
     
