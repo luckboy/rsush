@@ -121,6 +121,168 @@ fn main()
                         exit(1);
                     },
                 }
+            } else if applet_name == &String::from("read_2fds") {
+                match args.get(2) {
+                    Some(s) => {
+                        match s.parse::<i32>() {
+                            Ok(fd) => {
+                                match args.get(3) {
+                                    Some(s2) => {
+                                        match s2.parse::<usize>() {
+                                            Ok(size) => {
+                                                match args.get(4) {
+                                                    Some(s3) => {
+                                                        match s3.parse::<i32>() {
+                                                            Ok(fd2) => {
+                                                                match args.get(5) {
+                                                                    Some(s4) => {
+                                                                        match s4.parse::<usize>() {
+                                                                            Ok(size2) => {
+                                                                                let mut buf: Vec<u8> = vec![0; size];
+                                                                                let mut file = unsafe { File::from_raw_fd(fd) };
+                                                                                match file.read_exact(buf.as_mut_slice()) {
+                                                                                    Ok(()) => {
+                                                                                        println!("{}", String::from_utf8_lossy(buf.as_slice()));
+                                                                                    },
+                                                                                    Err(err) => {
+                                                                                        eprintln!("{}", err);
+                                                                                        exit(1);
+                                                                                    },
+                                                                                }
+                                                                                let mut buf2: Vec<u8> = vec![0; size2];
+                                                                                let mut file2 = unsafe { File::from_raw_fd(fd2) };
+                                                                                match file2.read_exact(buf2.as_mut_slice()) {
+                                                                                    Ok(()) => {
+                                                                                        println!("{}", String::from_utf8_lossy(buf2.as_slice()));
+                                                                                    },
+                                                                                    Err(err) => {
+                                                                                        eprintln!("{}", err);
+                                                                                        exit(1);
+                                                                                    },
+                                                                                }
+                                                                            },
+                                                                            Err(err) => {
+                                                                                eprintln!("{}", err);
+                                                                                exit(1);
+                                                                            },
+                                                                        }
+                                                                    },
+                                                                    None => {
+                                                                        eprintln!("Too few arguments");
+                                                                        exit(1);
+                                                                    },
+                                                                }
+                                                            },
+                                                            Err(err) => {
+                                                                eprintln!("{}", err);
+                                                                exit(1);
+                                                            },
+                                                        }
+                                                    },
+                                                    None => {
+                                                        eprintln!("Too few arguments");
+                                                        exit(1);
+                                                    },
+                                                }
+                                            },
+                                            Err(err) => {
+                                                eprintln!("{}", err);
+                                                exit(1);
+                                            },
+                                        }
+                                    },
+                                    None => {
+                                        eprintln!("Too few arguments");
+                                        exit(1);
+                                    },
+                                }
+                            },
+                            Err(err) => {
+                                eprintln!("{}", err);
+                                exit(1);
+                            },
+                        }
+                    },
+                    None => {
+                        eprintln!("Too few arguments");
+                        exit(1);
+                    },
+                }
+            } else if applet_name == &String::from("write_2fds") {
+                match args.get(2) {
+                    Some(s) => {
+                        match s.parse::<i32>() {
+                            Ok(fd) => {
+                                match args.get(3) {
+                                    Some(s2) => {
+                                        match s2.parse::<i32>() {
+                                            Ok(fd2) => {
+                                                match args.get(4) {
+                                                    Some(s3) => {
+                                                        match s3.parse::<usize>() {
+                                                            Ok(mut n) => {
+                                                                n = if n < args.len() - 5 {
+                                                                    n
+                                                                } else {
+                                                                    args.len() - 5
+                                                                };
+                                                                let args2 = &args[5..];
+                                                                let mut file = unsafe { File::from_raw_fd(fd) };
+                                                                for arg in (&args2[0..n]).iter() {
+                                                                    match writeln!(file, "{}", arg) {
+                                                                        Ok(()) => (),
+                                                                        Err(err) => {
+                                                                            eprintln!("{}", err);
+                                                                            exit(1);
+                                                                        },
+                                                                    }
+                                                                }
+                                                                let mut file2 = unsafe { File::from_raw_fd(fd2) };
+                                                                for arg in (&args2[n..]).iter() {
+                                                                    match writeln!(file2, "{}", arg) {
+                                                                        Ok(()) => (),
+                                                                        Err(err) => {
+                                                                            eprintln!("{}", err);
+                                                                            exit(1);
+                                                                        },
+                                                                    }
+                                                                }
+                                                            },
+                                                            Err(err) => {
+                                                                eprintln!("{}", err);
+                                                                exit(1);
+                                                            },
+                                                        }
+                                                    },
+                                                    None => {
+                                                        eprintln!("Too few arguments");
+                                                        exit(1);
+                                                    },
+                                                }
+                                            },
+                                            Err(err) => {
+                                                eprintln!("{}", err);
+                                                exit(1);
+                                            },
+                                        }
+                                    },
+                                    None => {
+                                        eprintln!("Too few arguments");
+                                        exit(1);
+                                    },
+                                }
+                            },
+                            Err(err) => {
+                                eprintln!("{}", err);
+                                exit(1);
+                            },
+                        }
+                    },
+                    None => {
+                        eprintln!("Too few arguments");
+                        exit(1);
+                    },
+                }
             }
         },
         None => {

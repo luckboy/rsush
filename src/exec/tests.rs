@@ -619,3 +619,71 @@ jkl
 ";
     assert_eq!(String::from(&expected_file_content[1..]), read_file("4.txt"));
 }
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_executes_rsush_test_read_2fds_for_other_fds()
+{
+    let mut exec = Executor::new();
+    let mut interp = Interpreter::new();
+    let mut env = Environment::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    initialize_builtin_funs(&mut env);
+    initialize_test_builtin_funs(&mut env);
+    initialize_vars(&mut env);
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    write_file("4.txt", "abcdef\n");
+    write_file("5.txt", "ghijkl\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    exec.push_file(5, Rc::new(RefCell::new(open_file("5.txt"))));
+    let args = vec![String::from("read_2fds"), String::from("4"), String::from("7"), String::from("5"), String::from("7")];
+    let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
+    exec.clear_files();
+    match res {
+        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        Err(_) => assert!(false),
+    }
+    assert_eq!(String::from("abcdef\n\nghijkl\n\n"), read_file("stdout.txt"));
+    assert_eq!(String::new(), read_file("stderr.txt"));
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_executes_rsush_test_write_2fds_for_other_fd()
+{
+    let mut exec = Executor::new();
+    let mut interp = Interpreter::new();
+    let mut env = Environment::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    initialize_builtin_funs(&mut env);
+    initialize_test_builtin_funs(&mut env);
+    initialize_vars(&mut env);
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(create_file("4.txt"))));
+    exec.push_file(5, Rc::new(RefCell::new(create_file("5.txt"))));
+    let args = vec![String::from("write_2fds"), String::from("4"), String::from("5"), String::from("2"), String::from("abc"), String::from("def"), String::from("ghi"), String::from("jkl")];
+    let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
+    exec.clear_files();
+    match res {
+        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        Err(_) => assert!(false),
+    }
+    assert_eq!(String::new(), read_file("stdout.txt"));
+    assert_eq!(String::new(), read_file("stderr.txt"));
+    let expected_file_content = "
+abc
+def
+";
+    assert_eq!(String::from(&expected_file_content[1..]), read_file("4.txt"));
+    let expected_file_content2 = "
+ghi
+jkl
+";
+    assert_eq!(String::from(&expected_file_content2[1..]), read_file("5.txt"));
+}
