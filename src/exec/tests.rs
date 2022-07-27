@@ -60,7 +60,7 @@ ghi
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_execute_executes_test_builtin_args_for_twice()
+fn test_executor_execute_twice_executes_test_builtin_args()
 {
     let mut exec = Executor::new();
     let mut interp = Interpreter::new();
@@ -242,7 +242,7 @@ ghi
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_execute_executes_rsush_test_args_for_twice()
+fn test_executor_execute_twice_executes_rsush_test_args()
 {
     let mut exec = Executor::new();
     let mut interp = Interpreter::new();
@@ -385,7 +385,7 @@ fn test_executor_execute_executes_rsush_test_read_fd_for_stdin()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_execute_executes_rsush_test_read_fd_for_stdin_and_twice()
+fn test_executor_execute_twice_executes_rsush_test_read_fd_for_stdin()
 {
     let mut exec = Executor::new();
     let mut interp = Interpreter::new();
@@ -445,7 +445,7 @@ fn test_executor_execute_executes_rsush_test_read_fd_for_other_fd()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_execute_executes_rsush_test_read_fd_for_other_fd_and_twice()
+fn test_executor_execute_twice_executes_rsush_test_read_fd_for_other_fd()
 {
     let mut exec = Executor::new();
     let mut interp = Interpreter::new();
@@ -510,7 +510,7 @@ ghi
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_execute_executes_rsush_test_write_fd_for_stderr_and_twice()
+fn test_executor_execute_twice_executes_rsush_test_write_fd_for_stderr()
 {
     let mut exec = Executor::new();
     let mut interp = Interpreter::new();
@@ -581,7 +581,7 @@ ghi
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_execute_executes_rsush_test_args_for_other_fd_and_twice()
+fn test_executor_execute_twice_executes_rsush_test_args_for_other_fd()
 {
     let mut exec = Executor::new();
     let mut interp = Interpreter::new();
