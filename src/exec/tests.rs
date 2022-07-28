@@ -1539,12 +1539,14 @@ fn test_executor_create_process_does_not_create_process_for_in_new_process()
             });
             match res {
                 Ok(pid) => {
-                    let _res2 = exec.wait_for_process(pid, true, false);
-                    ()
+                    let res2 = exec.wait_for_process(pid, true, false);
+                    match res2 {
+                        Ok(WaitStatus::Exited(status)) => status,
+                        _ => 1,
+                    }
                 },
-                Err(_) => (),
+                Err(_) => 1,
             }
-            0
     });
     match res {
         Ok(Some(pid)) => {
@@ -1635,16 +1637,21 @@ fn test_executor_create_process_creates_process_for_in_new_process_and_backgroun
                         },
                         None => (),
                     }
-                    let _res2 = exec.wait_for_process(Some(pid), true, false);
-                    ()
+                    let res2 = exec.wait_for_process(Some(pid), true, false);
+                    match res2 {
+                        Ok(WaitStatus::Exited(status)) => status,
+                        _ => 1,
+                    }
                 },
                 Ok(None) => {
-                    let _res2 = exec.wait_for_process(None, true, false);
-                    ()
+                    let res2 = exec.wait_for_process(None, true, false);
+                    match res2 {
+                        Ok(WaitStatus::Exited(status)) => status,
+                        _ => 1,
+                    }
                 },
-                Err(_) => (),
+                Err(_) => 1,
             }
-            0
     });
     match res {
         Ok(Some(pid)) => {
