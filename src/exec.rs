@@ -347,6 +347,7 @@ impl Executor
                             virtual_file.file_stack.clear();
                         }
                         self.jobs.clear();
+                        self.current_job_id = None;
                     },
                     _ => ()
                 }
