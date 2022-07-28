@@ -687,3 +687,977 @@ jkl
 ";
     assert_eq!(String::from(&expected_file_content2[1..]), read_file("5.txt"));
 }
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_sets_variables()
+{
+    let mut exec = Executor::new();
+    let mut interp = Interpreter::new();
+    let mut env = Environment::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    initialize_builtin_funs(&mut env);
+    initialize_test_builtin_funs(&mut env);
+    initialize_vars(&mut env);
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    let vars = vec![
+        (String::from("VAR1"), String::from("abc")),
+        (String::from("VAR2"), String::from("def")),
+        (String::from("VAR3"), String::from("ghi"))
+    ];
+    let args = vec![String::from("env")];
+    let res = exec.execute(&mut interp, vars.as_slice(), "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
+    exec.clear_files();
+    match res {
+        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        Err(_) => assert!(false),
+    }
+    let stdout_content = read_file("stdout.txt");
+    assert!(stdout_content.contains(format!("PWD={}\n", current_dir().as_path().to_string_lossy()).as_str()));
+    assert!(stdout_content.contains("VAR1=abc"));
+    assert!(stdout_content.contains("VAR2=def"));
+    assert!(stdout_content.contains("VAR3=ghi"));
+    assert_eq!(String::new(), read_file("stderr.txt"));
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_duplicates_file_for_reading()
+{
+    let mut exec = Executor::new();
+    let mut interp = Interpreter::new();
+    let mut env = Environment::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    initialize_builtin_funs(&mut env);
+    initialize_test_builtin_funs(&mut env);
+    initialize_vars(&mut env);
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    write_file("4.txt", "abcdef\nghijkl\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    let file = Rc::new(RefCell::new(open_file("4.txt")));
+    exec.push_file(4, file.clone());
+    exec.push_file(5, file);
+    let args = vec![String::from("read_2fds"), String::from("4"), String::from("7"), String::from("5"), String::from("7")];
+    let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
+    exec.clear_files();
+    match res {
+        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        Err(_) => assert!(false),
+    }
+    assert_eq!(String::from("abcdef\n\nghijkl\n\n"), read_file("stdout.txt"));
+    assert_eq!(String::new(), read_file("stderr.txt"));
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_duplicates_file_for_writing()
+{
+    let mut exec = Executor::new();
+    let mut interp = Interpreter::new();
+    let mut env = Environment::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    initialize_builtin_funs(&mut env);
+    initialize_test_builtin_funs(&mut env);
+    initialize_vars(&mut env);
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    let file = Rc::new(RefCell::new(create_file("4.txt")));
+    exec.push_file(4, file.clone());
+    exec.push_file(5, file);
+    let args = vec![String::from("write_2fds"), String::from("4"), String::from("5"), String::from("2"), String::from("abc"), String::from("def"), String::from("ghi"), String::from("jkl")];
+    let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
+    exec.clear_files();
+    match res {
+        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        Err(_) => assert!(false),
+    }
+    assert_eq!(String::new(), read_file("stdout.txt"));
+    assert_eq!(String::new(), read_file("stderr.txt"));
+    let expected_file_content = "
+abc
+def
+ghi
+jkl
+";
+    assert_eq!(String::from(&expected_file_content[1..]), read_file("4.txt"));
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_push_file_pushes_file()
+{
+    let mut exec = Executor::new();
+    write_file("4.txt", "abcdef\n");
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("abcdef\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_push_file_twice_pushes_file()
+{
+    let mut exec = Executor::new();
+    write_file("4.txt", "abcdef\n");
+    write_file("4_2.txt", "ghijkl\n");
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_2.txt"))));
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("ghijkl\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_push_file_thrice_pushes_file()
+{
+    let mut exec = Executor::new();
+    write_file("4.txt", "abcdef\n");
+    write_file("4_2.txt", "ghijkl\n");
+    write_file("4_3.txt", "mnopqr\n");
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_2.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_3.txt"))));
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("mnopqr\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_pop_file_pops_file()
+{
+    let mut exec = Executor::new();
+    write_file("4.txt", "abcdef\n");
+    write_file("4_2.txt", "ghijkl\n");
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_2.txt"))));
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("ghijkl\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    exec.pop_file(4);
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("abcdef\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_pop_file_twice_pops_file()
+{
+    let mut exec = Executor::new();
+    write_file("4.txt", "abcdef\n");
+    write_file("4_2.txt", "ghijkl\n");
+    write_file("4_3.txt", "mnopqr\n");
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_2.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_3.txt"))));
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("mnopqr\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    exec.pop_file(4);
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("ghijkl\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    exec.pop_file(4);
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("abcdef\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_pop_file_thrice_pops_file()
+{
+    let mut exec = Executor::new();
+    write_file("4.txt", "abcdef\n");
+    write_file("4_2.txt", "ghijkl\n");
+    write_file("4_3.txt", "mnopqr\n");
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_2.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_3.txt"))));
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("mnopqr\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    exec.pop_file(4);
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("ghijkl\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    exec.pop_file(4);
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("abcdef\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    exec.pop_file(4);
+    assert_eq!(true, exec.current_file(4).is_none());
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_push_file_and_set_saved_file_pushes_file_and_sets_saved_file()
+{
+    let mut exec = Executor::new();
+    write_file("4.txt", "abcdef\n");
+    write_file("4_2.txt", "ghijkl\n");
+    exec.push_file_and_set_saved_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_2.txt"))));
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("ghijkl\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    match exec.saved_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("abcdef\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_push_file_clear_files()
+{
+    let mut exec = Executor::new();
+    write_file("4.txt", "abcdef\n");
+    write_file("5.txt", "ghijkl\n");
+    write_file("6.txt", "mnopqr\n");
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    exec.push_file(5, Rc::new(RefCell::new(open_file("5.txt"))));
+    exec.push_file(6, Rc::new(RefCell::new(open_file("6.txt"))));
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("abcdef\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    match exec.current_file(5) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("ghijkl\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    match exec.current_file(6) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("mnopqr\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    exec.clear_files();
+    assert_eq!(true, exec.current_file(4).is_none());
+    assert_eq!(true, exec.current_file(5).is_none());
+    assert_eq!(true, exec.current_file(6).is_none());
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_set_pipes_sets_pipes()
+{
+    let mut exec = Executor::new();
+    write_file("4_r.txt", "abcdef\n");
+    write_file("5_r.txt", "ghijkl\n");
+    let pipes = vec![
+        Pipe::new(Rc::new(RefCell::new(open_file("4_r.txt"))), Rc::new(RefCell::new(create_file("4_w.txt")))),
+        Pipe::new(Rc::new(RefCell::new(open_file("5_r.txt"))), Rc::new(RefCell::new(create_file("5_w.txt"))))
+    ];
+    exec.set_pipes(pipes);
+    let mut reading_file_r1 = exec.pipes()[0].reading_file.borrow_mut();
+    assert_eq!(String::from("abcdef\n"), read_stream(&mut *reading_file_r1));
+    let mut writing_file_r1 = exec.pipes()[0].writing_file.borrow_mut();
+    write_stream(&mut *writing_file_r1, "abcdef2\n");
+    assert_eq!(String::from("abcdef2\n"), read_file("4_w.txt"));
+    let mut reading_file_r2 = exec.pipes()[1].reading_file.borrow_mut();
+    assert_eq!(String::from("ghijkl\n"), read_stream(&mut *reading_file_r2));
+    let mut writing_file_r2 = exec.pipes()[1].writing_file.borrow_mut();
+    write_stream(&mut *writing_file_r2, "ghijkl2\n");
+    assert_eq!(String::from("ghijkl2\n"), read_file("5_w.txt"));
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_clear_pipes_clears_pipes()
+{
+    let mut exec = Executor::new();
+    write_file("4_r.txt", "abcdef\n");
+    write_file("5_r.txt", "ghijkl\n");
+    let pipes = vec![
+        Pipe::new(Rc::new(RefCell::new(open_file("4_r.txt"))), Rc::new(RefCell::new(create_file("4_w.txt")))),
+        Pipe::new(Rc::new(RefCell::new(open_file("5_r.txt"))), Rc::new(RefCell::new(create_file("5_w.txt"))))
+    ];
+    exec.set_pipes(pipes);
+    {
+        let mut reading_file_r1 = exec.pipes()[0].reading_file.borrow_mut();
+        assert_eq!(String::from("abcdef\n"), read_stream(&mut *reading_file_r1));
+        let mut writing_file_r1 = exec.pipes()[0].writing_file.borrow_mut();
+        write_stream(&mut *writing_file_r1, "abcdef2\n");
+        assert_eq!(String::from("abcdef2\n"), read_file("4_w.txt"));
+        let mut reading_file_r2 = exec.pipes()[1].reading_file.borrow_mut();
+        assert_eq!(String::from("ghijkl\n"), read_stream(&mut *reading_file_r2));
+        let mut writing_file_r2 = exec.pipes()[1].writing_file.borrow_mut();
+        write_stream(&mut *writing_file_r2, "ghijkl2\n");
+        assert_eq!(String::from("ghijkl2\n"), read_file("5_w.txt"));
+    }
+    exec.clear_pipes();
+    assert_eq!(true, exec.pipes().is_empty());
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_shell_pid_returns_pid()
+{
+    let exec = Executor::new();
+    assert_eq!(process::id() as i32, exec.shell_pid());
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_add_job_adds_job()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(1234, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_add_job_twice_adds_job()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(2345, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(1234, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(Some(2), job.next_job_id);
+        },
+        None => assert!(false),
+    }
+    match exec.jobs().get(&2) {
+        Some(job) => {
+            assert_eq!(2345, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test2"), job.name);
+            assert_eq!(Some(1), job.prev_job_id);
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_add_job_thirce_adds_job()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(2345, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(3456, "test3")) {
+        Some(job_id) => assert_eq!(job_id, 3),
+        _ => assert!(false),
+    }
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(1234, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(Some(2), job.next_job_id);
+        },
+        None => assert!(false),
+    }
+    match exec.jobs().get(&2) {
+        Some(job) => {
+            assert_eq!(2345, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test2"), job.name);
+            assert_eq!(Some(1), job.prev_job_id);
+            assert_eq!(Some(3), job.next_job_id);
+        },
+        None => assert!(false),
+    }
+    match exec.jobs().get(&3) {
+        Some(job) => {
+            assert_eq!(3456, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test3"), job.name);
+            assert_eq!(Some(2), job.prev_job_id);
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_remove_job_removes_first_job()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(2345, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(3456, "test3")) {
+        Some(job_id) => assert_eq!(job_id, 3),
+        _ => assert!(false),
+    }
+    exec.remove_job(1);
+    match exec.jobs().get(&2) {
+        Some(job) => {
+            assert_eq!(2345, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test2"), job.name);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(Some(3), job.next_job_id);
+        },
+        None => assert!(false),
+    }
+    match exec.jobs().get(&3) {
+        Some(job) => {
+            assert_eq!(3456, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test3"), job.name);
+            assert_eq!(Some(2), job.prev_job_id);
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_remove_job_removes_center_job()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(2345, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(3456, "test3")) {
+        Some(job_id) => assert_eq!(job_id, 3),
+        _ => assert!(false),
+    }
+    exec.remove_job(2);
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(1234, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(Some(3), job.next_job_id);
+        },
+        None => assert!(false),
+    }
+    match exec.jobs().get(&3) {
+        Some(job) => {
+            assert_eq!(3456, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test3"), job.name);
+            assert_eq!(Some(1), job.prev_job_id);
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_remove_job_removes_last_job()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(2345, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(3456, "test3")) {
+        Some(job_id) => assert_eq!(job_id, 3),
+        _ => assert!(false),
+    }
+    exec.remove_job(3);
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(1234, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(Some(2), job.next_job_id);
+        },
+        None => assert!(false),
+    }
+    match exec.jobs().get(&2) {
+        Some(job) => {
+            assert_eq!(2345, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test2"), job.name);
+            assert_eq!(Some(1), job.prev_job_id);
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_add_job_adds_job_after_job_removing()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(2345, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(3456, "test3")) {
+        Some(job_id) => assert_eq!(job_id, 3),
+        _ => assert!(false),
+    }
+    exec.remove_job(2);
+    match exec.add_job(&Job::new(4567, "test4")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(1234, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(Some(3), job.next_job_id);
+        },
+        None => assert!(false),
+    }
+    match exec.jobs().get(&3) {
+        Some(job) => {
+            assert_eq!(3456, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test3"), job.name);
+            assert_eq!(Some(1), job.prev_job_id);
+            assert_eq!(Some(2), job.next_job_id);
+        },
+        None => assert!(false),
+    }
+    match exec.jobs().get(&2) {
+        Some(job) => {
+            assert_eq!(4567, job.pid);
+            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(String::from("test4"), job.name);
+            assert_eq!(Some(3), job.prev_job_id);
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_current_job_id_returns_current_job_id()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(2345, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(3456, "test3")) {
+        Some(job_id) => assert_eq!(job_id, 3),
+        _ => assert!(false),
+    }
+    assert_eq!(Some(3), exec.current_job_id());
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_current_job_id_does_not_return_current_job_id_after_job_removing()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    exec.remove_job(1);
+    assert_eq!(true, exec.current_job_id().is_none());
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_current_job_id_does_not_return_current_job_id_for_empty_jobs()
+{
+    let exec = Executor::new();
+    assert_eq!(true, exec.current_job_id().is_none());
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_prev_current_job_id_returns_previous_current_job_id()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(2345, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(3456, "test3")) {
+        Some(job_id) => assert_eq!(job_id, 3),
+        _ => assert!(false),
+    }
+    assert_eq!(Some(2), exec.prev_current_job_id());
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_set_job_status_sets_job_status()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    exec.set_job_status(1, WaitStatus::Signaled(9, false));
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(1234, job.pid);
+            assert_eq!(WaitStatus::Signaled(9, false), job.status);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_interpret_sets_in_interpreter_state()
+{
+    let mut exec = Executor::new();
+    let mut is_in_interp = false;
+    let mut is_in_interp2 = false;
+    let mut state_stack_len = 0;
+    exec.interpret(|exec| {
+            is_in_interp = exec.current_state == State::InInterpreter;
+            is_in_interp2 = exec.state_stack[0] == State::InInterpreter;
+            state_stack_len = exec.state_stack.len();
+    });
+    assert_eq!(true, is_in_interp);
+    assert_eq!(true, is_in_interp2);
+    assert_eq!(1, state_stack_len);
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_interpret_twice_sets_in_interpreter_state()
+{
+    let mut exec = Executor::new();
+    let mut is_in_interp = false;
+    let mut is_in_interp2 = false;
+    let mut is_in_interp3 = false;
+    let mut state_stack_len = 0;
+    exec.interpret(|exec| {
+            exec.interpret(|exec| {
+                    is_in_interp = exec.current_state == State::InInterpreter;
+                    is_in_interp2 = exec.state_stack[0] == State::InInterpreter;
+                    is_in_interp3 = exec.state_stack[1] == State::InInterpreter;
+                    state_stack_len = exec.state_stack.len();
+            });
+    });
+    assert_eq!(true, is_in_interp);
+    assert_eq!(true, is_in_interp2);
+    assert_eq!(true, is_in_interp3);
+    assert_eq!(2, state_stack_len);
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_interpret_or_sets_in_interpreter_state()
+{
+    let mut exec = Executor::new();
+    let mut is_in_interp = false;
+    let mut is_in_interp2 = false;
+    let mut state_stack_len = 0;
+    exec.interpret_or(true, |exec| {
+            is_in_interp = exec.current_state == State::InInterpreter;
+            is_in_interp2 = exec.state_stack[0] == State::InInterpreter;
+            state_stack_len = exec.state_stack.len();
+    });
+    assert_eq!(true, is_in_interp);
+    assert_eq!(true, is_in_interp2);
+    assert_eq!(1, state_stack_len);
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_interpret_or_does_not_set_in_interpreter_state()
+{
+    let mut exec = Executor::new();
+    let mut is_in_interp = false;
+    let mut state_stack_len = 0;
+    exec.interpret_or(false, |exec| {
+            is_in_interp = exec.current_state == State::InInterpreter;
+            state_stack_len = exec.state_stack.len();
+    });
+    assert_eq!(true, is_in_interp);
+    assert_eq!(0, state_stack_len);
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_create_process_creates_process()
+{
+    let mut exec = Executor::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    let res = exec.create_process(false, &mut settings, |exec, _| {
+            match exec.current_file(1) {
+                Some(file) => {
+                    let mut file_r = file.borrow_mut();
+                    write_stream(&mut *file_r, format!("{:?}\n", process::id() as i32).as_str());
+                    write_stream(&mut *file_r, format!("{:?}\n", exec.current_state).as_str());
+                    write_stream(&mut *file_r, format!("{:?}\n", exec.state_stack.len()).as_str());
+                },
+                None => (),
+            }
+            0
+    });
+    match res {
+        Ok(Some(pid)) => {
+            let res2 = exec.wait_for_process(Some(pid), true, false);
+            match res2 {
+                Ok(WaitStatus::Exited(0)) => {
+                    let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 1);
+                    assert_eq!(expected_stdout_content, read_file("stdout.txt"));
+                    assert_eq!(String::new(), read_file("stderr.txt"));
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    exec.clear_files();
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_create_process_does_not_create_process_for_nested_new_process()
+{
+    let mut exec = Executor::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    let res = exec.create_process(false, &mut settings, |exec, settings| {
+            let res = exec.create_process(false, settings, |exec, _| {
+                    match exec.current_file(1) {
+                        Some(file) => {
+                            let mut file_r = file.borrow_mut();
+                            write_stream(&mut *file_r, format!("{:?}\n", process::id() as i32).as_str());
+                            write_stream(&mut *file_r, format!("{:?}\n", exec.current_state).as_str());
+                            write_stream(&mut *file_r, format!("{:?}\n", exec.state_stack.len()).as_str());
+                        },
+                        None => (),
+                    }
+                    0
+            });
+            match res {
+                Ok(pid) => {
+                    let _res2 = exec.wait_for_process(pid, true, false);
+                    ()
+                },
+                Err(_) => (),
+            }
+            0
+    });
+    match res {
+        Ok(Some(pid)) => {
+            let res2 = exec.wait_for_process(Some(pid), true, false);
+            match res2 {
+                Ok(WaitStatus::Exited(0)) => {
+                    let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 2);
+                    assert_eq!(expected_stdout_content, read_file("stdout.txt"));
+                    assert_eq!(String::new(), read_file("stderr.txt"));
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    exec.clear_files();
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_create_process_creates_process_for_background()
+{
+    let mut exec = Executor::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    let res = exec.create_process(true, &mut settings, |exec, _| {
+            match exec.current_file(1) {
+                Some(file) => {
+                    let mut file_r = file.borrow_mut();
+                    write_stream(&mut *file_r, format!("{:?}\n", process::id() as i32).as_str());
+                    write_stream(&mut *file_r, format!("{:?}\n", exec.current_state).as_str());
+                    write_stream(&mut *file_r, format!("{:?}\n", exec.state_stack.len()).as_str());
+                },
+                None => (),
+            }
+            0
+    });
+    match res {
+        Ok(Some(pid)) => {
+            let res2 = exec.wait_for_process(Some(pid), true, false);
+            match res2 {
+                Ok(WaitStatus::Exited(0)) => {
+                    let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 2);
+                    assert_eq!(expected_stdout_content, read_file("stdout.txt"));
+                    assert_eq!(String::new(), read_file("stderr.txt"));
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    exec.clear_files();
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_create_process_creates_process_for_zero_status()
+{
+    let mut exec = Executor::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    let res = exec.create_process(false, &mut settings, |_, _| {
+            0
+    });
+    match res {
+        Ok(Some(pid)) => {
+            let res2 = exec.wait_for_process(Some(pid), true, false);
+            match res2 {
+                Ok(WaitStatus::Exited(status)) => {
+                    assert_eq!(0, status);
+                    assert_eq!(String::new(), read_file("stdout.txt"));
+                    assert_eq!(String::new(), read_file("stderr.txt"));
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    exec.clear_files();
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_create_process_creates_process_for_other_status()
+{
+    let mut exec = Executor::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    let res = exec.create_process(false, &mut settings, |_, _| {
+            12
+    });
+    match res {
+        Ok(Some(pid)) => {
+            let res2 = exec.wait_for_process(Some(pid), true, false);
+            match res2 {
+                Ok(WaitStatus::Exited(status)) => {
+                    assert_eq!(12, status);
+                    assert_eq!(String::new(), read_file("stdout.txt"));
+                    assert_eq!(String::new(), read_file("stderr.txt"));
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    exec.clear_files();
+}

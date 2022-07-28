@@ -18,6 +18,7 @@
 use std::env;
 use std::fs;
 use std::fs::*;
+use std::io::*;
 use std::path::*;
 use std::os::unix::fs::symlink;
 
@@ -35,7 +36,17 @@ pub fn read_file<P: AsRef<Path>>(path: P) -> String
 { fs::read_to_string(path).unwrap() }
 
 pub fn write_file<P: AsRef<Path>>(path: P, s: &str)
-{ write(path, s).unwrap(); }
+{ write(path, s.as_bytes()).unwrap(); }
+
+pub fn read_stream<R: Read>(r: &mut R) -> String
+{
+    let mut s = String::new();
+    r.read_to_string(&mut s).unwrap();
+    s
+}
+
+pub fn write_stream<W: Write>(w: &mut W, s: &str)
+{ w.write_all(s.as_bytes()).unwrap(); }
 
 pub fn current_dir() -> PathBuf
 { env::current_dir().unwrap() }
