@@ -1515,7 +1515,7 @@ fn test_executor_create_process_creates_process()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_create_process_does_not_create_process_for_nested_new_process()
+fn test_executor_create_process_does_not_create_process_for_in_new_process()
 {
     let mut exec = Executor::new();
     let mut settings = Settings::new();
@@ -1591,6 +1591,67 @@ fn test_executor_create_process_creates_process_for_background()
             match res2 {
                 Ok(WaitStatus::Exited(0)) => {
                     let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 2);
+                    assert_eq!(expected_stdout_content, read_file("stdout.txt"));
+                    assert_eq!(String::new(), read_file("stderr.txt"));
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    exec.clear_files();
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_create_process_creates_process_for_in_new_process_and_background()
+{
+    let mut exec = Executor::new();
+    let mut settings = Settings::new();
+    settings.arg0 = String::from("rsush");
+    write_file("stdin.txt", "Some line\nSecond line\n");
+    exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+    exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+    exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(create_file("4.txt"))));
+    let res = exec.create_process(false, &mut settings, |exec, settings| {
+            let res = exec.create_process(true, settings, |exec, _| {
+                    match exec.current_file(1) {
+                        Some(file) => {
+                            let mut file_r = file.borrow_mut();
+                            write_stream(&mut *file_r, format!("{:?}\n", process::id() as i32).as_str());
+                            write_stream(&mut *file_r, format!("{:?}\n", exec.current_state).as_str());
+                            write_stream(&mut *file_r, format!("{:?}\n", exec.state_stack.len()).as_str());
+                        },
+                        None => (),
+                    }
+                    0
+            });
+            match res {
+                Ok(Some(pid)) => {
+                    match exec.current_file(4) {
+                        Some(file) => {
+                            let mut file_r = file.borrow_mut();
+                            write_stream(&mut *file_r, format!("{}\n", pid).as_str());
+                        },
+                        None => (),
+                    }
+                    let _res2 = exec.wait_for_process(Some(pid), true, false);
+                    ()
+                },
+                Ok(None) => {
+                    let _res2 = exec.wait_for_process(None, true, false);
+                    ()
+                },
+                Err(_) => (),
+            }
+            0
+    });
+    match res {
+        Ok(Some(pid)) => {
+            let res2 = exec.wait_for_process(Some(pid), true, false);
+            match res2 {
+                Ok(WaitStatus::Exited(0)) => {
+                    let expected_stdout_content = format!("{}\n{:?}\n{:?}\n", read_file("4.txt").trim(), State::InNewProcess, 3);
                     assert_eq!(expected_stdout_content, read_file("stdout.txt"));
                     assert_eq!(String::new(), read_file("stderr.txt"));
                 },
