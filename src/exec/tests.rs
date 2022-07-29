@@ -938,7 +938,7 @@ fn test_executor_pop_file_thrice_pops_file()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_pop_file_pops_penultimate_file()
+fn test_executor_pop_penultimate_file_pops_penultimate_file()
 {
     let mut exec = Executor::new();
     write_file("4.txt", "abcdef\n");
