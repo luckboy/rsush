@@ -938,6 +938,34 @@ fn test_executor_pop_file_thrice_pops_file()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
+fn test_executor_pop_file_pops_penultimate_file()
+{
+    let mut exec = Executor::new();
+    write_file("4.txt", "abcdef\n");
+    write_file("4_2.txt", "ghijkl\n");
+    write_file("4_3.txt", "mnopqr\n");
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_2.txt"))));
+    exec.push_file(4, Rc::new(RefCell::new(open_file("4_3.txt"))));
+    exec.pop_penultimate_file(4);
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("mnopqr\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+    exec.pop_file(4);
+    match exec.current_file(4) {
+        Some(file) => {
+            let mut file_r = file.borrow_mut();
+            assert_eq!(String::from("abcdef\n"), read_stream(&mut *file_r));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
 fn test_executor_push_file_and_set_saved_file_pushes_file_and_sets_saved_file()
 {
     let mut exec = Executor::new();
