@@ -2086,7 +2086,7 @@ impl Interpreter
                             }
                         }
                         if is_success {
-                            let tmp_words: Vec<Rc<Word>> = word_iter.map(|we| we.clone()).collect();
+                            let tmp_words: Vec<Rc<Word>> = word_iter.map(|w| w.clone()).collect();
                             match self.perform_word_expansions(exec, tmp_words.as_slice(), env, settings) {
                                 Some(args2) => args.extend(args2),
                                 None => is_success = false,
