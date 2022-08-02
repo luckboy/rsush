@@ -123,7 +123,9 @@ jkl
 fn test_interpreter_interpret_logical_commands_takes_variables()
 {
     let s = "
+unset VAR1
 VAR1=abc
+unset VAR2
 VAR2=def
 unset VAR3
 ./rsush_test args $VAR1 $VAR2 $VAR3
@@ -535,6 +537,7 @@ fn test_interpreter_interpret_logical_commands_takes_excl_special_parameter()
 fn test_interpreter_interpret_logical_commands_performs_colon_minus_parameter_expansion_for_set_and_not_null()
 {
     let s = "
+unset VAR
 VAR=abc
 ./rsush_test args ${VAR:-def}
 ./rsush_test args $VAR
@@ -583,6 +586,7 @@ abc
 fn test_interpreter_interpret_logical_commands_performs_colon_minus_parameter_expansion_for_set_but_null()
 {
     let s = "
+unset VAR
 VAR=
 ./rsush_test args ${VAR:-def}
 ./rsush_test args $VAR
@@ -677,6 +681,7 @@ def
 fn test_interpreter_interpret_logical_commands_performs_minus_parameter_expansion_for_set_and_not_null()
 {
     let s = "
+unset VAR
 VAR=abc
 ./rsush_test args ${VAR-def}
 ./rsush_test args $VAR
@@ -725,6 +730,7 @@ abc
 fn test_interpreter_interpret_logical_commands_performs_minus_parameter_expansion_for_set_but_null()
 {
     let s = "
+unset VAR
 VAR=
 ./rsush_test args ${VAR-def}
 ./rsush_test args $VAR
@@ -818,6 +824,7 @@ def
 fn test_interpreter_interpret_logical_commands_performs_colon_equal_parameter_expansion_for_set_and_not_null()
 {
     let s = "
+unset VAR
 VAR=abc
 ./rsush_test args ${VAR:=def}
 ./rsush_test args $VAR
@@ -866,6 +873,7 @@ abc
 fn test_interpreter_interpret_logical_commands_performs_colon_equal_parameter_expansion_for_set_but_null()
 {
     let s = "
+unset VAR
 VAR=
 ./rsush_test args ${VAR:=def}
 ./rsush_test args $VAR
@@ -962,6 +970,7 @@ def
 fn test_interpreter_interpret_logical_commands_performs_equal_parameter_expansion_for_set_and_not_null()
 {
     let s = "
+unset VAR
 VAR=abc
 ./rsush_test args ${VAR=def}
 ./rsush_test args $VAR
@@ -1010,6 +1019,7 @@ abc
 fn test_interpreter_interpret_logical_commands_performs_equal_parameter_expansion_for_set_but_null()
 {
     let s = "
+unset VAR
 VAR=
 ./rsush_test args ${VAR=def}
 ./rsush_test args $VAR
@@ -1104,6 +1114,7 @@ def
 fn test_interpreter_interpret_logical_commands_performs_colon_ques_parameter_expansion_for_set_and_not_null()
 {
     let s = "
+unset VAR
 VAR=abc
 ./rsush_test args ${VAR:?def}
 ./rsush_test args $VAR
@@ -1152,6 +1163,7 @@ abc
 fn test_interpreter_interpret_logical_commands_performs_colon_ques_parameter_expansion_for_set_but_null()
 {
     let s = "
+unset VAR
 VAR=
 ./rsush_test args ${VAR:?def}
 ./rsush_test args $VAR
@@ -1284,6 +1296,7 @@ unset VAR
 fn test_interpreter_interpret_logical_commands_performs_ques_parameter_expansion_for_set_and_not_null()
 {
     let s = "
+unset VAR
 VAR=abc
 ./rsush_test args ${VAR?def}
 ./rsush_test args $VAR
@@ -1332,6 +1345,7 @@ abc
 fn test_interpreter_interpret_logical_commands_performs_ques_parameter_expansion_for_set_but_null()
 {
     let s = "
+unset VAR
 VAR=
 ./rsush_test args ${VAR?def}
 ./rsush_test args $VAR
@@ -1466,6 +1480,7 @@ unset VAR
 fn test_interpreter_interpret_logical_commands_performs_colon_plus_parameter_expansion_for_set_and_not_null()
 {
     let s = "
+unset VAR
 VAR=abc
 ./rsush_test args ${VAR:+def}
 ./rsush_test args $VAR
@@ -1514,6 +1529,7 @@ abc
 fn test_interpreter_interpret_logical_commands_performs_colon_plus_parameter_expansion_for_set_but_null()
 {
     let s = "
+unset VAR
 VAR=
 ./rsush_test args ${VAR:+def}
 ./rsush_test args $VAR
@@ -1606,6 +1622,7 @@ unset VAR
 fn test_interpreter_interpret_logical_commands_performs_plus_parameter_expansion_for_set_and_not_null()
 {
     let s = "
+unset VAR
 VAR=abc
 ./rsush_test args ${VAR+def}
 ./rsush_test args $VAR
@@ -1654,6 +1671,7 @@ abc
 fn test_interpreter_interpret_logical_commands_performs_plus_parameter_expansion_for_set_but_null()
 {
     let s = "
+unset VAR
 VAR=
 ./rsush_test args ${VAR+def}
 ./rsush_test args $VAR
@@ -1747,6 +1765,7 @@ unset VAR
 fn test_interpreter_interpret_logical_commands_performs_perc_parameter_expansion()
 {
     let s = "
+unset VAR
 VAR=file.c
 ./rsush_test args ${VAR%.c}
 ";
@@ -1793,6 +1812,7 @@ file
 fn test_interpreter_interpret_logical_commands_performs_perc_perc_parameter_expansion()
 {
     let s = "
+unset VAR
 VAR=posix/src/std
 ./rsush_test args ${VAR%%/*}
 ";
@@ -1839,6 +1859,7 @@ posix
 fn test_interpreter_interpret_logical_commands_performs_hash_parameter_expansion()
 {
     let s = "
+unset VAR
 VAR=/home/luck/src/cmd
 ./rsush_test args ${VAR#/home/luck}
 ";
@@ -1885,6 +1906,7 @@ VAR=/home/luck/src/cmd
 fn test_interpreter_interpret_logical_commands_performs_hash_hash_parameter_expansion()
 {
     let s = "
+unset VAR
 VAR=/one/two/three
 ./rsush_test args ${VAR##*/}
 ";
@@ -1931,6 +1953,7 @@ three
 fn test_interpreter_interpret_logical_commands_performs_parameter_length_expansion()
 {
     let s = "
+unset VAR
 VAR=abcdef
 ./rsush_test args ${#VAR}
 ";
@@ -2113,6 +2136,7 @@ fn test_interpreter_interpret_logical_commands_performs_arithmetic_expansion_for
 fn test_interpreter_interpret_logical_commands_performs_arithmetic_expansion_for_parameter()
 {
     let s = "
+unset X
 X=1234
 ./rsush_test args $((X))
 ";
@@ -2158,6 +2182,7 @@ X=1234
 fn test_interpreter_interpret_logical_commands_performs_arithmetic_expansion_for_parameter_that_is_null()
 {
     let s = "
+unset X
 X=
 ./rsush_test args $((X))
 ";
@@ -2336,6 +2361,7 @@ fn test_interpreter_interpret_logical_commands_performs_arithmetic_expansion_for
 fn test_interpreter_interpret_logical_commands_performs_arithmetic_expansion_for_assignment_operator()
 {
     let s = "
+unset X
 X=1234
 ./rsush_test args $((X = 2345))
 ./rsush_test args $X
@@ -2383,6 +2409,7 @@ X=1234
 fn test_interpreter_interpret_logical_commands_performs_arithmetic_expansion_for_binary_operator_with_assignment()
 {
     let s = "
+unset X
 X=2
 ./rsush_test args $((X *= 3))
 ./rsush_test args $X
