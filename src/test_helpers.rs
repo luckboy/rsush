@@ -51,6 +51,12 @@ pub fn write_stream<W: Write>(w: &mut W, s: &str)
 pub fn current_dir() -> PathBuf
 { env::current_dir().unwrap() }
 
+pub fn make_dir<P: AsRef<Path>>(path: P)
+{ fs::create_dir(path).unwrap(); }
+
+pub fn make_dir_all<P: AsRef<Path>>(path: P)
+{ fs::create_dir_all(path).unwrap(); }
+
 pub fn symlink_rsush_test()
 {
     let cargo_manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
