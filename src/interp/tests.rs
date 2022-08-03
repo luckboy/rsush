@@ -4930,7 +4930,7 @@ test2/bbb
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_interpreter_interpret_logical_commands_does_not_perform_two_glob_expansions_for_expansion_words()
+fn test_interpreter_interpret_logical_commands_does_not_perform_two_glob_expansions_for_doubly_quoted_expansion_words()
 {
     let s = "
 unset VAR
