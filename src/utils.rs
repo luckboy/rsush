@@ -287,9 +287,17 @@ pub fn escape_str(s: &str) -> String
 pub fn unescape_path_pattern<S: AsRef<OsStr>>(s: S) -> PathBuf
 {
     let mut buf: Vec<u8> = Vec::new();
-    for c in s.as_ref().as_bytes().iter() {
-        if *c != b'\\' {
-            buf.push(*c);
+    let mut iter = s.as_ref().as_bytes().iter();
+    loop {
+        match iter.next() {
+            Some(b'\\') => {
+                match iter.next() {
+                    Some(c) => buf.push(*c),
+                    None => break,
+                }
+            },
+            Some(c) => buf.push(*c),
+            None => break,
         }
     }
     let mut path_buf = PathBuf::new();

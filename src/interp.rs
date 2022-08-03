@@ -1190,7 +1190,7 @@ impl Interpreter
                         Some(Some(Value::ExpansionArray(ss))) => {
                             ts.extend(ss);
                             is_join = is_here_doc;
-                            is_unescaping = is_here_doc;
+                            is_unescaping = true;
                         },
                         Some(None) => ts.push(String::new()),
                         None => return false,
