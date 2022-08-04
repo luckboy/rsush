@@ -468,9 +468,9 @@ impl Executor
                     }
                 }
                 virtual_file.current_file = Rc::new(RefCell::new(unsafe { File::from_raw_fd(*vfd) }));
-                let flags = fcntl_f_getfd(*vfd)?;
-                unsafe { fcntl_f_setfd(*vfd, flags & !libc::FD_CLOEXEC) }?;
             }
+            let flags = fcntl_f_getfd(*vfd)?;
+            unsafe { fcntl_f_setfd(*vfd, flags & !libc::FD_CLOEXEC) }?;
         }
         Ok(())
     }

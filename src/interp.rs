@@ -1634,6 +1634,7 @@ impl Interpreter
                                         } else {
                                             xcfprintln!(exec, 2, "{}: {}: too large I/O number", path, pos);
                                         }
+                                        is_success = false;
                                     },
                                 }
                             } else {
@@ -1663,6 +1664,7 @@ impl Interpreter
                                         } else {
                                             xcfprintln!(exec, 2, "{}: {}: too large I/O number", path, pos);
                                         }
+                                        is_success = false;
                                     },
                                 }
                             } else {
@@ -1682,7 +1684,7 @@ impl Interpreter
                 },
                 Redirection::HereDocument(_, _, n, here_doc) => {
                     match self.perform_here_doc_expansion(exec, &here_doc.borrow(), env, settings) {
-                        Some(s) => interp_redirects.push(InterpreterRedirection::HereDocument(n.unwrap_or(1), s)),
+                        Some(s) => interp_redirects.push(InterpreterRedirection::HereDocument(n.unwrap_or(0), s)),
                         None => {
                             is_success = false;
                             break;
@@ -1867,6 +1869,7 @@ impl Interpreter
                                             _ => (),
                                         }
                                     }
+                                    exec.clear_pipes();
                                     let status = f(self, exec, env, settings);
                                     interp_redirects.reverse();
                                     for interp_redirect in &interp_redirects {
