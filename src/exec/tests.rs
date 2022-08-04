@@ -717,9 +717,9 @@ fn test_executor_execute_sets_variables()
     }
     let stdout_content = read_file("stdout.txt");
     assert!(stdout_content.contains(format!("PWD={}\n", current_dir().as_path().to_string_lossy()).as_str()));
-    assert!(stdout_content.contains("VAR1=abc"));
-    assert!(stdout_content.contains("VAR2=def"));
-    assert!(stdout_content.contains("VAR3=ghi"));
+    assert!(stdout_content.contains("VAR1=abc\n"));
+    assert!(stdout_content.contains("VAR2=def\n"));
+    assert!(stdout_content.contains("VAR3=ghi\n"));
     assert_eq!(String::new(), read_file("stderr.txt"));
 }
 
