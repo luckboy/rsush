@@ -16,6 +16,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 use super::*;
+use crate::io::*;
+use crate::lexer::*;
+use crate::parser::*;
 use crate::builtins::*;
 use crate::test_builtins::*;
 use crate::vars::*;
@@ -1756,4 +1759,301 @@ fn test_executor_create_process_creates_process_for_other_status()
         _ => assert!(false),
     }
     exec.clear_files();
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_executes_function()
+{
+    let s = "
+f() {
+    echo abc $*
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            let mut exec = Executor::new();
+            let mut interp = Interpreter::new();
+            let mut env = Environment::new();
+            let mut settings = Settings::new();
+            settings.arg0 = String::from("rsush");
+            initialize_builtin_funs(&mut env);
+            initialize_test_builtin_funs(&mut env);
+            initialize_vars(&mut env);
+            write_file("stdin.txt", "Some line\nSecond line\n");
+            exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+            exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+            exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+            let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+            assert_eq!(0, status);
+            let args = vec![String::from("def"), String::from("ghi")];
+            let res = exec.execute(&mut interp, &[], "f", args.as_slice(), false, &mut env, &mut settings, |_| true);
+            exec.clear_files();
+            match res {
+                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                Err(_) => assert!(false),
+            }
+            let expected_stdout_content = "
+abc def ghi
+";
+            assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+            assert_eq!(String::new(), read_file("stderr.txt"));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_twice_executes_function()
+{
+    let s = "
+f() {
+    echo abc $*
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            let mut exec = Executor::new();
+            let mut interp = Interpreter::new();
+            let mut env = Environment::new();
+            let mut settings = Settings::new();
+            settings.arg0 = String::from("rsush");
+            initialize_builtin_funs(&mut env);
+            initialize_test_builtin_funs(&mut env);
+            initialize_vars(&mut env);
+            write_file("stdin.txt", "Some line\nSecond line\n");
+            exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+            exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+            exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+            let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+            assert_eq!(0, status);
+            let args = vec![String::from("def"), String::from("ghi")];
+            let res = exec.execute(&mut interp, &[], "f", args.as_slice(), false, &mut env, &mut settings, |_| true);
+            let args2 = vec![String::from("jkl"), String::from("mno")];
+            let res2 = exec.execute(&mut interp, &[], "f", args2.as_slice(), false, &mut env, &mut settings, |_| true);
+            exec.clear_files();
+            match res {
+                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                Err(_) => assert!(false),
+            }
+            match res2 {
+                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                Err(_) => assert!(false),
+            }
+            let expected_stdout_content = "
+abc def ghi
+abc jkl mno
+";
+            assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+            assert_eq!(String::new(), read_file("stderr.txt"));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_executes_function_for_settings_of_variables()
+{
+    let s = "
+f() {
+    echo abc $var1 $var2
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            let mut exec = Executor::new();
+            let mut interp = Interpreter::new();
+            let mut env = Environment::new();
+            let mut settings = Settings::new();
+            settings.arg0 = String::from("rsush");
+            initialize_builtin_funs(&mut env);
+            initialize_test_builtin_funs(&mut env);
+            initialize_vars(&mut env);
+            write_file("stdin.txt", "Some line\nSecond line\n");
+            exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+            exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+            exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+            let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+            assert_eq!(0, status);
+            let vars = vec![
+                (String::from("var1"), String::from("def")),
+                (String::from("var2"), String::from("ghi"))
+            ];
+            let res = exec.execute(&mut interp, vars.as_slice(), "f", &[], false, &mut env, &mut settings, |_| true);
+            exec.clear_files();
+            match res {
+                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                Err(_) => assert!(false),
+            }
+            let expected_stdout_content = "
+abc def ghi
+";
+            assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+            assert_eq!(String::new(), read_file("stderr.txt"));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_twice_executes_function_for_settings_of_variables()
+{
+    let s = "
+f() {
+    echo abc $var1 $var2
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            let mut exec = Executor::new();
+            let mut interp = Interpreter::new();
+            let mut env = Environment::new();
+            let mut settings = Settings::new();
+            settings.arg0 = String::from("rsush");
+            initialize_builtin_funs(&mut env);
+            initialize_test_builtin_funs(&mut env);
+            initialize_vars(&mut env);
+            write_file("stdin.txt", "Some line\nSecond line\n");
+            exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+            exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+            exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+            let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+            assert_eq!(0, status);
+            let vars = vec![
+                (String::from("var1"), String::from("def")),
+                (String::from("var2"), String::from("ghi"))
+            ];
+            let res = exec.execute(&mut interp, vars.as_slice(), "f", &[], false, &mut env, &mut settings, |_| true);
+            let vars2 = vec![
+                (String::from("var1"), String::from("jkl")),
+                (String::from("var2"), String::from("mno"))
+            ];
+            let res2 = exec.execute(&mut interp, vars2.as_slice(), "f", &[], false, &mut env, &mut settings, |_| true);
+            exec.clear_files();
+            match res {
+                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                Err(_) => assert!(false),
+            }
+            match res2 {
+                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                Err(_) => assert!(false),
+            }
+            let expected_stdout_content = "
+abc def ghi
+abc jkl mno
+";
+            assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+            assert_eq!(String::new(), read_file("stderr.txt"));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_executes_function_with_return_value_true()
+{
+    let s = "
+f() {
+    true
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            let mut exec = Executor::new();
+            let mut interp = Interpreter::new();
+            let mut env = Environment::new();
+            let mut settings = Settings::new();
+            settings.arg0 = String::from("rsush");
+            initialize_builtin_funs(&mut env);
+            initialize_test_builtin_funs(&mut env);
+            initialize_vars(&mut env);
+            write_file("stdin.txt", "Some line\nSecond line\n");
+            exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+            exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+            exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+            let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+            assert_eq!(0, status);
+            let res = exec.execute(&mut interp, &[], "f", &[], false, &mut env, &mut settings, |_| true);
+            exec.clear_files();
+            match res {
+                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                Err(_) => assert!(false),
+            }
+            assert_eq!(String::new(), read_file("stdout.txt"));
+            assert_eq!(String::new(), read_file("stderr.txt"));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_execute_executes_function_with_return_value_false()
+{
+    let s = "
+f() {
+    false
+}
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            let mut exec = Executor::new();
+            let mut interp = Interpreter::new();
+            let mut env = Environment::new();
+            let mut settings = Settings::new();
+            settings.arg0 = String::from("rsush");
+            initialize_builtin_funs(&mut env);
+            initialize_test_builtin_funs(&mut env);
+            initialize_vars(&mut env);
+            write_file("stdin.txt", "Some line\nSecond line\n");
+            exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+            exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+            exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+            let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+            assert_eq!(0, status);
+            let res = exec.execute(&mut interp, &[], "f", &[], false, &mut env, &mut settings, |_| true);
+            exec.clear_files();
+            match res {
+                Ok(wait_status) => assert_eq!(WaitStatus::Exited(1), wait_status),
+                Err(_) => assert!(false),
+            }
+            assert_eq!(String::new(), read_file("stdout.txt"));
+            assert_eq!(String::new(), read_file("stderr.txt"));
+        },
+        _ => assert!(false),
+    }
 }
