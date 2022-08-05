@@ -52,7 +52,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
         }
     }
     let args: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
-    for arg in &args[1..] {
+    for arg in &args {
         match arg.split_once('=') {
             Some((name, value)) => {
                 if !is_name_str(name) {
