@@ -15,7 +15,27 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+use std::fmt;
+use std::result;
 use crate::args::*;
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum OptionType
+{
+    Minus,
+    Plus,
+}
+
+impl fmt::Display for OptionType
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            OptionType::Minus => write!(f, "-"),
+            OptionType::Plus => write!(f, "+"),
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct Settings
@@ -83,6 +103,115 @@ impl Settings
 
     pub fn current_args_mut(&mut self) -> &mut Arguments
     { &mut self.current_args }
+
+    pub fn parse_options<F>(&mut self, args: &[String], mut f: F) -> OptionResult
+        where F: FnMut(OptionType, char, &mut Self) -> bool
+    {
+        let mut arg_iter = args.iter();
+        let mut _arg0 = arg_iter.next();
+        let mut i: usize = 1;
+        loop {
+            match arg_iter.next() {
+                Some(arg) => {
+                    if arg == &String::from("--") {
+                        i += 1;
+                        break;
+                    } else if arg == &String::from("-") || arg == &String::from("+") {
+                        break;
+                    }
+                    let mut opt_iter = arg.char_indices();
+                    match opt_iter.next() {
+                        Some((_, c @ ('-' | '+'))) => {
+                            let opt_type = if c == '-' {
+                                OptionType::Minus
+                            } else {
+                                OptionType::Plus
+                            };
+                            loop {
+                                let mut is_stop = false;
+                                match opt_iter.next() {
+                                    Some((_, 'a')) => self.allexport_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'e')) => self.errexit_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'm')) => self.monitor_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'C')) => self.noclobber_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'f')) => self.noglob_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'n')) => self.noexec_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'b')) => self.notify_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'u')) => self.nounset_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'v')) => self.verbose_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'x')) => self.xtrace_flag = opt_type == OptionType::Minus,
+                                    Some((_, 'h')) => (),
+                                    Some((_, c2 @ 'o')) => {
+                                        let opt_arg = match opt_iter.next() {
+                                            Some((j, _)) => Some(String::from(&arg[j..])),
+                                            None => {
+                                                i += 1;
+                                                arg_iter.next().map(|s| s.clone())
+                                            },
+                                        };
+                                        match opt_arg {
+                                            Some(opt_arg) => {
+                                                if opt_arg == String::from("allexport") {
+                                                    self.allexport_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("ignoreeof") {
+                                                    self.ignoreeof_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("errexit") {
+                                                    self.errexit_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("monitor") {
+                                                    self.monitor_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("noclobber") {
+                                                    self.noclobber_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("noglob") {
+                                                    self.noglob_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("noexec") {
+                                                    self.noexec_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("nolog") {
+                                                    self.nolog_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("notify") {
+                                                    self.notify_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("nounset") {
+                                                    self.nounset_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("verbose") {
+                                                    self.verbose_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("vi") {
+                                                    self.vi_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("verbose") {
+                                                    self.verbose_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("xtrace") {
+                                                    self.xtrace_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("strlossy") {
+                                                    self.strlossy_flag = opt_type == OptionType::Minus;
+                                                } else {
+                                                    return Err(OptionError::InvalidArgument);
+                                                }
+                                            },
+                                            None => {
+                                                if !f(opt_type, c2, self) {
+                                                    return Err(OptionError::OptionRequiresArgument(opt_type, c2))
+                                                }
+                                            },
+                                        }
+                                        is_stop = true;
+                                    },
+                                    Some((_, c2)) => {
+                                        if !f(opt_type, c2, self) {
+                                            return Err(OptionError::UnknownOpgion(opt_type, c2))
+                                        }
+                                    },
+                                    None => break,
+                                }
+                                if is_stop { break; }
+                            }
+                        },
+                        _ => break,
+                    }
+                    i += 1;
+                },
+                None => break,
+            }
+        }
+        Ok(i)
+    }
     
     pub fn option_string(&self) -> String
     {
@@ -98,5 +227,26 @@ impl Settings
         if self.verbose_flag { s.push('v'); }
         if self.xtrace_flag { s.push('x'); }
         s
+    }
+}
+
+pub type OptionResult = result::Result<usize, OptionError>;
+
+pub enum OptionError
+{
+    UnknownOpgion(OptionType, char),
+    OptionRequiresArgument(OptionType, char),
+    InvalidArgument,
+}
+
+impl fmt::Display for OptionError
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            OptionError::UnknownOpgion(opt_type, c) => write!(f, "unknown option -- '{}{}'", opt_type, c),
+            OptionError::OptionRequiresArgument(opt_type, c) => write!(f, "option requires an argument -- '{}{}'", opt_type, c),
+            OptionError::InvalidArgument => write!(f, "Invalid argument"),
+        }
     }
 }
