@@ -108,7 +108,9 @@ impl Settings
         where F: FnMut(OptionType, char, &mut Self) -> bool
     {
         let mut arg_iter = args.iter();
-        let mut _arg0 = arg_iter.next();
+        if arg_iter.next().is_none() {
+            return Ok(0);
+        }
         let mut i: usize = 1;
         loop {
             match arg_iter.next() {
