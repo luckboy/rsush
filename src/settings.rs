@@ -197,7 +197,7 @@ impl Settings
                                     },
                                     Some((_, c2)) => {
                                         if !f(opt_type, c2, self) {
-                                            return Err(OptionError::UnknownOpgion(opt_type, c2))
+                                            return Err(OptionError::UnknownOption(opt_type, c2))
                                         }
                                     },
                                     None => break,
@@ -236,7 +236,7 @@ pub type OptionResult = result::Result<usize, OptionError>;
 
 pub enum OptionError
 {
-    UnknownOpgion(OptionType, char),
+    UnknownOption(OptionType, char),
     OptionRequiresArgument(OptionType, char),
     InvalidArgument,
 }
@@ -246,7 +246,7 @@ impl fmt::Display for OptionError
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
         match self {
-            OptionError::UnknownOpgion(opt_type, c) => write!(f, "unknown option -- '{}{}'", opt_type, c),
+            OptionError::UnknownOption(opt_type, c) => write!(f, "unknown option -- '{}{}'", opt_type, c),
             OptionError::OptionRequiresArgument(opt_type, c) => write!(f, "option requires an argument -- '{}{}'", opt_type, c),
             OptionError::InvalidArgument => write!(f, "Invalid argument"),
         }
