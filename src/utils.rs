@@ -137,6 +137,16 @@ pub fn setpgid(pid: i32, pgid: i32) -> Result<()>
     }
 }
 
+pub fn kill(pid: i32, sig: i32) -> Result<()>
+{
+    let res = unsafe { libc::kill(pid, sig) };
+    if res != -1 {
+        Ok(())
+    } else {
+        Err(Error::last_os_error())
+    }
+}
+
 pub unsafe fn dup2(old_fd: i32, new_fd: i32) -> Result<()>
 {
     let res = libc::dup2(old_fd, new_fd);

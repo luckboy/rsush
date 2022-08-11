@@ -338,7 +338,7 @@ impl Interpreter
         }
     }
     
-    fn wait_for_process(&mut self, exec: &mut Executor, pid: Option<i32>, is_exit_for_err: bool) -> Option<i32>
+    pub fn wait_for_process(&mut self, exec: &mut Executor, pid: Option<i32>, is_exit_for_err: bool) -> Option<i32>
     {
         match exec.wait_for_process(pid, true, false) {
             Ok(WaitStatus::None) => panic!("wait status is none"),
