@@ -130,7 +130,7 @@ pub fn getppid() -> i32
 pub fn setpgid(pid: i32, pgid: i32) -> Result<()>
 {
     let res = unsafe { libc::setpgid(pid, pgid) };
-    if res == -1 {
+    if res != -1 {
         Ok(())
     } else {
         Err(Error::last_os_error())
