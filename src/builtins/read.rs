@@ -108,7 +108,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpret
             let mut status = 0;
             let names: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
             for (i, name) in names.iter().enumerate() {
-                if is_name_str(name) {
+                if !is_name_str(name) {
                     fprintln!(stderr, "{}: Invalid variable name", name);
                     status = 1;
                     continue;
