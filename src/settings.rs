@@ -157,10 +157,10 @@ impl Settings
                                             Some(opt_arg) => {
                                                 if opt_arg == String::from("allexport") {
                                                     self.allexport_flag = opt_type == OptionType::Minus;
-                                                } else if opt_arg == String::from("ignoreeof") {
-                                                    self.ignoreeof_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("errexit") {
                                                     self.errexit_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("ignoreeof") {
+                                                    self.ignoreeof_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("monitor") {
                                                     self.monitor_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("noclobber") {
@@ -179,8 +179,6 @@ impl Settings
                                                     self.verbose_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("vi") {
                                                     self.vi_flag = opt_type == OptionType::Minus;
-                                                } else if opt_arg == String::from("verbose") {
-                                                    self.verbose_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("xtrace") {
                                                     self.xtrace_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("strlossy") {
