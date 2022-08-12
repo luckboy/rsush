@@ -109,14 +109,16 @@ impl Settings
     {
         let mut arg_iter = args.iter();
         if arg_iter.next().is_none() {
-            return Ok(0);
+            return Ok((0, false));
         }
         let mut i: usize = 1;
+        let mut is_minus_minus = false;
         loop {
             match arg_iter.next() {
                 Some(arg) => {
                     if arg == &String::from("--") {
                         i += 1;
+                        is_minus_minus = true;
                         break;
                     } else if arg == &String::from("-") || arg == &String::from("+") {
                         break;
@@ -212,7 +214,7 @@ impl Settings
                 None => break,
             }
         }
-        Ok(i)
+        Ok((i, is_minus_minus))
     }
     
     pub fn option_string(&self) -> String
@@ -232,7 +234,7 @@ impl Settings
     }
 }
 
-pub type OptionResult = result::Result<usize, OptionError>;
+pub type OptionResult = result::Result<(usize, bool), OptionError>;
 
 pub enum OptionError
 {
