@@ -101,6 +101,250 @@ pub fn str_to_number(s: &str) -> result::Result<i64, ParseIntError>
 pub fn is_io_number_str(s: &str) -> bool
 { !s.is_empty() && s.chars().all(|c| c >= '0' && c <= '9') }
 
+#[derive(Clone)]
+pub enum Mode
+{
+    Number(u32),
+    Symbol(Vec<ModeClause>),
+}
+
+#[derive(Clone)]
+pub struct ModeClause
+{
+    who_list: ModeWhoList,
+    action_list: Vec<ModeAction>,
+}
+
+#[derive(Copy, Clone)]
+struct ModeWhoList
+{
+    has_user: bool,
+    has_group: bool,
+    has_other: bool,
+}
+
+#[derive(Copy, Clone)]
+struct ModeAction
+{
+    op: ModeOp,
+    perm: ModePermListOrPermCopy,
+}
+
+#[derive(Copy, Clone)]
+enum ModeOp
+{
+    Add,
+    Delete,
+    Set,
+}
+
+#[derive(Copy, Clone)]
+enum ModePermListOrPermCopy
+{
+    List(ModePermList),
+    Copy(ModePermCopy),
+}
+
+#[derive(Copy, Clone)]
+struct ModePermList
+{
+    has_reading: bool,
+    has_writing: bool,
+    has_executing: bool,
+    has_searching: bool,
+    has_set_id: bool,
+    has_sticky: bool,
+}
+
+#[derive(Copy, Clone)]
+enum ModePermCopy
+{
+    User,
+    Group,
+    Other,
+}
+
+impl Mode
+{
+    pub fn parse(s: &str) -> Option<Mode>
+    {
+        match u32::from_str_radix(s, 8) {
+            Ok(x)  => Some(Mode::Number(x & 0o7777)),
+            Err(_) => {
+                let mut clauses: Vec<ModeClause> = Vec::new();
+                for clause_s in s.split(',') {
+                    let mut clause_s_iter = PushbackIter::new(clause_s.chars());
+                    let mut who_list = ModeWhoList {
+                        has_user: false,
+                        has_group: false,
+                        has_other: false,
+                    };
+                    let mut action_list: Vec<ModeAction> = Vec::new();
+                    loop {
+                        match clause_s_iter.next() {
+                            Some('a') => {
+                                who_list.has_user = true;
+                                who_list.has_group = true;
+                                who_list.has_other = true;
+                            },
+                            Some('u') => who_list.has_user = true,
+                            Some('g') => who_list.has_group = true,
+                            Some('o') => who_list.has_other = true,
+                            Some(c)   => {
+                                clause_s_iter.undo(c);
+                                break;
+                            },
+                            None      => break,
+                        }
+                    }
+                    loop {
+                        let op = match clause_s_iter.next() {
+                            Some('+') => ModeOp::Add,
+                            Some('-') => ModeOp::Delete,
+                            Some('=') => ModeOp::Set,
+                            Some(_)   => return None,
+                            None      => break,
+                        };
+                        let perm_copy = match clause_s_iter.next() {
+                            Some('u') => Some(ModePermCopy::User),
+                            Some('g') => Some(ModePermCopy::Group),
+                            Some('o') => Some(ModePermCopy::Other),
+                            Some(c)   => {
+                                clause_s_iter.undo(c);
+                                None
+                            },
+                            None      => None,
+                        };
+                        let action = match perm_copy {
+                            Some(perm_copy) => {
+                                ModeAction {
+                                    op,
+                                    perm: ModePermListOrPermCopy::Copy(perm_copy),
+                                }
+                            },
+                            None => {
+                                let mut perm_list = ModePermList {
+                                    has_reading: false,
+                                    has_writing: false,
+                                    has_executing: false,
+                                    has_searching: false,
+                                    has_set_id: false,
+                                    has_sticky: false,
+                                };
+                                loop {
+                                    match clause_s_iter.next() {
+                                        Some('r') => perm_list.has_reading = true,
+                                        Some('w') => perm_list.has_writing = true,
+                                        Some('x') => perm_list.has_executing = true,
+                                        Some('X') => perm_list.has_searching = true,
+                                        Some('s') => perm_list.has_set_id = true,
+                                        Some('t') => perm_list.has_sticky = true,
+                                        Some(c)   => {
+                                            clause_s_iter.undo(c);
+                                            break;
+                                        },
+                                        None      => break,
+                                    }
+                                }
+                                ModeAction {
+                                    op,
+                                    perm: ModePermListOrPermCopy::List(perm_list),
+                                }
+                            },
+                        };
+                        action_list.push(action);
+                    }
+                    if !action_list.is_empty() {
+                        clauses.push(ModeClause {
+                                who_list,
+                                action_list,
+                        });
+                    } else {
+                        return None
+                    }
+                }
+                Some(Mode::Symbol(clauses))
+            },
+        }
+    }
+
+    pub fn change_mode(&self, mode: u32, is_dir: bool) -> u32
+    {
+        match self {
+            Mode::Number(new_mode) => *new_mode,
+            Mode::Symbol(clauses) => {
+                let mut current_mode = mode;
+                for clause in clauses {
+                    let mut who_mode = 0;
+                    if clause.who_list.has_user { who_mode |= 0o4700; }
+                    if clause.who_list.has_group { who_mode |= 0o2070; }
+                    if clause.who_list.has_other { who_mode |= 0o1007; }
+                    if !clause.who_list.has_user && !clause.who_list.has_group && !clause.who_list.has_other {
+                        let mask = umask(0);
+                        umask(mask);
+                        who_mode |= 0o7777 & !mask;
+                    }
+                    for action in &clause.action_list {
+                        let mut perm_mode = 0;
+                        match action.perm {
+                            ModePermListOrPermCopy::List(perm_list) => {
+                                if perm_list.has_reading { perm_mode |= 0o444; }
+                                if perm_list.has_writing { perm_mode |= 0o222; }
+                                if perm_list.has_executing { perm_mode |= 0o111; }
+                                if perm_list.has_searching && (is_dir || (current_mode & 0o111) != 0)  { perm_mode |= 0o111; }
+                                if perm_list.has_set_id { perm_mode |= 0o6000; }
+                                if perm_list.has_sticky { perm_mode |= 0o1000; }
+                            },
+                            ModePermListOrPermCopy::Copy(ModePermCopy::User) => {
+                                perm_mode |= current_mode & 0o700;
+                                perm_mode |= (current_mode & 0o700) >> 3;
+                                perm_mode |= (current_mode & 0o700) >> 6;
+                            },
+                            ModePermListOrPermCopy::Copy(ModePermCopy::Group) => {
+                                perm_mode |= (current_mode & 0o70) << 3;
+                                perm_mode |= current_mode & 0o70;
+                                perm_mode |= (current_mode & 0o70) >> 3;
+                            },
+                            ModePermListOrPermCopy::Copy(ModePermCopy::Other) => {
+                                perm_mode |= (current_mode & 0o7) << 6;
+                                perm_mode |= (current_mode & 0o7) << 3;
+                                perm_mode |= current_mode & 0o7;
+                            },
+                        }
+                        match action.op {
+                            ModeOp::Add    => current_mode |= who_mode & perm_mode,
+                            ModeOp::Delete => current_mode &= !(who_mode & perm_mode),
+                            ModeOp::Set    => current_mode = (current_mode & !who_mode) | (who_mode & perm_mode),
+                        }
+                    }
+                }
+                current_mode
+            },
+        }
+    }
+}
+
+pub fn mode_to_string(mode: u32) -> String
+{
+    let mut s = String::new();
+    s.push_str("u=");
+    if (mode & 0o4000) != 0 { s.push('s'); }
+    if (mode & 0o400) != 0 { s.push('r'); }
+    if (mode & 0o200) != 0 { s.push('w'); }
+    if (mode & 0o100) != 0 { s.push('x'); }
+    s.push_str(",g=");
+    if (mode & 0o2000) != 0 { s.push('s'); }
+    if (mode & 0o40) != 0 { s.push('r'); }
+    if (mode & 0o20) != 0 { s.push('w'); }
+    if (mode & 0o10) != 0 { s.push('x'); }
+    s.push_str(",o=");
+    if (mode & 0o1000) != 0 { s.push('t'); }
+    if (mode & 0o4) != 0 { s.push('r'); }
+    if (mode & 0o2) != 0 { s.push('w'); }
+    if (mode & 0o1) != 0 { s.push('x'); }
+    s
+}
+
 pub fn fork() -> Result<Option<i32>>
 {
     let res = unsafe { libc::fork() };
@@ -154,6 +398,9 @@ pub fn kill(pid: i32, sig: i32) -> Result<()>
         Err(Error::last_os_error())
     }
 }
+
+pub fn umask(mask: u32) -> u32 
+{ unsafe { libc::umask(mask as libc::mode_t) as u32 } }
 
 pub unsafe fn dup2(old_fd: i32, new_fd: i32) -> Result<()>
 {

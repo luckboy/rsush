@@ -39,6 +39,7 @@ mod r#return;
 mod set;
 mod shift;
 mod times;
+mod umask;
 mod unalias;
 mod unset;
 
@@ -65,6 +66,7 @@ pub fn initialize_builtin_funs(env: &mut Environment)
     env.set_builtin_fun("set", set::main);
     env.set_builtin_fun("times", times::main);
     env.set_builtin_fun("shift", shift::main);
+    env.set_builtin_fun("umask", umask::main);
     env.set_builtin_fun("unalias", unalias::main);
     env.set_builtin_fun("unset", unset::main);
 }
