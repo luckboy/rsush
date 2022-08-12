@@ -32,10 +32,13 @@ mod exec;
 mod exit;
 mod export;
 mod fg;
+mod getopts;
 mod read;
 mod readonly;
 mod r#return;
+mod set;
 mod shift;
+mod times;
 mod unalias;
 mod unset;
 
@@ -55,9 +58,12 @@ pub fn initialize_builtin_funs(env: &mut Environment)
     env.set_builtin_fun("exit", exit::main);
     env.set_builtin_fun("export", export::main);
     env.set_builtin_fun("fg", fg::main);
+    env.set_builtin_fun("getopts", getopts::main);
     env.set_builtin_fun("read", read::main);
     env.set_builtin_fun("readonly", readonly::main);
     env.set_builtin_fun("return", r#return::main);
+    env.set_builtin_fun("set", set::main);
+    env.set_builtin_fun("times", times::main);
     env.set_builtin_fun("shift", shift::main);
     env.set_builtin_fun("unalias", unalias::main);
     env.set_builtin_fun("unset", unset::main);

@@ -35,6 +35,14 @@ pub struct PipeFds
     pub writing_fd: i32,
 }
 
+pub struct Tms
+{
+    pub utime: i64,
+    pub stime: i64,
+    pub cutime: i64,
+    pub cstime: i64,
+}
+
 pub enum GlobResult
 {
     Ok(Vec<PathBuf>),
@@ -193,6 +201,33 @@ pub fn pipe() -> Result<PipeFds>
     let res = unsafe { libc::pipe(&mut libc_pipe_fds as *mut i32) };
     if res != -1 {
         Ok(PipeFds { reading_fd: libc_pipe_fds[0], writing_fd: libc_pipe_fds[1], })
+    } else {
+        Err(Error::last_os_error())        
+    }
+}
+
+pub fn times() -> Result<Tms>
+{
+    let mut libc_tms: libc::tms = unsafe { MaybeUninit::uninit().assume_init() };
+    let res = unsafe { libc::times(&mut libc_tms as *mut libc::tms) };
+    if res != -1 {
+        let tms = Tms {
+            utime: libc_tms.tms_utime as i64,
+            stime: libc_tms.tms_stime as i64,
+            cutime: libc_tms.tms_cutime as i64,
+            cstime: libc_tms.tms_cstime as i64,
+        };
+        Ok(tms)
+    } else {
+        Err(Error::last_os_error())        
+    }
+}
+
+pub fn clk_tck() -> Result<i64>
+{
+    let res = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
+    if res != -1 {
+        Ok(res as i64)
     } else {
         Err(Error::last_os_error())        
     }
