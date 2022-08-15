@@ -85,11 +85,12 @@ impl Arguments
         let mut arg_ics: Option<Vec<(usize, char)>> = args.get(data.index).map(|s| s.char_indices().collect());
         match &arg_ics {
             Some(arg_ics) if  data.point < arg_ics.len() => (),
-            _ => {
+            Some(_) => {
                 data.index = 0;
                 data.point = 0;
                 arg_ics = args.get(data.index).map(|s| s.char_indices().collect());
             },
+            None => (),
         }
         match &arg_ics {
             Some(arg_ics) => {
@@ -202,3 +203,6 @@ impl fmt::Display for OptionError
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
