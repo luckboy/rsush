@@ -1390,6 +1390,34 @@ fn test_settings_parse_options_parses_options_and_minus_minus_and_argument()
 }
 
 #[test]
+fn test_settings_parse_options_parses_options_and_minus_minus_and_ignored_options()
+{
+    let mut settings = Settings::new();
+    settings.allexport_flag = false;
+    settings.errexit_flag = false;
+    settings.noclobber_flag = true;
+    settings.noglob_flag = true;
+    let args = vec![
+        String::from("test"),
+        String::from("-ae"),
+        String::from("--"),
+        String::from("+Cf")
+    ];
+    let res = settings.parse_options(args.as_slice(), |_, _, _| { false });
+    match res {
+        Ok((i, is_minus_minus)) => {
+            assert_eq!(3, i);
+            assert_eq!(true, is_minus_minus);
+            assert_eq!(true, settings.allexport_flag);
+            assert_eq!(true, settings.errexit_flag);
+            assert_eq!(true, settings.noclobber_flag);
+            assert_eq!(true, settings.noglob_flag);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
 fn test_settings_parse_options_parses_minus_minus_and_arguments()
 {
     let mut settings = Settings::new();

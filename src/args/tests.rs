@@ -341,6 +341,48 @@ fn test_arguments_get_option_parses_options_and_minus_minus_and_argument()
 }
 
 #[test]
+fn test_arguments_get_option_parses_options_and_minus_minus_and_ignored_option()
+{
+    let mut args = Arguments::new();
+    let tmp_args = vec![
+        String::from("-ab"),
+        String::from("--"),
+        String::from("-c"),
+    ];
+    args.set_args(tmp_args);
+    let opts = "abc";
+    match args.get_option(opts, None) {
+        Ok(Some((c, None))) => {
+            assert_eq!('a', c);
+            assert_eq!(0, args.arg_option_data.index);
+            assert_eq!(2, args.arg_option_data.point);
+            assert_eq!(0, args.other_option_data.index);
+            assert_eq!(0, args.other_option_data.point);
+        },
+        _ => assert!(false),
+    }
+    match args.get_option(opts, None) {
+        Ok(Some((c, None))) => {
+            assert_eq!('b', c);
+            assert_eq!(1, args.arg_option_data.index);
+            assert_eq!(0, args.arg_option_data.point);
+            assert_eq!(0, args.other_option_data.index);
+            assert_eq!(0, args.other_option_data.point);
+        },
+        _ => assert!(false),
+    }
+    match args.get_option(opts, None) {
+        Ok(None) => {
+            assert_eq!(2, args.arg_option_data.index);
+            assert_eq!(0, args.arg_option_data.point);
+            assert_eq!(0, args.other_option_data.index);
+            assert_eq!(0, args.other_option_data.point);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
 fn test_arguments_get_option_parses_options_for_arguments()
 {
     let mut args = Arguments::new();
