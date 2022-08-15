@@ -188,6 +188,7 @@ impl Settings
                                                 }
                                             },
                                             None => {
+                                                i -= 1;
                                                 if !f(opt_type, c2, self) {
                                                     return Err(OptionError::OptionRequiresArgument(opt_type, c2))
                                                 }
@@ -252,3 +253,6 @@ impl fmt::Display for OptionError
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
