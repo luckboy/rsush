@@ -42,7 +42,7 @@ pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter
     let s = (&args[1..]).join(" ");
     let mut cursor = Cursor::new(s.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
-    let mut lexer = Lexer::new("evaluation", &Position::new(1, 1), &mut cr, 0, false);
+    let mut lexer = Lexer::new("(evaluation)", &Position::new(1, 1), &mut cr, 0, false);
     let mut parser = Parser::new();
     parser.set_error_cont(false);
     match parser.parse_logical_commands(&mut lexer, settings) {
@@ -206,12 +206,12 @@ abc def ghi
         assert!(interp.has_exit_with(false));
         assert_eq!(false, interp.exec_redirect_flag());
         assert_eq!(String::new(), read_file("stdout.txt"));
-        assert_eq!(String::from("evaluation: 1.10: unexpected token\n"), read_file("stderr.txt"));
+        assert_eq!(String::from("(evaluation): 1.10: unexpected token\n"), read_file("stderr.txt"));
         assert_eq!(String::new(), read_file("stderr2.txt"));
     }
 
     #[sealed_test(before=setup(), after=teardown())]
-    fn test_eval_builtin_function_complains_on_is_read_only()
+    fn test_eval_builtin_function_complains_on_variable_is_read_only()
     {
         let mut exec = Executor::new();
         let mut interp = Interpreter::new();
