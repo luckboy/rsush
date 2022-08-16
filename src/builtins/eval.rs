@@ -216,12 +216,14 @@ abc def ghi
         let mut exec = Executor::new();
         let mut interp = Interpreter::new();
         let mut env = Environment::new();
-        env.set_read_only_var_attr("VAR2");
         let mut settings = Settings::new();
         settings.arg0 = String::from("rsush");
         initialize_builtin_funs(&mut env);
         initialize_test_builtin_funs(&mut env);
         initialize_vars(&mut env);
+        env.set_read_only_var_attr("VAR2");
+        env.unset_var("VAR2");
+        env.unset_var("VAR3");
         write_file("stdin.txt", "Some line\nSecond line\n");
         exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
         exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
@@ -230,7 +232,7 @@ abc def ghi
         let vars = vec![
             (String::from("VAR1"), String::from("def")),
             (String::from("VAR2"), String::from("ghi")),
-            (String::from("VAR2"), String::from("jkl"))
+            (String::from("VAR3"), String::from("jkl"))
         ];
         let args = vec![
             String::from("eval"),
@@ -245,5 +247,7 @@ abc def ghi
         assert_eq!(String::from("VAR2: Is read only\n"), read_file("stderr.txt"));
         assert_eq!(String::new(), read_file("stderr2.txt"));
         assert_eq!(Some(String::from("def")), env.exported_var("VAR1"));
+        assert!(env.exported_var("VAR2").is_none());
+        assert!(env.exported_var("VAR3").is_none());
     }
 }

@@ -323,12 +323,14 @@ abc
         let mut exec = Executor::new();
         let mut interp = Interpreter::new();
         let mut env = Environment::new();
-        env.set_read_only_var_attr("VAR2");
         let mut settings = Settings::new();
         settings.arg0 = String::from("rsush");
         initialize_builtin_funs(&mut env);
         initialize_test_builtin_funs(&mut env);
         initialize_vars(&mut env);
+        env.set_read_only_var_attr("VAR2");
+        env.unset_var("VAR2");
+        env.unset_var("VAR3");
         let s = "
 echo abc
 echo $VAR1
@@ -359,6 +361,8 @@ echo $VAR3
         assert_eq!(String::from("VAR2: Is read only\n"), read_file("stderr.txt"));
         assert_eq!(String::new(), read_file("stderr2.txt"));
         assert_eq!(Some(String::from("def")), env.exported_var("VAR1"));
+        assert!(env.exported_var("VAR2").is_none());
+        assert!(env.exported_var("VAR3").is_none());
     }
 
     #[sealed_test(before=setup(), after=teardown())]
