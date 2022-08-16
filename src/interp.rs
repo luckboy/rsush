@@ -182,6 +182,21 @@ impl Interpreter
     pub fn last_status(&self) -> i32
     { self.last_status }
 
+    pub fn has_none(&self) -> bool
+    { self.return_state == ReturnState::None }
+
+    pub fn has_break_with(&self, n: usize) -> bool
+    { self.return_state == ReturnState::Break(n) }
+
+    pub fn has_continue_with(&self, n: usize) -> bool
+    { self.return_state == ReturnState::Continue(n) }
+    
+    pub fn has_return(&self) -> bool
+    { self.return_state == ReturnState::Return }
+    
+    pub fn has_exit_with(&self, is_interactive: bool) -> bool
+    { self.return_state == ReturnState::Exit(is_interactive) }
+
     pub fn has_continue_with_one(&self) -> bool
     {
         match self.return_state {
@@ -277,6 +292,9 @@ impl Interpreter
             _ => self.return_state = ReturnState::None,
         }
     }
+    
+    pub fn exec_redirect_flag(&self) -> bool
+    { self.exec_redirect_flag }
     
     pub fn set_exec_redirect_flag(&mut self)
     { self.exec_redirect_flag = true; }
