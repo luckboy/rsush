@@ -70,7 +70,7 @@ mod tests
     { remove_rsush_test(); }
 
     #[sealed_test(before=setup(), after=teardown())]
-    fn test_continue_builtin_function_breaks()
+    fn test_continue_builtin_function_continues()
     {
         let mut exec = Executor::new();
         let mut interp = Interpreter::new();
@@ -101,7 +101,7 @@ mod tests
     }
 
     #[sealed_test(before=setup(), after=teardown())]
-    fn test_continue_builtin_function_doubly_breaks()
+    fn test_continue_builtin_function_doubly_continues()
     {
         let mut exec = Executor::new();
         let mut interp = Interpreter::new();
