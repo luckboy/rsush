@@ -302,9 +302,21 @@ impl Interpreter
     pub fn is_in_loop(&self) -> bool
     { self.current_loop_count > 0 }
     
+    pub fn increase_current_loop_count(&mut self) 
+    { self.current_loop_count += 1; }
+
+    pub fn decrease_current_loop_count(&mut self) 
+    { self.current_loop_count -= 1; }
+    
     pub fn is_in_fun(&self) -> bool
     { self.fun_count > 0 }
     
+    pub fn increase_fun_count(&mut self) 
+    { self.fun_count += 1; }
+
+    pub fn decrease_fun_count(&mut self) 
+    { self.fun_count -= 1; }
+
     fn push_loop_count(&mut self, count: usize)
     {
         self.loop_count_stack.push(self.current_loop_count);
