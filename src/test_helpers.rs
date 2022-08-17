@@ -20,7 +20,9 @@ use std::fs;
 use std::fs::*;
 use std::io::*;
 use std::path::*;
+use std::process::exit;
 use std::os::unix::fs::symlink;
+use crate::utils::*;
 
 pub fn open_file<P: AsRef<Path>>(path: P) -> File
 { File::open(path).unwrap() }
@@ -65,3 +67,40 @@ pub fn symlink_rsush_test()
 
 pub fn remove_rsush_test()
 { remove_file("./rsush_test").unwrap(); }
+
+pub fn create_process_and_wait_for_process<F>(f: F) -> i32
+    where F: FnOnce() -> i32
+{
+    match fork().unwrap() {
+        None => {
+            let status = f();
+            exit(status);
+        },
+        Some(pid) => {
+            let mut status = 0;
+            let pid2 = loop {
+                match waitpid(pid, Some(&mut status), 0) {
+                    Ok(pid) => break pid,
+                    Err(err) if err.kind() == ErrorKind::Interrupted => (),
+                    res @ Err(_) => {
+                        res.unwrap();
+                    },
+                }
+            };
+            match pid2 {
+                Some(_) => {
+                    if libc::WIFEXITED(status) {
+                        libc::WEXITSTATUS(status)
+                    } else if libc::WIFSIGNALED(status) {
+                        libc::WTERMSIG(status) + 128
+                    } else if libc::WIFSTOPPED(status) {
+                        libc::WSTOPSIG(status) + 128
+                    } else {
+                        128
+                    }
+                },
+                None => pid2.unwrap(),
+            }
+        }
+    }
+}
