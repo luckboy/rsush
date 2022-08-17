@@ -464,5 +464,7 @@ mod tests
         assert_eq!(String::new(), read_file("stdout.txt"));
         assert_eq!(String::from("VAR: Is read only\n"), read_file("stderr.txt"));
         assert_eq!(String::new(), read_file("stderr2.txt"));
+        assert!(env.unexported_var("VAR").is_none());
+        assert!(env.exported_var("VAR").is_none());
     }
 }
