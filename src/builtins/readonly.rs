@@ -434,7 +434,8 @@ mod tests
         assert_eq!(String::new(), read_file("stdout.txt"));
         assert_eq!(String::from("!@#: Invalid variable name\n"), read_file("stderr.txt"));
         assert_eq!(String::new(), read_file("stderr2.txt"));
-    }    
+    }
+
     #[sealed_test(before=setup(), after=teardown())]
     fn test_readonly_builtin_function_complains_on_variable_is_read_only()
     {
