@@ -464,7 +464,7 @@ mod tests
     }
     
     #[sealed_test(before=setup(), after=teardown())]
-    fn test_getopts_builtin_function_returns_colon_character_for_option_requires_argument()
+    fn test_getopts_builtin_function_returns_colon_character_for_option_that_requires_argument()
     {
         let mut exec = Executor::new();
         let mut interp = Interpreter::new();
