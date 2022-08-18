@@ -496,7 +496,7 @@ fn test_arguments_get_option_returns_ques_character_for_unknown_option()
 }
 
 #[test]
-fn test_arguments_get_option_returns_colon_character_for_unknown_option()
+fn test_arguments_get_option_returns_colon_character_for_option_requires_argument()
 {
     let mut args = Arguments::new();
     let tmp_args = vec![
