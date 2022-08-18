@@ -59,7 +59,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpret
                         Some(mode) => {
                             match &mode {
                                 Mode::Number(new_mode) => {
-                                    umask(*new_mode);
+                                    umask(*new_mode & 0o777);
                                 },
                                 Mode::Symbol(_) => {
                                     let mask = umask(0);
