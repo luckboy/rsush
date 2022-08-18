@@ -53,6 +53,9 @@ pub fn write_stream<W: Write>(w: &mut W, s: &str)
 pub fn current_dir() -> PathBuf
 { env::current_dir().unwrap() }
 
+pub fn set_current_dir<P: AsRef<Path>>(path: P)
+{ env::set_current_dir(path).unwrap(); }
+
 pub fn make_dir<P: AsRef<Path>>(path: P)
 { fs::create_dir(path).unwrap(); }
 
