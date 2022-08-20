@@ -52,6 +52,7 @@ pub struct Settings
     pub nounset_flag: bool,
     pub verbose_flag: bool,
     pub vi_flag: bool,
+    pub emacs_flag: bool,
     pub xtrace_flag: bool,
     pub strlossy_flag: bool,
     pub arg0: String,
@@ -76,6 +77,7 @@ impl Settings
             nounset_flag: false,
             verbose_flag: false,
             vi_flag: false,
+            emacs_flag: false,
             xtrace_flag: false,
             strlossy_flag: false,
             arg0: String::new(),
@@ -179,6 +181,8 @@ impl Settings
                                                     self.verbose_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("vi") {
                                                     self.vi_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("emacs") {
+                                                    self.emacs_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("xtrace") {
                                                     self.xtrace_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("strlossy") {

@@ -63,6 +63,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
                             fprintln!(&mut line_stdout, "nounset         {}", on_or_off(settings.nounset_flag));
                             fprintln!(&mut line_stdout, "verbose         {}", on_or_off(settings.verbose_flag));
                             fprintln!(&mut line_stdout, "vi              {}", on_or_off(settings.vi_flag));
+                            fprintln!(&mut line_stdout, "emacs           {}", on_or_off(settings.emacs_flag));
                             fprintln!(&mut line_stdout, "xtrace          {}", on_or_off(settings.xtrace_flag));
                             fprintln!(&mut line_stdout, "strlossy        {}", on_or_off(settings.strlossy_flag));
                         },
@@ -87,6 +88,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
                             fprintln!(&mut line_stdout, "set {}o nounset", minus_or_plus(settings.nounset_flag));
                             fprintln!(&mut line_stdout, "set {}o verbose", minus_or_plus(settings.verbose_flag));
                             fprintln!(&mut line_stdout, "set {}o vi", minus_or_plus(settings.vi_flag));
+                            fprintln!(&mut line_stdout, "set {}o emacs", minus_or_plus(settings.emacs_flag));
                             fprintln!(&mut line_stdout, "set {}o xtrace", minus_or_plus(settings.xtrace_flag));
                             fprintln!(&mut line_stdout, "set {}o strlossy", minus_or_plus(settings.strlossy_flag));
                         },
@@ -452,6 +454,7 @@ notify          on
 nounset         off
 verbose         off
 vi              off
+emacs           off
 xtrace          off
 strlossy        off
 ";
@@ -511,6 +514,7 @@ set -o notify
 set +o nounset
 set +o verbose
 set +o vi
+set +o emacs
 set +o xtrace
 set +o strlossy
 ";
