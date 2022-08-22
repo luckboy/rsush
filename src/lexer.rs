@@ -720,7 +720,7 @@ impl<'a> Lexer<'a>
         loop {
             match self.get_char(settings)? {
                 (None, _) => break,
-                (Some(c2), _) if c2.is_alphanumeric() || c == '_' => s.push(c2),
+                (Some(c2), _) if c2.is_alphanumeric() || c2 == '_' => s.push(c2),
                 (Some(c2), pos2) => {
                     self.unget_char(c2, &pos2, settings);
                     break;
