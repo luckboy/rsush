@@ -5528,6 +5528,7 @@ VAR3=ghi ./rsush_test args abc
             initialize_builtin_funs(&mut env);
             initialize_test_builtin_funs(&mut env);
             initialize_vars(&mut env);
+            env.unset_var("PS4");
             write_file("stdin.txt", "Some line\nSecond line\n");
             exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
             exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));

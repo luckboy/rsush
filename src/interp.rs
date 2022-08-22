@@ -36,6 +36,8 @@ use crate::xsfprint;
 use crate::xsfprintln;
 
 pub const DEFAULT_IFS: &'static str = " \t\n";
+pub const DEFAULT_PS4: &'static str = "+ ";
+
 
 #[derive(Clone, Debug)]
 pub enum Value
@@ -106,14 +108,26 @@ fn set_vars(exec: &Executor, vars: &[(String, String)], env: &mut Environment, s
     0
 }
 
-fn print_command_for_xtrace(exec: &Executor, vars: &[(String, String)], args: &[String])
+fn print_command_for_xtrace(exec: &Executor, vars: &[(String, String)], args: &[String], env: &Environment)
 {
-    xsfprint!(exec, 2, "+");
+    let ps4 = env.var("PS4").unwrap_or(String::from(DEFAULT_PS4));
+    xsfprint!(exec, 2, "{}", ps4);
+    let mut is_first = true;
     for (name, value) in vars.iter() {
-        xsfprint!(exec, 2, " {}={}", name, value);
+        if is_first {
+            xsfprint!(exec, 2, "{}={}", name, value);
+        } else {
+            xsfprint!(exec, 2, " {}={}", name, value);
+        }
+        is_first = false;
     }
     for arg in args.iter() {
-        xsfprint!(exec, 2, " {}", arg);
+        if is_first {
+            xsfprint!(exec, 2, "{}", arg);
+        } else  {
+            xsfprint!(exec, 2, " {}", arg);
+        }
+        is_first = false;
     }
     xsfprintln!(exec, 2, "");
 }
@@ -2128,7 +2142,7 @@ impl Interpreter
                             match args.first() {
                                 Some(arg0) => {
                                     if settings.xtrace_flag {
-                                        print_command_for_xtrace(exec, vars.as_slice(), args.as_slice());
+                                        print_command_for_xtrace(exec, vars.as_slice(), args.as_slice(), env);
                                     }
                                     self.interpret_redirects(exec, redirects.as_slice(), self.has_special_builtin_fun(arg0.as_str(), env), env, settings, |interp, exec, env, settings| {
                                             interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], false, env, settings).unwrap_or(1)
@@ -2136,7 +2150,7 @@ impl Interpreter
                                 },
                                 None => {
                                     if settings.xtrace_flag {
-                                        print_command_for_xtrace(exec, vars.as_slice(), &[]);
+                                        print_command_for_xtrace(exec, vars.as_slice(), &[], env);
                                     }
                                     self.interpret_redirects(exec, redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                                             set_vars(exec, vars.as_slice(), env, settings)
@@ -2152,7 +2166,7 @@ impl Interpreter
             },
             Some(None) => {
                 if settings.xtrace_flag {
-                    print_command_for_xtrace(exec, vars.as_slice(), &[]);
+                    print_command_for_xtrace(exec, vars.as_slice(), &[], env);
                 }
                 self.interpret_redirects(exec, command.redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                         set_vars(exec, vars.as_slice(), env, settings)
