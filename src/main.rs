@@ -261,15 +261,16 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
             if is_exit { return status; }
         }
         Err(err) if err.kind() == ErrorKind::NotFound => (),
-        Err(err) => xsfprintln!(exec, 2, "{}", err),
+        Err(err) => xsfprintln!(exec, 2, "/etc/rsushrc: {}", err),
     }
     let home = env.var("HOME").unwrap_or(String::from("/"));
-    match interpret_file((home + "/.rsushrc").as_str(), interp, exec, env, settings, false) {
+    let path = format!("{}/.rsushrc", home);
+    match interpret_file(path.as_str(), interp, exec, env, settings, false) {
         Ok((status, is_exit)) => {
             if is_exit { return status; }
         }
         Err(err) if err.kind() == ErrorKind::NotFound => (),
-        Err(err) => xsfprintln!(exec, 2, "{}", err),
+        Err(err) => xsfprintln!(exec, 2, "{}: {}", path, err),
     }
     let mut editor = match new_rustyline_editor(settings) {
         Ok(tmp_editor) => tmp_editor,
@@ -400,7 +401,7 @@ fn interpret(shell_commands: ShellCommands, interp: &mut Interpreter, exec: &mut
             match interpret_file(path.as_str(), interp, exec, env, settings, true) {
                 Ok((tmp_status, _)) => tmp_status,
                 Err(err) => {
-                    xsfprintln!(exec, 2, "{}", err);
+                    xsfprintln!(exec, 2, "{}: {}", path, err);
                     1
                 }
             }
