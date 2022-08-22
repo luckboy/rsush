@@ -348,7 +348,7 @@ impl Interpreter
     fn signal_name(&self, sig: i32) -> Option<&str>
     { self.signal_names.get(&sig).map(|s| s.as_str()) }
 
-    fn signal_string(&self, sig: i32, is_coredump: bool) -> String
+    pub fn signal_string(&self, sig: i32, is_coredump: bool) -> String
     {
         let coredump_s = if is_coredump {
             " (coredump)"

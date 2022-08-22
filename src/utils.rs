@@ -480,6 +480,19 @@ pub fn clk_tck() -> Result<i64>
     }
 }
 
+pub fn isatty(fd: i32) -> Result<bool>
+{
+    let res = unsafe { libc::isatty(fd) };
+    if res != -1 {
+        Ok(res != 0)
+    } else {
+        Err(Error::last_os_error())        
+    }
+}
+
+pub fn getuid() -> u32
+{ unsafe { libc::getuid() } }
+
 pub fn pipe_with_cloexec() -> Result<PipeFds>
 {
     let pipe_fds = pipe()?;
