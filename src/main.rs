@@ -323,8 +323,8 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                                     xsfprintln!(exec, 2, "{}", err);
                                     break None
                                 },
-                                Err(err) => {
-                                    xsfprintln!(exec, 2, "{}", err);
+                                Err(err2) => {
+                                    xsfprintln!(exec, 2, "{}", err2);
                                     return 1;
                                 },
                             }
