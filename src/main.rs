@@ -261,6 +261,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
 {
     initialize_signals();
     exec.set_foreground();
+    let _res = setpgid(exec.shell_pid(), exec.shell_pid());
     exec.set_foreground_for_shell(settings);
     match interpret_file("/etc/rsushrc", interp, exec, env, settings, false) {
         Ok((status, is_exit)) => {
