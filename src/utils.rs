@@ -493,6 +493,16 @@ pub fn isatty(fd: i32) -> Result<bool>
 pub fn getuid() -> u32
 { unsafe { libc::getuid() } }
 
+pub fn tcsetpgrp(fd: i32, pgrp: i32) -> Result<()>
+{
+    let res = unsafe { libc::tcsetpgrp(fd, pgrp) };
+    if res != -1 {
+        Ok(())
+    } else {
+        Err(Error::last_os_error())
+    }
+}
+
 pub fn pipe_with_cloexec() -> Result<PipeFds>
 {
     let pipe_fds = pipe()?;

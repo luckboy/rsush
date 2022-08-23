@@ -19,6 +19,7 @@ use std::cell::*;
 use std::fs::*;
 use std::io::*;
 use std::os::unix::io::FromRawFd;
+use std::process;
 use std::process::exit;
 use std::rc::*;
 use rustyline;
@@ -52,6 +53,8 @@ mod parser;
 #[allow(dead_code)]
 mod settings;
 #[allow(dead_code)]
+mod signals;
+#[allow(dead_code)]
 mod utils;
 #[allow(dead_code)]
 mod vars;
@@ -71,6 +74,7 @@ use io::*;
 use lexer::*;
 use parser::*;
 use settings::*;
+use signals::initialize_signals;
 use utils::*;
 use vars::initialize_vars;
 
@@ -256,6 +260,8 @@ fn parse_stdin_str(s: &str, line: u64, settings: &Settings) -> ParserResult<Opti
 
 fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings) -> i32
 {
+    initialize_signals();
+    exec.set_foreground();
     match interpret_file("/etc/rsushrc", interp, exec, env, settings, false) {
         Ok((status, is_exit)) => {
             if is_exit { return status; }
@@ -272,6 +278,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
         Err(err) if err.kind() == ErrorKind::NotFound => (),
         Err(err) => xsfprintln!(exec, 2, "{}: {}", path, err),
     }
+    let _res = tcsetpgrp(0, process::id() as i32);
     let mut editor = match new_rustyline_editor(settings) {
         Ok(tmp_editor) => tmp_editor,
         Err(err) => {
@@ -347,6 +354,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                     Some(commands) => {
                         let old_edit_mode_flags = EditModeFlags::from_settings(settings);
                         let status = interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
+                        let _res = tcsetpgrp(0, process::id() as i32);
                         match update_rustyline_edit_mode(editor, &old_edit_mode_flags, settings) {
                             Ok(tmp_editor) => editor = tmp_editor,
                             Err(err) => {

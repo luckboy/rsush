@@ -26,7 +26,7 @@ use crate::fprintln;
 use crate::xcfprintln;
 use crate::xsfprintln;
 
-pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interpreter, exec: &mut Executor, _env: &mut Environment, _settings: &mut Settings) -> i32
+pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interpreter, exec: &mut Executor, _env: &mut Environment, settings: &mut Settings) -> i32
 {
     let job_id = match args.get(1) {
         Some(arg) => {
@@ -61,6 +61,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
             return 1;
         },
     };
+    exec.set_foreground_for_process(pid, settings);
     match kill(pid, libc::SIGCONT) {
         Ok(()) => {
             match exec.current_file(1) {

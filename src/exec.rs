@@ -113,6 +113,7 @@ pub struct Executor
     shell_pid: i32,
     jobs: HashMap<u32, Job>,
     current_job_id: Option<u32>,
+    has_foreground: bool,
 }
 
 impl Executor
@@ -128,6 +129,7 @@ impl Executor
             shell_pid: process::id() as i32,
             jobs: HashMap::new(),
             current_job_id: None,
+            has_foreground: false,
        }
     }
    
@@ -298,6 +300,9 @@ impl Executor
         self.jobs.remove(&job_id);
     }
     
+    pub fn set_foreground(&mut self)
+    { self.has_foreground = true; }
+    
     pub fn interpret<T, F>(&mut self, f: F) -> T
         where F: FnOnce(&mut Self) -> T
     {
@@ -332,9 +337,13 @@ impl Executor
         };
         let mut status = 0;
         match pid {
-            Some(None) => {
+            Some(None) => self.has_foreground = false,
+            Some(Some(pid)) => {
                 if settings.monitor_flag {
-                    let _res = setpgid(0, self.shell_pid);
+                    let _res = setpgid(pid, pid);
+                    if self.has_foreground && !is_in_background {
+                        let _res = tcsetpgrp(0, pid); 
+                    }
                 }
             },
             _ => (),
@@ -417,6 +426,15 @@ impl Executor
                 res
             },
             _  => Ok(WaitStatus::Exited(self.exit_status)),
+        }
+    }
+    
+    pub fn set_foreground_for_process(&self, pid: i32, settings: &Settings)
+    {
+        if settings.monitor_flag {
+            if self.has_foreground {
+                let _res = tcsetpgrp(0, pid); 
+            }
         }
     }
     
