@@ -26,7 +26,7 @@ use crate::fprintln;
 use crate::xcfprintln;
 use crate::xsfprintln;
 
-fn run_job_in_background(job_id: u32, exec: &mut Executor) -> bool
+fn run_job_in_background(job_id: u32, exec: &mut Executor, settings: &Settings) -> bool
 {
     let (pid, name) = match exec.jobs().get(&job_id) {
         Some(job) => (job.pid, job.name.clone()),
@@ -35,6 +35,7 @@ fn run_job_in_background(job_id: u32, exec: &mut Executor) -> bool
             return false;
         },
     };
+    exec.set_foreground_for_shell(settings);
     match kill(pid, libc::SIGCONT) {
         Ok(()) => {
             exec.set_job_status(job_id, WaitStatus::None);
@@ -58,14 +59,14 @@ fn run_job_in_background(job_id: u32, exec: &mut Executor) -> bool
     }
 }
 
-pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpreter, exec: &mut Executor, _env: &mut Environment, _settings: &mut Settings) -> i32
+pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpreter, exec: &mut Executor, _env: &mut Environment, settings: &mut Settings) -> i32
 {
     let mut status = 0;
     if args.len() > 1 {
         for arg in &args[1..] {
             match arg.parse::<u32>() {
                 Ok(job_id) => {
-                    if !run_job_in_background(job_id, exec) {
+                    if !run_job_in_background(job_id, exec, settings) {
                         status = 1;
                     }
                 },
@@ -78,7 +79,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpret
     } else {
         match exec.current_job_id() {
             Some(job_id) => {
-                if !run_job_in_background(job_id, exec) {
+                if !run_job_in_background(job_id, exec, settings) {
                     status = 1;
                 }
             },

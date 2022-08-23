@@ -76,7 +76,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
                 },
             }
             exec.remove_job(job_id);
-            interp.wait_for_process(exec, Some(pid), false).unwrap_or(1)
+            interp.wait_for_process(exec, Some(pid), false, settings).unwrap_or(1)
         },
         Err(err) => {
             xcfprintln!(exec, 2, "{}: {}", job_id, err);

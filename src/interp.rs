@@ -382,9 +382,9 @@ impl Interpreter
         }
     }
     
-    pub fn wait_for_process(&mut self, exec: &mut Executor, pid: Option<i32>, is_exit_for_err: bool) -> Option<i32>
+    pub fn wait_for_process(&mut self, exec: &mut Executor, pid: Option<i32>, is_exit_for_err: bool, settings: &Settings) -> Option<i32>
     {
-        match exec.wait_for_process(pid, true, false) {
+        match exec.wait_for_process(pid, true, false, settings) {
             Ok(WaitStatus::None) => panic!("wait status is none"),
             Ok(WaitStatus::Exited(status)) => Some(status),
             Ok(WaitStatus::Signaled(sig, is_coredump)) => {
@@ -791,7 +791,7 @@ impl Interpreter
                         },
                     }
                     s = String::from(s.trim_end_matches('\n'));
-                    match self.wait_for_process(exec, pid, true) {
+                    match self.wait_for_process(exec, pid, true, settings) {
                         Some(status) => self.last_status = status,
                         None => is_success = false,
                     }
@@ -1941,7 +1941,7 @@ impl Interpreter
                         for interp_redirect in &interp_redirects[0..k] {
                             match interp_redirect {
                                 InterpreterRedirection::HereDocument(_, _) => {
-                                    match self.wait_for_process(exec, pids[j], is_special_builtin_fun) {
+                                    match self.wait_for_process(exec, pids[j], is_special_builtin_fun, settings) {
                                         Some(tmp_status) if tmp_status != 0 => {
                                             tmp_is_success = false;
                                             is_success_for_interp_redirects = false;
@@ -1958,7 +1958,7 @@ impl Interpreter
                             }
                         }
                         if is_success {
-                            match self.wait_for_process(exec, pid, false) {
+                            match self.wait_for_process(exec, pid, false, settings) {
                                 Some(tmp_status) => {
                                     is_success &= tmp_is_success;
                                     tmp_status
@@ -2202,7 +2202,7 @@ impl Interpreter
                         });
                         match res {
                             Ok(pid) => {
-                                let status = interp.wait_for_process(exec, pid, false).unwrap_or(1);
+                                let status = interp.wait_for_process(exec, pid, false, settings).unwrap_or(1);
                                 interp.last_status = status;
                                 status
                             },
@@ -2491,7 +2491,7 @@ impl Interpreter
                     exec.clear_pipes();
                     status = 1;
                     for (i, pid) in pids.iter().enumerate() {
-                        let tmp_status = self.wait_for_process(exec, *pid, false).unwrap_or(1);
+                        let tmp_status = self.wait_for_process(exec, *pid, false, settings).unwrap_or(1);
                         if i == command.commands.len() - 1 {
                             status = tmp_status;
                         }

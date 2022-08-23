@@ -21,5 +21,4 @@ pub fn initialize_signals()
 {
     unsafe { libc::signal(libc::SIGTTIN, libc::SIG_IGN); }
     unsafe { libc::signal(libc::SIGTTOU, libc::SIG_IGN); }
-    unsafe { libc::signal(libc::SIGTSTP, libc::SIG_IGN); }
 }

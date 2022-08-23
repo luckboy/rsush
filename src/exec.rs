@@ -379,7 +379,7 @@ impl Executor
         }
     }
 
-    pub fn wait_for_process(&self, pid: Option<i32>, is_hang: bool, is_untraced: bool) -> Result<WaitStatus>
+    pub fn wait_for_process(&self, pid: Option<i32>, is_hang: bool, is_untraced: bool, settings: &Settings) -> Result<WaitStatus>
     {
         match pid {
             Some(pid) => {
@@ -407,9 +407,11 @@ impl Executor
                         Some(_) => {
                             if libc::WIFEXITED(status) {
                                 res = Ok(WaitStatus::Exited(libc::WEXITSTATUS(status)));
+                                self.set_foreground_for_shell(settings);
                                 break;
                             } else if libc::WIFSIGNALED(status) {
                                 res = Ok(WaitStatus::Signaled(libc::WTERMSIG(status), libc::WCOREDUMP(status)));
+                                self.set_foreground_for_shell(settings);
                                 break;
                             } else if libc::WIFSTOPPED(status) {
                                 res = Ok(WaitStatus::Stopped(libc::WSTOPSIG(status)));
@@ -434,6 +436,15 @@ impl Executor
         if settings.monitor_flag {
             if self.has_foreground {
                 let _res = tcsetpgrp(0, pid); 
+            }
+        }
+    }
+    
+    pub fn set_foreground_for_shell(&self, settings: &Settings)
+    {
+        if settings.monitor_flag {
+            if self.has_foreground {
+                let _res = tcsetpgrp(0, self.shell_pid); 
             }
         }
     }
@@ -520,7 +531,7 @@ impl Executor
                                     status
                             })?;
                             let wait_status = loop {
-                                match self.wait_for_process(pid, true, is_untraced)? {
+                                match self.wait_for_process(pid, true, is_untraced, settings)? {
                                     tmp_wait_status @ WaitStatus::Stopped(sig) => {
                                         if stop_f(sig) { break tmp_wait_status };
                                     },
@@ -558,7 +569,7 @@ impl Executor
                                 }
                         })?;
                         let wait_status = loop {
-                            match self.wait_for_process(pid, true, is_untraced)? {
+                            match self.wait_for_process(pid, true, is_untraced, settings)? {
                                 tmp_wait_status @ WaitStatus::Stopped(sig) => {
                                     if stop_f(sig) { break tmp_wait_status };
                                 },

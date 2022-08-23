@@ -1530,7 +1530,7 @@ fn test_executor_create_process_creates_process()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false);
+            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(0)) => {
                     let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 1);
@@ -1570,7 +1570,7 @@ fn test_executor_create_process_does_not_create_process_for_in_new_process()
             });
             match res {
                 Ok(pid) => {
-                    let res2 = exec.wait_for_process(pid, true, false);
+                    let res2 = exec.wait_for_process(pid, true, false, settings);
                     match res2 {
                         Ok(WaitStatus::Exited(status)) => status,
                         _ => 1,
@@ -1581,7 +1581,7 @@ fn test_executor_create_process_does_not_create_process_for_in_new_process()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false);
+            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(0)) => {
                     let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 2);
@@ -1620,7 +1620,7 @@ fn test_executor_create_process_creates_process_for_background()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false);
+            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(0)) => {
                     let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 2);
@@ -1668,14 +1668,14 @@ fn test_executor_create_process_creates_process_for_in_new_process_and_backgroun
                         },
                         None => (),
                     }
-                    let res2 = exec.wait_for_process(Some(pid), true, false);
+                    let res2 = exec.wait_for_process(Some(pid), true, false, settings);
                     match res2 {
                         Ok(WaitStatus::Exited(status)) => status,
                         _ => 1,
                     }
                 },
                 Ok(None) => {
-                    let res2 = exec.wait_for_process(None, true, false);
+                    let res2 = exec.wait_for_process(None, true, false, settings);
                     match res2 {
                         Ok(WaitStatus::Exited(status)) => status,
                         _ => 1,
@@ -1686,7 +1686,7 @@ fn test_executor_create_process_creates_process_for_in_new_process_and_backgroun
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false);
+            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(0)) => {
                     let expected_stdout_content = format!("{}\n{:?}\n{:?}\n", read_file("4.txt").trim(), State::InNewProcess, 3);
@@ -1716,7 +1716,7 @@ fn test_executor_create_process_creates_process_for_zero_status()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false);
+            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(status)) => {
                     assert_eq!(0, status);
@@ -1746,7 +1746,7 @@ fn test_executor_create_process_creates_process_for_other_status()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false);
+            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(status)) => {
                     assert_eq!(12, status);

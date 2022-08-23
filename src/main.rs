@@ -19,7 +19,6 @@ use std::cell::*;
 use std::fs::*;
 use std::io::*;
 use std::os::unix::io::FromRawFd;
-use std::process;
 use std::process::exit;
 use std::rc::*;
 use rustyline;
@@ -129,7 +128,7 @@ fn update_jobs(interp: &mut Interpreter, exec: &mut Executor, settings: &Setting
 {
     let jobs: Vec<(u32, Job)> = exec.jobs().iter().map(|p| (*(p.0), p.1.clone())).collect();
     for (job_id, job) in &jobs {
-        match exec.wait_for_process(Some(job.pid), false, true) {
+        match exec.wait_for_process(Some(job.pid), false, true, settings) {
             Ok(wait_status) => {
                 let current = if settings.notify_flag {
                     if exec.current_job_id().map(|id| id == *job_id).unwrap_or(false) {
@@ -262,6 +261,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
 {
     initialize_signals();
     exec.set_foreground();
+    exec.set_foreground_for_shell(settings);
     match interpret_file("/etc/rsushrc", interp, exec, env, settings, false) {
         Ok((status, is_exit)) => {
             if is_exit { return status; }
@@ -278,7 +278,6 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
         Err(err) if err.kind() == ErrorKind::NotFound => (),
         Err(err) => xsfprintln!(exec, 2, "{}: {}", path, err),
     }
-    let _res = tcsetpgrp(0, process::id() as i32);
     let mut editor = match new_rustyline_editor(settings) {
         Ok(tmp_editor) => tmp_editor,
         Err(err) => {
@@ -354,7 +353,6 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                     Some(commands) => {
                         let old_edit_mode_flags = EditModeFlags::from_settings(settings);
                         let status = interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
-                        let _res = tcsetpgrp(0, process::id() as i32);
                         match update_rustyline_edit_mode(editor, &old_edit_mode_flags, settings) {
                             Ok(tmp_editor) => editor = tmp_editor,
                             Err(err) => {
