@@ -1080,11 +1080,11 @@ impl<'a> Lexer<'a>
                 (Some('$'), _) => {
                     let simple_word_elem = self.get_dolar_simple_word_elem(settings)?;
                     simple_word_elems.push(simple_word_elem);
-                }
+                },
                 (Some('`'), _) => {
                     let simple_word_elem = self.get_backquote_simple_word_elem(settings)?;
                     simple_word_elems.push(simple_word_elem);
-                }
+                },
                 (Some(c), pos) => {
                     self.unget_char(c, &pos, settings);
                     let (simple_word_elem, is_newline) = self.get_string_simple_word_elem_for_here_doc(settings)?;
