@@ -461,6 +461,10 @@ fn main()
                     if shell_args.len() >= i + 1 {
                         args.extend_from_slice(&shell_args[(i + 1)..]);
                     }
+                    match &file {
+                        Some(file) => settings.arg0 = file.clone(),
+                        None => (),
+                    }
                     settings.current_args_mut().set_args(args);
                     let status = interpret(ShellCommands::FromFile(file), &mut interp, &mut exec, &mut env, &mut settings, &opts);
                     exit(status);
