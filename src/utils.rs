@@ -491,7 +491,7 @@ pub fn isatty(fd: i32) -> Result<bool>
 }
 
 pub fn getuid() -> u32
-{ unsafe { libc::getuid() } }
+{ unsafe { libc::getuid() as u32 } }
 
 pub fn tcsetpgrp(fd: i32, pgrp: i32) -> Result<()>
 {
