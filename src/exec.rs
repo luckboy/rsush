@@ -400,7 +400,10 @@ impl Executor
                         match waitpid(pid, Some(&mut status), opts) {
                             Ok(pid) => break pid,
                             Err(err) if err.kind() == ErrorKind::Interrupted => (),
-                            Err(err) => return Err(err),
+                            Err(err) => {
+                                self.set_foreground_for_shell(settings);
+                                return Err(err);
+                            },
                         }
                     };
                     match pid2 {
