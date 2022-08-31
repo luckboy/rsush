@@ -4586,6 +4586,37 @@ fn test_format_with_word_element_formats_word_element()
 }
 
 #[test]
+fn test_lexer_next_token_returns_word_with_doubly_quoted_variable_for_bug_of_variable_character()
+{
+    let s = "\"$_var\"";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(1, word_elems.len());
+            match &word_elems[0] {
+                WordElement::DoublyQuoted(simple_word_elems) => {
+                    assert_eq!(1, simple_word_elems.len());
+                    match &simple_word_elems[0] {
+                        SimpleWordElement::Parameter(ParameterName::Variable(var_name), None) => {
+                            assert_eq!(&String::from("_var"), var_name);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
 fn test_format_with_word_element_formats_word_element_with_escapes()
 {
     let s = "\\a\\b\\c\\ \\\t\\'\\\"\\;\\<\\>\\&\\|\\(\\)\\$\\`";
