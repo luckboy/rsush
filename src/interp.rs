@@ -494,18 +494,19 @@ impl Interpreter
         res
     }
 
-    pub fn wait_for_processes<F>(&mut self, exec: &mut Executor, pids: &[Option<i32>], pgid: Option<i32>, is_exit_for_err: bool, settings: &Settings, name_f: F) -> Option<i32>
+    pub fn wait_for_processes<F>(&mut self, exec: &mut Executor, pids: &[Option<i32>], pgid: Option<i32>, count: usize, is_exit_for_err: bool, settings: &Settings, name_f: F) -> (Option<i32>, bool)
         where F: FnOnce() -> String
     {
         let mut job_pids: Vec<i32> = Vec::new();
         let mut res: Option<i32> = None;
+        let mut is_success_for_first_processes = true;
         for (i, pid) in pids.iter().enumerate() {
             let tmp_res = loop {
                 match exec.wait_for_process(*pid, true, true, i == pids.len() - 1, settings) {
                     Ok(WaitStatus::None) => panic!("wait status is none"),
                     Ok(WaitStatus::Exited(status)) => break Some(status),
                     Ok(WaitStatus::Signaled(sig, is_coredump)) => {
-                        if is_exit_for_err {
+                        if i != count.saturating_sub(1) && is_exit_for_err {
                             xsfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
                         } else {
                             xcfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
@@ -513,14 +514,14 @@ impl Interpreter
                         break Some(sig + 128);
                     },
                     Ok(WaitStatus::Stopped(sig @ libc::SIGTSTP)) => {
-                        if i == pids.len() - 1  {
+                        if i == pids.len() - 1 {
                             exec.set_foreground_for_shell(settings);
                         }
                         match pid {
                             Some(pid) => job_pids.push(*pid),
                             None => (),
                         }
-                        if is_exit_for_err {
+                        if i != count.saturating_sub(1) && is_exit_for_err {
                             xsfprintln!(exec, 2, "{}", self.signal_string(sig, false));
                         } else {
                             xcfprintln!(exec, 2, "{}", self.signal_string(sig, false));
@@ -530,6 +531,9 @@ impl Interpreter
                     Ok(WaitStatus::Stopped(_)) => (),
                     Err(err) => {
                         xcfprintln!(exec, 2, "{}", err);
+                        if i != count.saturating_sub(1) {
+                            is_success_for_first_processes = false;
+                        }
                         break None;
                     },
                 }
@@ -549,8 +553,8 @@ impl Interpreter
             },
             None => (),
         }
-        res
-    }    
+        (res, is_success_for_first_processes)
+    }
     
     pub fn param(&self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<Value>
     {
@@ -2086,18 +2090,21 @@ impl Interpreter
                                 },
                             }
                         }
+                        j += 1;
                         exec.clear_pipes();
                         let pgid = pids.last().map(|pid| *pid).unwrap_or(None);
                         set_process_group_and_foreground_for_processes(exec, pids.as_slice(), pgid, settings);
-                        match self.wait_for_processes(exec, pids.as_slice(), pgid, is_special_builtin_fun, settings, name_f) {
-                            Some(tmp_status) => {
+                        match self.wait_for_processes(exec, pids.as_slice(), pgid, j, is_special_builtin_fun, settings, name_f) {
+                            (Some(tmp_status), tmp_is_success_for_interp_redirects) => {
+                                is_success_for_interp_redirects &= tmp_is_success_for_interp_redirects;
                                 if is_fun_process {
                                     tmp_status
                                 } else {
                                     1
                                 }
                             },
-                            None => {
+                            (None, tmp_is_success_for_interp_redirects) => {
+                                is_success_for_interp_redirects &= tmp_is_success_for_interp_redirects;
                                 is_success = false;
                                 1
                             },
@@ -2625,13 +2632,13 @@ impl Interpreter
                     status = 1;
                     let pgid = pids.last().map(|pid| *pid).unwrap_or(None);
                     set_process_group_and_foreground_for_processes(exec, pids.as_slice(), pgid, settings);
-                    match self.wait_for_processes(exec, pids.as_slice(), pgid, false, settings, || format!("{}", command)) {
-                        Some(tmp_status) => {
+                    match self.wait_for_processes(exec, pids.as_slice(), pgid, pids.len(), false, settings, || format!("{}", command)) {
+                        (Some(tmp_status), _) => {
                             if command.commands.len() == pids.len() {
                                 status = tmp_status
                             }
                         },
-                        None => (),
+                        (None, _) => (),
                     }
                     self.last_status = status;
             });

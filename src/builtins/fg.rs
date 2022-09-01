@@ -109,7 +109,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
             },
         }
         exec.remove_job(job_id);
-        interp.wait_for_processes(exec, pids.as_slice(), Some(job.pgid), false, settings, || job.name.clone()).unwrap_or(1)
+        interp.wait_for_processes(exec, pids.as_slice(), Some(job.pgid), pids.len(), false, settings, || job.name.clone()).0.unwrap_or(1)
     } else {
         1
     }
