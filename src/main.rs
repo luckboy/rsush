@@ -146,7 +146,6 @@ fn update_jobs(interp: &mut Interpreter, exec: &mut Executor, settings: &Setting
             Ok(tmp_wait_status) => {
                 exec.set_job_last_status(*job_id, tmp_wait_status);
                 wait_status = if is_show || job.show_flag {
-                    exec.set_job_show_flag(*job_id, false);
                     match wait_status {
                         WaitStatus::None => job.last_status,
                         _ => tmp_wait_status,
@@ -157,6 +156,7 @@ fn update_jobs(interp: &mut Interpreter, exec: &mut Executor, settings: &Setting
             },
             Err(err) => xsfprint!(exec, 2, "{}", err),
         }
+        exec.set_job_show_flag(*job_id, false);
         if settings.notify_flag {
             match wait_status {
                 WaitStatus::None => (),
