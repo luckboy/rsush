@@ -28,34 +28,56 @@ use crate::xsfprintln;
 
 fn run_job_in_background(job_id: u32, exec: &mut Executor, settings: &Settings) -> bool
 {
-    let (pid, name) = match exec.jobs().get(&job_id) {
-        Some(job) => (job.pid, job.name.clone()),
+    let job = match exec.jobs().get(&job_id) {
+        Some(tmp_job) => tmp_job.clone(),
         None => {
             xcfprintln!(exec, 2, "{}: No job", job_id);
             return false;
         },
     };
     exec.set_foreground_for_shell(settings);
-    match kill(pid, libc::SIGCONT) {
-        Ok(()) => {
-            exec.set_job_status(job_id, WaitStatus::None);
-            match exec.current_file(1) {
-                Some(stdout_file) => {
-                    let mut stdout_file_r = stdout_file.borrow_mut();
-                    let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                    fprintln!(&mut line_stdout, "[{}] {}", job_id, name);
-                    true
-                },
-                None => {
-                    xsfprintln!(exec, 2, "No standard output");
-                    false
+    let mut is_success = true;
+    for (i, (pid, status)) in job.pids.iter().zip(job.statuses.iter()).enumerate() {
+        match status {
+            WaitStatus::None | WaitStatus::Stopped(_) => {
+                match kill(*pid, libc::SIGCONT) {
+                    Ok(()) => exec.set_job_status(job_id, i, WaitStatus::None),
+                    Err(err) => {
+                        xcfprintln!(exec, 2, "{}: {}", job_id, err);
+                        is_success = false;
+                    },
+                }
+            },
+            _ => (),
+        }
+    }
+    match job.last_status {
+        WaitStatus::None | WaitStatus::Stopped(_) => {
+            match kill(job.last_pid, libc::SIGCONT) {
+                Ok(()) => exec.set_job_last_status(job_id, WaitStatus::None),
+                Err(err) => {
+                    xcfprintln!(exec, 2, "{}: {}", job_id, err);
+                    is_success = false;
                 },
             }
         },
-        Err(err) => {
-            xcfprintln!(exec, 2, "{}: {}", job_id, err);
-            false
-        },
+        _ => (),
+    }
+    if is_success {
+        match exec.current_file(1) {
+            Some(stdout_file) => {
+                let mut stdout_file_r = stdout_file.borrow_mut();
+                let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
+                fprintln!(&mut line_stdout, "[{}] {}", job_id, job.name);
+                true
+            },
+            None => {
+                xsfprintln!(exec, 2, "No standard output");
+                false
+            },
+        }
+    } else {
+        false
     }
 }
 

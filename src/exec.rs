@@ -82,24 +82,63 @@ pub enum WaitStatus
 #[derive(Clone)]
 pub struct Job
 {
-    pub pid: i32,
-    pub status: WaitStatus,
+    pub pids: Vec<i32>,
+    pub statuses: Vec<WaitStatus>,
+    pub last_pid: i32,
+    pub last_status: WaitStatus,
+    pub pgid: i32,
     pub name: String,
+    pub show_flag: bool,
     prev_job_id: Option<u32>,
     next_job_id: Option<u32>,
 }
 
 impl Job
 {
-    pub fn new(pid: i32, name: &str) -> Job
+    pub fn new(last_pid: i32, name: &str) -> Job
     {
         Job {
-            pid,
-            status: WaitStatus::None,
+            pids: Vec::new(),
+            statuses: Vec::new(),
+            last_pid,
+            last_status: WaitStatus::None,
+            pgid: last_pid,
             name: String::from(name),
+            show_flag: false,
             prev_job_id: None,
             next_job_id: None,
         }
+    }
+    
+    pub fn new_with_pids(pids: Vec<i32>, last_pid: i32, pgid: i32, name: &str) -> Job
+    {
+        let len = pids.len();
+        Job {
+            pids,
+            statuses: vec![WaitStatus::None; len],
+            last_pid,
+            last_status: WaitStatus::None,
+            pgid: pgid,
+            name: String::from(name),
+            show_flag: false,
+            prev_job_id: None,
+            next_job_id: None,
+        }
+    }
+    
+    pub fn is_done(&self) -> bool
+    {
+        let mut b = self.statuses.iter().all(|status| {
+                match status {
+                    WaitStatus::Exited(_) | WaitStatus::Signaled(_, _) => true,
+                    _ => false,
+                }
+        });
+        b &= match self.last_status {
+            WaitStatus::Exited(_) | WaitStatus::Signaled(_, _) => true,
+            _ => false,
+        };
+        b
     }
 }
 
@@ -266,11 +305,40 @@ impl Executor
         self.current_job_id = Some(job_id);
         Some(job_id)
     }
-    
-    pub fn set_job_status(&mut self, job_id: u32, status: WaitStatus)
+
+    pub fn set_job_status(&mut self, job_id: u32, i: usize, status: WaitStatus)
     {
         match self.jobs.get_mut(&job_id) {
-            Some(job) => job.status = status,
+            Some(job) => {
+                match job.statuses.get_mut(i) {
+                    Some(job_status) => *job_status = status,
+                    None => (),
+                }
+            },
+            None => (),
+        }
+    }
+
+    pub fn set_job_statuses(&mut self, job_id: u32, statuses: Vec<WaitStatus>)
+    {
+        match self.jobs.get_mut(&job_id) {
+            Some(job) => job.statuses = statuses,
+            None => (),
+        }
+    }
+    
+    pub fn set_job_last_status(&mut self, job_id: u32, status: WaitStatus)
+    {
+        match self.jobs.get_mut(&job_id) {
+            Some(job) => job.last_status = status,
+            None => (),
+        }
+    }
+    
+    pub fn set_job_show_flag(&mut self, job_id: u32, show_flag: bool)
+    {
+        match self.jobs.get_mut(&job_id) {
+            Some(job) => job.show_flag = show_flag,
             None => (),
         }
     }
@@ -379,7 +447,7 @@ impl Executor
         }
     }
 
-    pub fn wait_for_process(&self, pid: Option<i32>, is_hang: bool, is_untraced: bool, settings: &Settings) -> Result<WaitStatus>
+    pub fn wait_for_process(&self, pid: Option<i32>, is_hang: bool, is_untraced: bool, is_foregrond: bool, settings: &Settings) -> Result<WaitStatus>
     {
         match pid {
             Some(pid) => {
@@ -401,7 +469,9 @@ impl Executor
                             Ok(pid) => break pid,
                             Err(err) if err.kind() == ErrorKind::Interrupted => (),
                             Err(err) => {
-                                self.set_foreground_for_shell(settings);
+                                if is_foregrond {
+                                    self.set_foreground_for_shell(settings);
+                                }
                                 return Err(err);
                             },
                         }
@@ -410,11 +480,15 @@ impl Executor
                         Some(_) => {
                             if libc::WIFEXITED(status) {
                                 res = Ok(WaitStatus::Exited(libc::WEXITSTATUS(status)));
-                                self.set_foreground_for_shell(settings);
+                                if is_foregrond {
+                                    self.set_foreground_for_shell(settings);
+                                }
                                 break;
                             } else if libc::WIFSIGNALED(status) {
                                 res = Ok(WaitStatus::Signaled(libc::WTERMSIG(status), libc::WCOREDUMP(status)));
-                                self.set_foreground_for_shell(settings);
+                                if is_foregrond {
+                                    self.set_foreground_for_shell(settings);
+                                }
                                 break;
                             } else if libc::WIFSTOPPED(status) {
                                 res = Ok(WaitStatus::Stopped(libc::WSTOPSIG(status)));
@@ -507,7 +581,7 @@ impl Executor
         Ok(())
     }
     
-    pub fn execute<F>(&mut self, interp: &mut Interpreter, vars: &[(String, String)], arg0: &str, args: &[String], is_untraced: bool, env: &mut Environment, settings: &mut Settings, mut stop_f: F) -> Result<WaitStatus>
+    pub fn execute<F>(&mut self, interp: &mut Interpreter, vars: &[(String, String)], arg0: &str, args: &[String], is_untraced: bool, env: &mut Environment, settings: &mut Settings, mut stop_f: F) -> Result<(WaitStatus, Option<i32>)>
         where F: FnMut(i32) -> bool
     {
         match env.builtin_fun(arg0) {
@@ -515,7 +589,7 @@ impl Executor
                 let mut tmp_args = vec![String::from(arg0)];
                 tmp_args.extend_from_slice(args);
                 let status = builtin_fun(vars, tmp_args.as_slice(), interp, self, env, settings);
-                Ok(WaitStatus::Exited(status))
+                Ok((WaitStatus::Exited(status), None))
             },
             None => {
                 match env.fun(arg0) {
@@ -534,21 +608,21 @@ impl Executor
                                     status
                             })?;
                             let wait_status = loop {
-                                match self.wait_for_process(pid, true, is_untraced, settings)? {
+                                match self.wait_for_process(pid, true, is_untraced, true, settings)? {
                                     tmp_wait_status @ WaitStatus::Stopped(sig) => {
                                         if stop_f(sig) { break tmp_wait_status };
                                     },
                                     tmp_wait_status => break tmp_wait_status,
                                 }
                             };
-                            Ok(wait_status)
+                            Ok((wait_status, pid))
                         } else {
                             let mut tmp_args = Arguments::new();
                             tmp_args.set_args(args.iter().map(|a| a.clone()).collect());
                             settings.push_args(tmp_args);
                             let status = interp.interpret_fun_body(self, &(*fun_body), env, settings);
                             settings.pop_args();
-                            Ok(WaitStatus::Exited(status))
+                            Ok((WaitStatus::Exited(status), None))
                         }
                     },
                     None => {
@@ -572,18 +646,25 @@ impl Executor
                                 }
                         })?;
                         let wait_status = loop {
-                            match self.wait_for_process(pid, true, is_untraced, settings)? {
+                            match self.wait_for_process(pid, true, is_untraced, true, settings)? {
                                 tmp_wait_status @ WaitStatus::Stopped(sig) => {
                                     if stop_f(sig) { break tmp_wait_status };
                                 },
                                 tmp_wait_status => break tmp_wait_status,
                             }
                         };
-                        Ok(wait_status)
+                        Ok((wait_status, pid))
                     },
                 }
             },
         }
+    }
+}
+
+pub fn set_process_group(pid: i32, pgid: i32, settings: &Settings)
+{
+    if settings.monitor_flag {
+        let _res = setpgid(pid, pgid);
     }
 }
 

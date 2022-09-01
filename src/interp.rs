@@ -132,6 +132,57 @@ fn print_command_for_xtrace(exec: &Executor, vars: &[(String, String)], args: &[
     xsfprintln!(exec, 2, "");
 }
 
+fn add_job_for_sigtstp<F>(exec: &mut Executor, last_pid: i32, name_f: F) -> bool
+    where F: FnOnce() -> String
+{
+    match exec.add_job(&Job::new(last_pid, name_f().as_str())) {
+        Some(job_id) => {
+            exec.set_job_last_status(job_id, WaitStatus::Stopped(libc::SIGTSTP));
+            exec.set_job_show_flag(job_id, true);
+            true
+        },
+        None => {
+            xcfprintln!(exec, 2, "No free job identifiers");
+            false
+        },
+    }
+}
+
+fn add_job_with_pids_for_sigtstp<F>(exec: &mut Executor, pids: &[i32], last_pid: i32, pgid: i32, name_f: F) -> bool
+    where F: FnOnce() -> String
+{
+    let mut tmp_pids: Vec<i32> = Vec::new();
+    tmp_pids.extend_from_slice(pids);
+    match exec.add_job(&Job::new_with_pids(tmp_pids, last_pid, pgid, name_f().as_str())) {
+        Some(job_id) => {
+            exec.set_job_statuses(job_id, vec![WaitStatus::Stopped(libc::SIGTSTP); pids.len()]);
+            exec.set_job_last_status(job_id, WaitStatus::Stopped(libc::SIGTSTP));
+            exec.set_job_show_flag(job_id, true);
+            true
+        },
+        None => {
+            xcfprintln!(exec, 2, "No free job identifiers");
+            false
+        },
+    }
+}
+
+fn set_process_group_and_foreground_for_processes(exec: &Executor, pids: &[Option<i32>], pgid: Option<i32>, settings: &Settings)
+{
+    match pgid {
+        Some(pgid) => {
+            for pid in pids.iter() {
+                match pid {
+                    Some(pid) => set_process_group(*pid, pgid, settings),
+                    None => (),
+                }
+            }
+            exec.set_foreground_for_process(pgid, settings);
+        },
+        None => (),
+    }
+}
+
 impl Interpreter
 {
     pub fn new() -> Interpreter
@@ -361,12 +412,14 @@ impl Interpreter
     fn has_special_builtin_fun(&self, name: &str, env: &Environment) -> bool
     { self.special_builtin_fun_names.contains(&String::from(name)) && env.builtin_fun(name).is_some() }
     
-    fn execute(&mut self, exec: &mut Executor, vars: &[(String, String)], arg0: &str, args: &[String], is_exit_for_err: bool, env: &mut Environment, settings: &mut Settings) -> Option<i32>
+    fn execute<F>(&mut self, exec: &mut Executor, vars: &[(String, String)], arg0: &str, args: &[String], is_exit_for_err: bool, env: &mut Environment, settings: &mut Settings, name_f: F) -> Option<i32>
+        where F: FnOnce() -> String
     {
-        match exec.execute(self, vars, arg0, args, false, env, settings, |_| true) {
-            Ok(WaitStatus::None) => panic!("wait status is none"),
-            Ok(WaitStatus::Exited(status)) => Some(status),
-            Ok(WaitStatus::Signaled(sig, is_coredump)) => {
+        let mut job_pid: Option<i32> = None;
+        let res = match exec.execute(self, vars, arg0, args, true, env, settings, |sig| sig == libc::SIGTSTP) {
+            Ok((WaitStatus::None, _)) => panic!("wait status is none"),
+            Ok((WaitStatus::Exited(status), _)) => Some(status),
+            Ok((WaitStatus::Signaled(sig, is_coredump), _)) => {
                 if is_exit_for_err {
                     xsfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
                 } else {
@@ -374,34 +427,130 @@ impl Interpreter
                 }
                 Some(sig + 128)
             },
-            Ok(WaitStatus::Stopped(_)) => panic!("wait status is stopped"),
+            Ok((WaitStatus::Stopped(sig @ libc::SIGTSTP), pid)) => {
+                exec.set_foreground_for_shell(settings);
+                job_pid = pid;
+                if is_exit_for_err {
+                    xsfprintln!(exec, 2, "{}", self.signal_string(sig, false));
+                } else {
+                    xcfprintln!(exec, 2, "{}", self.signal_string(sig, false));
+                }
+                Some(sig + 128)
+            },
+            Ok((WaitStatus::Stopped(_), _)) => panic!("wait status is stopped"),
             Err(err) => {
                 xcfprintln!(exec, 2, "{}", err);
                 None
             }
+        };
+        match job_pid {
+            Some(job_pid) => {
+                add_job_for_sigtstp(exec, job_pid, name_f);
+            },
+            None => (),
         }
+        res
     }
     
-    pub fn wait_for_process(&mut self, exec: &mut Executor, pid: Option<i32>, is_exit_for_err: bool, settings: &Settings) -> Option<i32>
+    pub fn wait_for_process<F>(&mut self, exec: &mut Executor, pid: Option<i32>, is_exit_for_err: bool, settings: &Settings, name_f: F) -> Option<i32>
+        where F: FnOnce() -> String
     {
-        match exec.wait_for_process(pid, true, false, settings) {
-            Ok(WaitStatus::None) => panic!("wait status is none"),
-            Ok(WaitStatus::Exited(status)) => Some(status),
-            Ok(WaitStatus::Signaled(sig, is_coredump)) => {
-                if is_exit_for_err {
+        let mut job_pid: Option<i32> = None;
+        let res = loop {
+            match exec.wait_for_process(pid, true, true, true, settings) {
+                Ok(WaitStatus::None) => panic!("wait status is none"),
+                Ok(WaitStatus::Exited(status)) => break Some(status),
+                Ok(WaitStatus::Signaled(sig, is_coredump)) => {
+                    if is_exit_for_err {
                     xsfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
-                } else {
-                    xcfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
-                }
-                Some(sig + 128)
+                    } else {
+                        xcfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
+                    }
+                    break Some(sig + 128);
+                },
+                Ok(WaitStatus::Stopped(sig @ libc::SIGTSTP)) => {
+                    exec.set_foreground_for_shell(settings);
+                    job_pid = pid;
+                    if is_exit_for_err {
+                        xsfprintln!(exec, 2, "{}", self.signal_string(sig, false));
+                    } else {
+                        xcfprintln!(exec, 2, "{}", self.signal_string(sig, false));
+                    }
+                    break Some(sig + 128);
+                },
+                Ok(WaitStatus::Stopped(_)) => (),
+                Err(err) => {
+                    xcfprintln!(exec, 2, "{}", err);
+                    break None;
+                },
+            }
+        };
+        match job_pid {
+            Some(job_pid) => {
+                add_job_for_sigtstp(exec, job_pid, name_f);
             },
-            Ok(WaitStatus::Stopped(_)) => panic!("wait status is stopped"),
-            Err(err) => {
-                xcfprintln!(exec, 2, "{}", err);
-                None
-            },
+            None => (),
         }
+        res
     }
+
+    pub fn wait_for_processes<F>(&mut self, exec: &mut Executor, pids: &[Option<i32>], pgid: Option<i32>, is_exit_for_err: bool, settings: &Settings, name_f: F) -> Option<i32>
+        where F: FnOnce() -> String
+    {
+        let mut job_pids: Vec<i32> = Vec::new();
+        let mut res: Option<i32> = None;
+        for (i, pid) in pids.iter().enumerate() {
+            let tmp_res = loop {
+                match exec.wait_for_process(*pid, true, true, i == pids.len() - 1, settings) {
+                    Ok(WaitStatus::None) => panic!("wait status is none"),
+                    Ok(WaitStatus::Exited(status)) => break Some(status),
+                    Ok(WaitStatus::Signaled(sig, is_coredump)) => {
+                        if is_exit_for_err {
+                            xsfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
+                        } else {
+                            xcfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
+                        }
+                        break Some(sig + 128);
+                    },
+                    Ok(WaitStatus::Stopped(sig @ libc::SIGTSTP)) => {
+                        if i == pids.len() - 1  {
+                            exec.set_foreground_for_shell(settings);
+                        }
+                        match pid {
+                            Some(pid) => job_pids.push(*pid),
+                            None => (),
+                        }
+                        if is_exit_for_err {
+                            xsfprintln!(exec, 2, "{}", self.signal_string(sig, false));
+                        } else {
+                            xcfprintln!(exec, 2, "{}", self.signal_string(sig, false));
+                        }
+                        break Some(sig + 128);
+                    },
+                    Ok(WaitStatus::Stopped(_)) => (),
+                    Err(err) => {
+                        xcfprintln!(exec, 2, "{}", err);
+                        break None;
+                    },
+                }
+            };
+            if i == pids.len() - 1 {
+                res = tmp_res;
+            }
+        }
+        match job_pids.last() {
+            Some(last_job_pid) => {
+                match pgid {
+                    Some(pgid) => {
+                        add_job_with_pids_for_sigtstp(exec, &job_pids[..(job_pids.len() - 1)], *last_job_pid, pgid, name_f);
+                    },
+                    None => (),
+                }
+            },
+            None => (),
+        }
+        res
+    }    
     
     pub fn param(&self, exec: &Executor, param_name: &ParameterName, env: &Environment, settings: &Settings) -> Option<Value>
     {
@@ -791,7 +940,7 @@ impl Interpreter
                         },
                     }
                     s = String::from(s.trim_end_matches('\n'));
-                    match self.wait_for_process(exec, pid, true, settings) {
+                    match self.wait_for_process(exec, pid, true, settings, || format!("{}", LogicalCommandSlice(commands))) {
                         Some(status) => self.last_status = status,
                         None => is_success = false,
                     }
@@ -1623,8 +1772,9 @@ impl Interpreter
         Some(ss.join(""))
     }
     
-    fn interpret_redirects<F>(&mut self, exec: &mut Executor, redirects: &[Rc<Redirection>], is_special_builtin_fun: bool, env: &mut Environment, settings: &mut Settings, f: F) -> i32
-        where F: FnOnce(&mut Self, &mut Executor, &mut Environment, &mut Settings) -> i32
+    fn interpret_redirects<F, G>(&mut self, exec: &mut Executor, redirects: &[Rc<Redirection>], is_special_builtin_fun: bool, env: &mut Environment, settings: &mut Settings, f: F, name_f: G) -> i32
+        where F: FnOnce(&mut Self, &mut Executor, &mut Environment, &mut Settings) -> i32,
+              G: FnOnce() -> String
     {
         let mut is_success = true;
         let mut interp_redirects: Vec<InterpreterRedirection> = Vec::new();
@@ -1859,9 +2009,9 @@ impl Interpreter
                 status = f(self, exec, env, settings);
             } else {
                 status = exec.interpret(|exec| {
+                        let mut is_fun_process = false;
                         let mut j = 0;
-                        let mut k = 0;
-                        let mut pids: Vec<Option<i32>> = Vec::new(); 
+                        let mut pids: Vec<Option<i32>> = Vec::new();
                         for interp_redirect in &interp_redirects {
                             match interp_redirect {
                                 InterpreterRedirection::HereDocument(_, s) => {
@@ -1898,17 +2048,15 @@ impl Interpreter
                                 },
                                 _ => (),
                             }
-                            k += 1;
                         }
-                        let mut pid: Option<i32> = None;
                         if is_success {
                             let res = exec.create_process(false, settings, |exec, settings| {
-                                    let mut l = 0;
+                                    let mut k = 0;
                                     for interp_redirect in &interp_redirects {
                                         match interp_redirect {
                                             InterpreterRedirection::HereDocument(vfd, _) => {
-                                                exec.push_file(*vfd, exec.pipes()[l].reading_file.clone());
-                                                l += 1;
+                                                exec.push_file(*vfd, exec.pipes()[k].reading_file.clone());
+                                                k += 1;
                                             },
                                             _ => (),
                                         }
@@ -1919,7 +2067,7 @@ impl Interpreter
                                     for interp_redirect in &interp_redirects {
                                         match interp_redirect {
                                             InterpreterRedirection::HereDocument(vfd, _) => {
-                                                l -= 1;
+                                                k -= 1;
                                                 exec.pop_file(*vfd);
                                             },
                                             _ => (),
@@ -1928,7 +2076,10 @@ impl Interpreter
                                     status
                             });
                             match res {
-                                Ok(tmp_pid) => pid = tmp_pid,
+                                Ok(pid) => {
+                                    is_fun_process = true;
+                                    pids.push(pid);
+                                },
                                 Err(err) => {
                                     xcfprintln!(exec, 2, "{}", err);
                                     is_success = false;
@@ -1936,40 +2087,20 @@ impl Interpreter
                             }
                         }
                         exec.clear_pipes();
-                        let mut tmp_is_success = true;
-                        j = 0;
-                        for interp_redirect in &interp_redirects[0..k] {
-                            match interp_redirect {
-                                InterpreterRedirection::HereDocument(_, _) => {
-                                    match self.wait_for_process(exec, pids[j], is_special_builtin_fun, settings) {
-                                        Some(tmp_status) if tmp_status != 0 => {
-                                            tmp_is_success = false;
-                                            is_success_for_interp_redirects = false;
-                                        },
-                                        None => {
-                                            tmp_is_success = false;
-                                            is_success_for_interp_redirects = false;
-                                        },
-                                        _ => (),
-                                    }
-                                    j += 1;
-                                },
-                                _ => (),
-                            }
-                        }
-                        if is_success {
-                            match self.wait_for_process(exec, pid, false, settings) {
-                                Some(tmp_status) => {
-                                    is_success &= tmp_is_success;
+                        let pgid = pids.last().map(|pid| *pid).unwrap_or(None);
+                        set_process_group_and_foreground_for_processes(exec, pids.as_slice(), pgid, settings);
+                        match self.wait_for_processes(exec, pids.as_slice(), pgid, is_special_builtin_fun, settings, name_f) {
+                            Some(tmp_status) => {
+                                if is_fun_process {
                                     tmp_status
-                                },
-                                None => {
-                                    is_success = false;
+                                } else {
                                     1
-                                },
-                            }
-                        } else {
-                            1
+                                }
+                            },
+                            None => {
+                                is_success = false;
+                                1
+                            },
                         }
                 });
             }
@@ -2145,8 +2276,8 @@ impl Interpreter
                                         print_command_for_xtrace(exec, vars.as_slice(), args.as_slice(), env);
                                     }
                                     self.interpret_redirects(exec, redirects.as_slice(), self.has_special_builtin_fun(arg0.as_str(), env), env, settings, |interp, exec, env, settings| {
-                                            interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], false, env, settings).unwrap_or(1)
-                                    })
+                                            interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], false, env, settings, || format!("{}", command)).unwrap_or(1)
+                                    }, || format!("{}", command))
                                 },
                                 None => {
                                     if settings.xtrace_flag {
@@ -2154,7 +2285,7 @@ impl Interpreter
                                     }
                                     self.interpret_redirects(exec, redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                                             set_vars(exec, vars.as_slice(), env, settings)
-                                    })
+                                    }, || format!("{}", command))
                                 },
                             }
                         } else {
@@ -2170,7 +2301,7 @@ impl Interpreter
                 }
                 self.interpret_redirects(exec, command.redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                         set_vars(exec, vars.as_slice(), env, settings)
-                })
+                }, || format!("{}", command))
             },
             None => 1,
         };
@@ -2182,7 +2313,9 @@ impl Interpreter
         }
     }
 
-    fn interpret_compound_command(&mut self, exec: &mut Executor, command: &CompoundCommand, redirects: &[Rc<Redirection>], env: &mut Environment, settings: &mut Settings) -> i32
+    fn interpret_compound_command<F, G>(&mut self, exec: &mut Executor, command: &CompoundCommand, redirects: &[Rc<Redirection>], env: &mut Environment, settings: &mut Settings, name_f: F, name_g: G) -> i32
+        where F: FnOnce() -> String,
+              G: FnOnce() -> String
     {
         self.interpret_redirects(exec, redirects, false, env, settings, |interp, exec, env, settings| {
                 match command {
@@ -2202,7 +2335,7 @@ impl Interpreter
                         });
                         match res {
                             Ok(pid) => {
-                                let status = interp.wait_for_process(exec, pid, false, settings).unwrap_or(1);
+                                let status = interp.wait_for_process(exec, pid, false, settings, name_f).unwrap_or(1);
                                 interp.last_status = status;
                                 status
                             },
@@ -2391,7 +2524,7 @@ impl Interpreter
                         })
                     },
                 }
-        })
+        }, name_g)
     }
 
     fn interpret_fun_def(&mut self, exec: &mut Executor, name_word: &Word, fun_body: &Rc<FunctionBody>, env: &mut Environment, settings: &mut Settings) -> i32
@@ -2417,7 +2550,7 @@ impl Interpreter
         env.set_var("LINENO", format!("{}", command.pos().line).as_str(), settings);
         match command {
             Command::Simple(_, _, simple_command) => self.interpret_simple_command(exec, &(*simple_command), env, settings),
-            Command::Compound(_, _, compound_command, redirects) => self.interpret_compound_command(exec, &(*compound_command), redirects.as_slice(), env, settings),
+            Command::Compound(_, _, compound_command, redirects) => self.interpret_compound_command(exec, &(*compound_command), redirects.as_slice(), env, settings, || format!("{}", command), || format!("{}", command)),
             Command::FunctionDefinition(_, _, name_word, fun_body) => self.interpret_fun_def(exec, &(*name_word), fun_body, env, settings),
         }
     }
@@ -2490,11 +2623,15 @@ impl Interpreter
                     self.non_simple_comamnd_count -= 1;
                     exec.clear_pipes();
                     status = 1;
-                    for (i, pid) in pids.iter().enumerate() {
-                        let tmp_status = self.wait_for_process(exec, *pid, false, settings).unwrap_or(1);
-                        if i == command.commands.len() - 1 {
-                            status = tmp_status;
-                        }
+                    let pgid = pids.last().map(|pid| *pid).unwrap_or(None);
+                    set_process_group_and_foreground_for_processes(exec, pids.as_slice(), pgid, settings);
+                    match self.wait_for_processes(exec, pids.as_slice(), pgid, false, settings, || format!("{}", command)) {
+                        Some(tmp_status) => {
+                            if command.commands.len() == pids.len() {
+                                status = tmp_status
+                            }
+                        },
+                        None => (),
                     }
                     self.last_status = status;
             });
@@ -2590,7 +2727,7 @@ impl Interpreter
     {
         self.fun_count += 1;
         self.push_loop_count(0);
-        let status = self.interpret_compound_command(exec, &fun_body.command, fun_body.redirects.as_slice(), env, settings);
+        let status = self.interpret_compound_command(exec, &fun_body.command, fun_body.redirects.as_slice(), env, settings, || format!("{}", fun_body), || format!("{}", fun_body));
         self.pop_loop_count();
         self.fun_count -= 1;
         if self.has_break_or_continue_or_return() {

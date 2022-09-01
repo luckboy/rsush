@@ -54,33 +54,63 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
             }
         },
     };
-    let (pid, name) = match exec.jobs().get(&job_id) {
-        Some(job) => (job.pid, job.name.clone()),
+    let job = match exec.jobs().get(&job_id) {
+        Some(tmp_job) => tmp_job.clone(),
         None => {
             xcfprintln!(exec, 2, "{}: No job", job_id);
             return 1;
         },
     };
-    exec.set_foreground_for_process(pid, settings);
-    match kill(pid, libc::SIGCONT) {
-        Ok(()) => {
-            match exec.current_file(1) {
-                Some(stdout_file) => {
-                    let mut stdout_file_r = stdout_file.borrow_mut();
-                    let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                    fprintln!(&mut line_stdout, "{}", name);
+    exec.set_foreground_for_process(job.pgid, settings);
+    let mut is_success = true;
+    let mut pids: Vec<Option<i32>> = Vec::new();
+    for (i, (pid, status)) in job.pids.iter().zip(job.statuses.iter()).enumerate() {
+        match status {
+            WaitStatus::None | WaitStatus::Stopped(_) => {
+                match kill(*pid, libc::SIGCONT) {
+                    Ok(()) => {
+                        exec.set_job_status(job_id, i, WaitStatus::None);
+                        pids.push(Some(*pid))
+                    },
+                    Err(err) => {
+                        xcfprintln!(exec, 2, "{}: {}", job_id, err);
+                        is_success = false;
+                    },
+                }
+            },
+            _ => (),
+        }
+    }
+    match job.last_status {
+        WaitStatus::None | WaitStatus::Stopped(_) => {
+            match kill(job.last_pid, libc::SIGCONT) {
+                Ok(()) => {
+                    exec.set_job_last_status(job_id, WaitStatus::None);
+                    pids.push(Some(job.last_pid));
                 },
-                None => {
-                    xsfprintln!(exec, 2, "No standard output");
-                    return 1;
+                Err(err) => {
+                    xcfprintln!(exec, 2, "{}: {}", job_id, err);
+                    is_success = false;
                 },
             }
-            exec.remove_job(job_id);
-            interp.wait_for_process(exec, Some(pid), false, settings).unwrap_or(1)
         },
-        Err(err) => {
-            xcfprintln!(exec, 2, "{}: {}", job_id, err);
-            1
-        },
+        _ => (),
+    }
+    if is_success {
+        match exec.current_file(1) {
+            Some(stdout_file) => {
+                let mut stdout_file_r = stdout_file.borrow_mut();
+                let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
+                fprintln!(&mut line_stdout, "{}", job.name);
+            },
+            None => {
+                xsfprintln!(exec, 2, "No standard output");
+                return 1;
+            },
+        }
+        exec.remove_job(job_id);
+        interp.wait_for_processes(exec, pids.as_slice(), Some(job.pgid), false, settings, || job.name.clone()).unwrap_or(1)
+    } else {
+        1
     }
 }

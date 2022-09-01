@@ -50,8 +50,8 @@ fn test_executor_execute_executes_test_builtin_args()
     let res = exec.execute(&mut interp, &[], "test_builtin_args", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     let expected_stdout_content = "
 abc
@@ -83,12 +83,12 @@ fn test_executor_execute_twice_executes_test_builtin_args()
     let res2 = exec.execute(&mut interp, &[], "test_builtin_args", args2.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     match res2 {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     let expected_stdout_content = "
 abc
@@ -118,8 +118,8 @@ fn test_executor_execute_executes_test_builtin_env()
     let res = exec.execute(&mut interp, &[], "test_builtin_env", &[], false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     let stdout_content = read_file("stdout.txt");
     assert!(stdout_content.contains(format!("PWD={}\n", current_dir().as_path().to_string_lossy()).as_str()));
@@ -149,8 +149,8 @@ fn test_executor_execute_executes_test_builtin_vars()
     let res = exec.execute(&mut interp, vars.as_slice(), "test_builtin_vars", &[], false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     let expected_stdout_content = "
 var1=abc
@@ -180,8 +180,8 @@ fn test_executor_execute_executes_test_builtin_exit_for_zero_status()
     let res = exec.execute(&mut interp, &[], "test_builtin_exit", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -206,8 +206,8 @@ fn test_executor_execute_executes_test_builtin_exit_for_other_status()
     let res = exec.execute(&mut interp, &[], "test_builtin_exit", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(11), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(11), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -232,8 +232,8 @@ fn test_executor_execute_executes_rsush_test_args()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     let expected_stdout_content = "
 abc
@@ -265,12 +265,12 @@ fn test_executor_execute_twice_executes_rsush_test_args()
     let res2 = exec.execute(&mut interp, &[], "./rsush_test", args2.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     match res2 {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     let expected_stdout_content = "
 abc
@@ -301,8 +301,8 @@ fn test_executor_execute_executes_rsush_test_env()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     let stdout_content = read_file("stdout.txt");
     assert!(stdout_content.contains(format!("PWD={}\n", current_dir().as_path().to_string_lossy()).as_str()));
@@ -328,8 +328,8 @@ fn test_executor_execute_executes_rsush_test_exit_for_zero_status()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -354,8 +354,8 @@ fn test_executor_execute_executes_rsush_test_exit_for_other_status()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(12), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(12), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -380,8 +380,8 @@ fn test_executor_execute_executes_rsush_test_read_fd_for_stdin()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::from("Some line\n\n"), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -408,12 +408,12 @@ fn test_executor_execute_twice_executes_rsush_test_read_fd_for_stdin()
     let res2 = exec.execute(&mut interp, &[], "./rsush_test", args2.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     match res2 {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::from("Some line\n\nSecond line\n\n"), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -440,8 +440,8 @@ fn test_executor_execute_executes_rsush_test_read_fd_for_other_fd()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::from("abcdef\n\n"), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -470,12 +470,12 @@ fn test_executor_execute_twice_executes_rsush_test_read_fd_for_other_fd()
     let res2 = exec.execute(&mut interp, &[], "./rsush_test", args2.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     match res2 {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::from("abcdef\n\nghijkl\n\n"), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -500,8 +500,8 @@ fn test_executor_execute_executes_rsush_test_write_fd_for_stderr()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     let expected_stderr_content = "
@@ -533,12 +533,12 @@ fn test_executor_execute_twice_executes_rsush_test_write_fd_for_stderr()
     let res2 = exec.execute(&mut interp, &[], "./rsush_test", args2.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     match res2 {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     let expected_stderr_content = "
@@ -570,8 +570,8 @@ fn test_executor_execute_executes_rsush_test_write_fd_for_other_fd()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -605,12 +605,12 @@ fn test_executor_execute_twice_executes_rsush_test_args_for_other_fd()
     let res2 = exec.execute(&mut interp, &[], "./rsush_test", args2.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     match res2 {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -646,8 +646,8 @@ fn test_executor_execute_executes_rsush_test_read_2fds_for_other_fds()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::from("abcdef\n\nghijkl\n\n"), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -674,8 +674,8 @@ fn test_executor_execute_executes_rsush_test_write_2fds_for_other_fd()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -715,8 +715,8 @@ fn test_executor_execute_sets_variables()
     let res = exec.execute(&mut interp, vars.as_slice(), "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     let stdout_content = read_file("stdout.txt");
     assert!(stdout_content.contains(format!("PWD={}\n", current_dir().as_path().to_string_lossy()).as_str()));
@@ -749,8 +749,8 @@ fn test_executor_execute_duplicates_file_for_reading()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::from("abcdef\n\nghijkl\n\n"), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -778,8 +778,8 @@ fn test_executor_execute_duplicates_file_for_writing()
     let res = exec.execute(&mut interp, &[], "./rsush_test", args.as_slice(), false, &mut env, &mut settings, |_| true);
     exec.clear_files();
     match res {
-        Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-        Err(_) => assert!(false),
+        Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+        _ => assert!(false),
     }
     assert_eq!(String::new(), read_file("stdout.txt"));
     assert_eq!(String::new(), read_file("stderr.txt"));
@@ -1096,8 +1096,8 @@ fn test_executor_add_job_adds_job()
     }
     match exec.jobs().get(&1) {
         Some(job) => {
-            assert_eq!(1234, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(true, job.prev_job_id.is_none());
             assert_eq!(true, job.next_job_id.is_none());
@@ -1120,8 +1120,8 @@ fn test_executor_add_job_twice_adds_job()
     }
     match exec.jobs().get(&1) {
         Some(job) => {
-            assert_eq!(1234, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(true, job.prev_job_id.is_none());
             assert_eq!(Some(2), job.next_job_id);
@@ -1130,8 +1130,8 @@ fn test_executor_add_job_twice_adds_job()
     }
     match exec.jobs().get(&2) {
         Some(job) => {
-            assert_eq!(2345, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(2345, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test2"), job.name);
             assert_eq!(Some(1), job.prev_job_id);
             assert_eq!(true, job.next_job_id.is_none());
@@ -1158,8 +1158,8 @@ fn test_executor_add_job_thirce_adds_job()
     }
     match exec.jobs().get(&1) {
         Some(job) => {
-            assert_eq!(1234, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(true, job.prev_job_id.is_none());
             assert_eq!(Some(2), job.next_job_id);
@@ -1168,8 +1168,8 @@ fn test_executor_add_job_thirce_adds_job()
     }
     match exec.jobs().get(&2) {
         Some(job) => {
-            assert_eq!(2345, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(2345, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test2"), job.name);
             assert_eq!(Some(1), job.prev_job_id);
             assert_eq!(Some(3), job.next_job_id);
@@ -1178,8 +1178,8 @@ fn test_executor_add_job_thirce_adds_job()
     }
     match exec.jobs().get(&3) {
         Some(job) => {
-            assert_eq!(3456, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(3456, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test3"), job.name);
             assert_eq!(Some(2), job.prev_job_id);
             assert_eq!(true, job.next_job_id.is_none());
@@ -1207,8 +1207,8 @@ fn test_executor_remove_job_removes_first_job()
     exec.remove_job(1);
     match exec.jobs().get(&2) {
         Some(job) => {
-            assert_eq!(2345, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(2345, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test2"), job.name);
             assert_eq!(true, job.prev_job_id.is_none());
             assert_eq!(Some(3), job.next_job_id);
@@ -1217,8 +1217,8 @@ fn test_executor_remove_job_removes_first_job()
     }
     match exec.jobs().get(&3) {
         Some(job) => {
-            assert_eq!(3456, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(3456, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test3"), job.name);
             assert_eq!(Some(2), job.prev_job_id);
             assert_eq!(true, job.next_job_id.is_none());
@@ -1246,8 +1246,8 @@ fn test_executor_remove_job_removes_center_job()
     exec.remove_job(2);
     match exec.jobs().get(&1) {
         Some(job) => {
-            assert_eq!(1234, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(true, job.prev_job_id.is_none());
             assert_eq!(Some(3), job.next_job_id);
@@ -1256,8 +1256,8 @@ fn test_executor_remove_job_removes_center_job()
     }
     match exec.jobs().get(&3) {
         Some(job) => {
-            assert_eq!(3456, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(3456, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test3"), job.name);
             assert_eq!(Some(1), job.prev_job_id);
             assert_eq!(true, job.next_job_id.is_none());
@@ -1285,8 +1285,8 @@ fn test_executor_remove_job_removes_last_job()
     exec.remove_job(3);
     match exec.jobs().get(&1) {
         Some(job) => {
-            assert_eq!(1234, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(true, job.prev_job_id.is_none());
             assert_eq!(Some(2), job.next_job_id);
@@ -1295,8 +1295,8 @@ fn test_executor_remove_job_removes_last_job()
     }
     match exec.jobs().get(&2) {
         Some(job) => {
-            assert_eq!(2345, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(2345, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test2"), job.name);
             assert_eq!(Some(1), job.prev_job_id);
             assert_eq!(true, job.next_job_id.is_none());
@@ -1328,8 +1328,8 @@ fn test_executor_add_job_adds_job_after_job_removing()
     }
     match exec.jobs().get(&1) {
         Some(job) => {
-            assert_eq!(1234, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(true, job.prev_job_id.is_none());
             assert_eq!(Some(3), job.next_job_id);
@@ -1338,8 +1338,8 @@ fn test_executor_add_job_adds_job_after_job_removing()
     }
     match exec.jobs().get(&3) {
         Some(job) => {
-            assert_eq!(3456, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(3456, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test3"), job.name);
             assert_eq!(Some(1), job.prev_job_id);
             assert_eq!(Some(2), job.next_job_id);
@@ -1348,8 +1348,8 @@ fn test_executor_add_job_adds_job_after_job_removing()
     }
     match exec.jobs().get(&2) {
         Some(job) => {
-            assert_eq!(4567, job.pid);
-            assert_eq!(WaitStatus::None, job.status);
+            assert_eq!(4567, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(String::from("test4"), job.name);
             assert_eq!(Some(3), job.prev_job_id);
             assert_eq!(true, job.next_job_id.is_none());
@@ -1416,18 +1416,18 @@ fn test_executor_prev_current_job_id_returns_previous_current_job_id()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_set_job_status_sets_job_status()
+fn test_executor_set_job_last_status_sets_job_last_status()
 {
     let mut exec = Executor::new();
     match exec.add_job(&Job::new(1234, "test")) {
         Some(job_id) => assert_eq!(job_id, 1),
         _ => assert!(false),
     }
-    exec.set_job_status(1, WaitStatus::Signaled(9, false));
+    exec.set_job_last_status(1, WaitStatus::Signaled(9, false));
     match exec.jobs().get(&1) {
         Some(job) => {
-            assert_eq!(1234, job.pid);
-            assert_eq!(WaitStatus::Signaled(9, false), job.status);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::Signaled(9, false), job.last_status);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(true, job.prev_job_id.is_none());
             assert_eq!(true, job.next_job_id.is_none());
@@ -1530,7 +1530,7 @@ fn test_executor_create_process_creates_process()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
+            let res2 = exec.wait_for_process(Some(pid), true, false, true, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(0)) => {
                     let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 1);
@@ -1570,7 +1570,7 @@ fn test_executor_create_process_does_not_create_process_for_in_new_process()
             });
             match res {
                 Ok(pid) => {
-                    let res2 = exec.wait_for_process(pid, true, false, settings);
+                    let res2 = exec.wait_for_process(pid, true, false, true, settings);
                     match res2 {
                         Ok(WaitStatus::Exited(status)) => status,
                         _ => 1,
@@ -1581,7 +1581,7 @@ fn test_executor_create_process_does_not_create_process_for_in_new_process()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
+            let res2 = exec.wait_for_process(Some(pid), true, false, true, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(0)) => {
                     let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 2);
@@ -1620,7 +1620,7 @@ fn test_executor_create_process_creates_process_for_background()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
+            let res2 = exec.wait_for_process(Some(pid), true, false, true, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(0)) => {
                     let expected_stdout_content = format!("{:?}\n{:?}\n{:?}\n", pid, State::InNewProcess, 2);
@@ -1668,14 +1668,14 @@ fn test_executor_create_process_creates_process_for_in_new_process_and_backgroun
                         },
                         None => (),
                     }
-                    let res2 = exec.wait_for_process(Some(pid), true, false, settings);
+                    let res2 = exec.wait_for_process(Some(pid), true, false, true, settings);
                     match res2 {
                         Ok(WaitStatus::Exited(status)) => status,
                         _ => 1,
                     }
                 },
                 Ok(None) => {
-                    let res2 = exec.wait_for_process(None, true, false, settings);
+                    let res2 = exec.wait_for_process(None, true, false, true, settings);
                     match res2 {
                         Ok(WaitStatus::Exited(status)) => status,
                         _ => 1,
@@ -1686,7 +1686,7 @@ fn test_executor_create_process_creates_process_for_in_new_process_and_backgroun
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
+            let res2 = exec.wait_for_process(Some(pid), true, false, true, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(0)) => {
                     let expected_stdout_content = format!("{}\n{:?}\n{:?}\n", read_file("4.txt").trim(), State::InNewProcess, 3);
@@ -1716,7 +1716,7 @@ fn test_executor_create_process_creates_process_for_zero_status()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
+            let res2 = exec.wait_for_process(Some(pid), true, false, true, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(status)) => {
                     assert_eq!(0, status);
@@ -1746,7 +1746,7 @@ fn test_executor_create_process_creates_process_for_other_status()
     });
     match res {
         Ok(Some(pid)) => {
-            let res2 = exec.wait_for_process(Some(pid), true, false, &mut settings);
+            let res2 = exec.wait_for_process(Some(pid), true, false, true, &mut settings);
             match res2 {
                 Ok(WaitStatus::Exited(status)) => {
                     assert_eq!(12, status);
@@ -1795,8 +1795,8 @@ f() {
             let res = exec.execute(&mut interp, &[], "f", args.as_slice(), false, &mut env, &mut settings, |_| true);
             exec.clear_files();
             match res {
-                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-                Err(_) => assert!(false),
+                Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                _ => assert!(false),
             }
             let expected_stdout_content = "
 abc def ghi
@@ -1844,12 +1844,12 @@ f() {
             let res2 = exec.execute(&mut interp, &[], "f", args2.as_slice(), false, &mut env, &mut settings, |_| true);
             exec.clear_files();
             match res {
-                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-                Err(_) => assert!(false),
+                Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                _ => assert!(false),
             }
             match res2 {
-                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-                Err(_) => assert!(false),
+                Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                _ => assert!(false),
             }
             let expected_stdout_content = "
 abc def ghi
@@ -1899,8 +1899,8 @@ f() {
             let res = exec.execute(&mut interp, vars.as_slice(), "f", &[], false, &mut env, &mut settings, |_| true);
             exec.clear_files();
             match res {
-                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-                Err(_) => assert!(false),
+                Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                _ => assert!(false),
             }
             let expected_stdout_content = "
 abc def ghi
@@ -1954,12 +1954,12 @@ f() {
             let res2 = exec.execute(&mut interp, vars2.as_slice(), "f", &[], false, &mut env, &mut settings, |_| true);
             exec.clear_files();
             match res {
-                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-                Err(_) => assert!(false),
+                Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                _ => assert!(false),
             }
             match res2 {
-                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-                Err(_) => assert!(false),
+                Ok((wait_status, Some(_))) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                _ => assert!(false),
             }
             let expected_stdout_content = "
 abc def ghi
@@ -2005,8 +2005,8 @@ f() {
             let res = exec.execute(&mut interp, &[], "f", &[], false, &mut env, &mut settings, |_| true);
             exec.clear_files();
             match res {
-                Ok(wait_status) => assert_eq!(WaitStatus::Exited(0), wait_status),
-                Err(_) => assert!(false),
+                Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(0), wait_status),
+                _ => assert!(false),
             }
             assert_eq!(String::new(), read_file("stdout.txt"));
             assert_eq!(String::new(), read_file("stderr.txt"));
@@ -2048,8 +2048,8 @@ f() {
             let res = exec.execute(&mut interp, &[], "f", &[], false, &mut env, &mut settings, |_| true);
             exec.clear_files();
             match res {
-                Ok(wait_status) => assert_eq!(WaitStatus::Exited(1), wait_status),
-                Err(_) => assert!(false),
+                Ok((wait_status, None)) => assert_eq!(WaitStatus::Exited(1), wait_status),
+                _ => assert!(false),
             }
             assert_eq!(String::new(), read_file("stdout.txt"));
             assert_eq!(String::new(), read_file("stderr.txt"));

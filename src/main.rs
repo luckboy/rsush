@@ -128,39 +128,61 @@ fn update_jobs(interp: &mut Interpreter, exec: &mut Executor, settings: &Setting
 {
     let jobs: Vec<(u32, Job)> = exec.jobs().iter().map(|p| (*(p.0), p.1.clone())).collect();
     for (job_id, job) in &jobs {
-        match exec.wait_for_process(Some(job.pid), false, true, settings) {
-            Ok(wait_status) => {
-                let current = if settings.notify_flag {
-                    if exec.current_job_id().map(|id| id == *job_id).unwrap_or(false) {
+        let mut is_show = false;
+        for (i, pid) in job.pids.iter().enumerate() {
+            match exec.wait_for_process(Some(*pid), false, true, false, settings) {
+                Ok(tmp_wait_status) => {
+                    is_show |= match tmp_wait_status {
+                        WaitStatus::None => false,
+                        _ => true,
+                    };
+                    exec.set_job_status(*job_id, i, tmp_wait_status)
+                },
+                Err(err) => xsfprint!(exec, 2, "{}", err),
+            }
+        }
+        let mut wait_status = WaitStatus::None;
+        match exec.wait_for_process(Some(job.last_pid), false, true, false, settings) {
+            Ok(tmp_wait_status) => {
+                exec.set_job_last_status(*job_id, tmp_wait_status);
+                wait_status = if is_show || job.show_flag {
+                    exec.set_job_show_flag(*job_id, false);
+                    match wait_status {
+                        WaitStatus::None => job.last_status,
+                        _ => tmp_wait_status,
+                    }
+                } else {
+                    tmp_wait_status
+                };
+            },
+            Err(err) => xsfprint!(exec, 2, "{}", err),
+        }
+        if settings.notify_flag {
+            match wait_status {
+                WaitStatus::None => (),
+                _ => {
+                    let current = if exec.current_job_id().map(|id| id == *job_id).unwrap_or(false) {
                         '+'
                     } else if exec.prev_current_job_id().map(|id| id == *job_id).unwrap_or(false) {
                         '-'
                     } else {
                         ' '
-                    }
-                } else {
-                    ' '
-                };
-                match wait_status {
-                    WaitStatus::Exited(_) | WaitStatus::Signaled(_, _) => exec.remove_job(*job_id),
-                    _ => exec.set_job_status(*job_id, wait_status),
-                }
-                if settings.notify_flag {
-                    match wait_status {
-                        WaitStatus::None => (),
-                        _ => {
-                            let status = match wait_status {
-                                WaitStatus::None => String::new(),
-                                WaitStatus::Exited(_) => String::from("Done"),
-                                WaitStatus::Signaled(sig, is_coredump) => interp.signal_string(sig, is_coredump),
-                                WaitStatus::Stopped(sig) => interp.signal_string(sig, false),
-                            };
-                            xsfprintln!(exec, 2, "[{}]{} {} {}", job_id, current, status, job.name);
-                        },
-                    }
-                }
-            },
-            Err(err) => xsfprint!(exec, 2, "{}", err),
+                    };
+                    let status = match wait_status {
+                        WaitStatus::None => String::new(),
+                        WaitStatus::Exited(_) => String::from("Done"),
+                        WaitStatus::Signaled(sig, is_coredump) => interp.signal_string(sig, is_coredump),
+                        WaitStatus::Stopped(sig) => interp.signal_string(sig, false),
+                    };
+                    xsfprintln!(exec, 2, "[{}]{} {} {}", job_id, current, status, job.name);
+                },
+            }
+        }
+    }
+    let jobs: Vec<(u32, Job)> = exec.jobs().iter().map(|p| (*(p.0), p.1.clone())).collect();
+    for (job_id, job) in &jobs {
+        if job.is_done() {
+            exec.remove_job(*job_id);
         }
     }
 }
