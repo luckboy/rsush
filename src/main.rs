@@ -136,7 +136,10 @@ fn update_jobs(interp: &mut Interpreter, exec: &mut Executor, settings: &Setting
                         WaitStatus::None => false,
                         _ => true,
                     };
-                    exec.set_job_status(*job_id, i, tmp_wait_status)
+                    match tmp_wait_status {
+                        WaitStatus::None => (),
+                        _ => exec.set_job_status(*job_id, i, tmp_wait_status),
+                    }
                 },
                 Err(err) => xsfprint!(exec, 2, "{}", err),
             }
@@ -144,7 +147,10 @@ fn update_jobs(interp: &mut Interpreter, exec: &mut Executor, settings: &Setting
         let mut wait_status = WaitStatus::None;
         match exec.wait_for_process(Some(job.last_pid), false, true, false, settings) {
             Ok(tmp_wait_status) => {
-                exec.set_job_last_status(*job_id, tmp_wait_status);
+                match tmp_wait_status {
+                    WaitStatus::None => (),
+                    _ => exec.set_job_last_status(*job_id, tmp_wait_status),
+                }
                 wait_status = if is_show || job.show_flag {
                     match wait_status {
                         WaitStatus::None => job.last_status,
