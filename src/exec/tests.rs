@@ -1437,6 +1437,145 @@ fn test_executor_set_job_last_status_sets_job_last_status()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
+fn test_executor_add_job_adds_job_without_pids()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(Vec::<i32>::new(), job.pids);
+            assert_eq!(Vec::<WaitStatus>::new(), job.statuses);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
+            assert_eq!(1234, job.pgid);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(false, job.show_flag);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_add_job_adds_job_with_pids()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new_with_pids(vec![2345, 3456], 1234, 4567, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(vec![2345, 3456], job.pids);
+            let expected_statuses = vec![
+                WaitStatus::None,
+                WaitStatus::None
+            ];
+            assert_eq!(expected_statuses, job.statuses);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
+            assert_eq!(4567, job.pgid);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(false, job.show_flag);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_set_job_status_sets_job_status()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new_with_pids(vec![2345, 3456], 1234, 4567, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    exec.set_job_status(1, 0, WaitStatus::Signaled(9, false));
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(vec![2345, 3456], job.pids);
+            let expected_statuses = vec![
+                WaitStatus::Signaled(9, false),
+                WaitStatus::None
+            ];
+            assert_eq!(expected_statuses, job.statuses);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
+            assert_eq!(4567, job.pgid);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(false, job.show_flag);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_set_job_statuses_sets_job_statuses()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new_with_pids(vec![2345, 3456], 1234, 4567, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    exec.set_job_statuses(1, vec![WaitStatus::Signaled(9, false), WaitStatus::Signaled(2, false)]);
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(vec![2345, 3456], job.pids);
+            let expected_statuses = vec![
+                WaitStatus::Signaled(9, false),
+                WaitStatus::Signaled(2, false)
+            ];
+            assert_eq!(expected_statuses, job.statuses);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
+            assert_eq!(4567, job.pgid);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(false, job.show_flag);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_set_job_show_flag_sets_job_show_flag()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new_with_pids(vec![2345, 3456], 1234, 4567, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    exec.set_job_show_flag(1, true);
+    match exec.jobs().get(&1) {
+        Some(job) => {
+            assert_eq!(vec![2345, 3456], job.pids);
+            let expected_statuses = vec![
+                WaitStatus::None,
+                WaitStatus::None
+            ];
+            assert_eq!(expected_statuses, job.statuses);
+            assert_eq!(1234, job.last_pid);
+            assert_eq!(WaitStatus::None, job.last_status);
+            assert_eq!(4567, job.pgid);
+            assert_eq!(String::from("test"), job.name);
+            assert_eq!(true, job.show_flag);
+            assert_eq!(true, job.prev_job_id.is_none());
+            assert_eq!(true, job.next_job_id.is_none());
+        },
+        None => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
 fn test_executor_interpret_sets_in_interpreter_state()
 {
     let mut exec = Executor::new();
