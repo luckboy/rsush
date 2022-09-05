@@ -162,7 +162,7 @@ var3=ghi
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_execute_executes_test_builtin_exit_for_zero_status()
+fn test_executor_execute_executes_test_builtin_exit_for_status_zero()
 {
     let mut exec = Executor::new();
     let mut interp = Interpreter::new();
@@ -310,7 +310,7 @@ fn test_executor_execute_executes_rsush_test_env()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_execute_executes_rsush_test_exit_for_zero_status()
+fn test_executor_execute_executes_rsush_test_exit_for_status_zero()
 {
     let mut exec = Executor::new();
     let mut interp = Interpreter::new();
@@ -1841,7 +1841,7 @@ fn test_executor_create_process_creates_process_for_in_new_process_and_backgroun
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_create_process_creates_process_for_zero_status()
+fn test_executor_create_process_creates_process_for_status_zero()
 {
     let mut exec = Executor::new();
     let mut settings = Settings::new();
