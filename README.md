@@ -7,7 +7,7 @@ Unix shell.
 
 This shell is most compliant with the SUSv3 (Single UNIX Specification Version 3). Non-compliance
 with the SUSv3 is most caused size of the shell. This shell contains the built-in commands. These
-built-in commands are from the SUSv3. This program doesn't contain the non-standard built-in commands.
+built-in commands are from the SUSv3. This program doesn't contain non-standard built-in commands.
 
 ## Installation
 
