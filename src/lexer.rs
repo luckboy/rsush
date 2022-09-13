@@ -31,54 +31,62 @@ enum State
     InParameterExpansion,
     InCommandSubstitution,
     HereDocumentWord,
-    InHereDocument(String, bool),
+    InHereDocument(String, bool, bool),
     FirstWord,
     ThirdWord,
     InArithmeticExpression,
     InArithmeticExpressionAndParentheses,
 }
 
-fn fmt_str(s: &str, f: &mut fmt::Formatter<'_>, is_double_quote: bool, is_here_doc: bool) -> fmt::Result
+fn fmt_str(s: &str, f: &mut fmt::Formatter<'_>, is_double_quote: bool, is_here_doc: bool, is_here_doc_word: bool, is_quoted: bool) -> fmt::Result
 {
+    let mut is_first = true;
     for c in s.chars() {
-        if !is_double_quote {
-            if !is_here_doc {
-                match c {
-                    '\'' | '"' | ';' | '<' | '>' | '&' | '|' | '(' | ')' =>  write!(f, "\\")?,
-                    c if c.is_whitespace() => write!(f, "\\")?,
-                    _ => (),
-                }
-            } else {
-                if c == '\\' {
-                    write!(f, "\\")?;
-                }
-            }
-        } else {
-            if !is_here_doc {
-                if c == '"' || c == '\\' {
-                    write!(f, "\\")?;
-                }
-            } else {
-                if c == '\\' {
-                    write!(f, "\\")?;
-                }
-            }
-        }
-        if c == '$' || c == '`' {
+        if is_here_doc_word && is_quoted && is_first {
             write!(f, "\\")?;
+        } else {
+            if !is_double_quote {
+                if !is_here_doc {
+                    match c {
+                        '\'' | '"' | ';' | '<' | '>' | '&' | '|' | '(' | ')' =>  write!(f, "\\")?,
+                        c if c.is_whitespace() => write!(f, "\\")?,
+                        _ => (),
+                    }
+                } else {
+                    if c == '\\' {
+                        write!(f, "\\")?;
+                    }
+                }
+            } else {
+                if !is_here_doc {
+                    if c == '"' || c == '\\' {
+                        write!(f, "\\")?;
+                    }
+                } else {
+                    if c == '\\' {
+                        write!(f, "\\")?;
+                    }
+                }
+            }
+            if !is_here_doc_word {
+                if c == '$' || c == '`' {
+                    write!(f, "\\")?;
+                }
+            }
         }
         write!(f, "{}", c)?;
+        is_first = false;
     }
     Ok(())
 }
 
 #[derive(Copy, Clone)]
-pub struct HereDocumentWordStr<'a>(pub &'a str);
+pub struct HereDocumentWordStr<'a>(pub &'a str, pub bool);
 
 impl<'a> fmt::Display for HereDocumentWordStr<'a>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
-    { fmt_str(self.0, f, false, false) }
+    { fmt_str(self.0, f, false, false, true, self.1) }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -182,7 +190,7 @@ impl fmt::Display for SimpleWordElement
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
         match self {
-            SimpleWordElement::String(s) => fmt_str(s.as_str(), f, true, false),
+            SimpleWordElement::String(s) => fmt_str(s.as_str(), f, true, false, false, false),
             SimpleWordElement::Parameter(ParameterName::Special(special_param_name), None) => write!(f, "${}", special_param_name),
             SimpleWordElement::Parameter(param_name, None) => write!(f, "${{{}}}", param_name),
             SimpleWordElement::Parameter(param_name, Some((modifier, words))) => {
@@ -216,14 +224,20 @@ impl fmt::Display for SimpleWordElement
 }
 
 #[derive(Copy, Clone)]
-pub struct HereDocumentSimpleWordElement<'a>(pub &'a SimpleWordElement);
+pub struct HereDocumentSimpleWordElement<'a>(pub &'a SimpleWordElement, pub bool);
 
 impl<'a> fmt::Display for HereDocumentSimpleWordElement<'a>
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
         match self.0 {
-            SimpleWordElement::String(s) => fmt_str(s.as_str(), f, false, true),
+            SimpleWordElement::String(s) => {
+                if !self.1 {
+                    fmt_str(s.as_str(), f, false, true, false, false)
+                } else {
+                    write!(f, "{}", s.as_str())
+                }
+            },
             simple_word_elem => write!(f, "{}", simple_word_elem),
         }
     }
@@ -242,7 +256,7 @@ impl fmt::Display for WordElement
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
         match self {
-            WordElement::Simple(SimpleWordElement::String(s)) => fmt_str(s.as_str(), f, false, false),
+            WordElement::Simple(SimpleWordElement::String(s)) => fmt_str(s.as_str(), f, false, false, false, false),
             WordElement::Simple(simple_word_elem) => write!(f, "{}", simple_word_elem),
             WordElement::SinglyQuoted(s) => write!(f, "'{}'", s),
             WordElement::DoublyQuoted(simple_word_elems) => {
@@ -294,8 +308,8 @@ pub enum Token
     Until,
     While,
     Word(Vec<WordElement>),
-    HereDocWord(String),
-    HereDoc(Vec<SimpleWordElement>, bool),
+    HereDocWord(String, bool),
+    HereDoc(Vec<SimpleWordElement>, bool, bool),
     EOF,
 }
 
@@ -417,8 +431,8 @@ impl<'a> Lexer<'a>
     pub fn push_here_doc_word(&mut self)
     { self.push_state(State::HereDocumentWord); }
 
-    pub fn push_in_here_doc(&mut self, s: &str, is_minus: bool)
-    { self.push_state(State::InHereDocument(String::from(s), is_minus)); }
+    pub fn push_in_here_doc(&mut self, s: &str, is_minus: bool, is_quoted: bool)
+    { self.push_state(State::InHereDocument(String::from(s), is_minus, is_quoted)); }
 
     pub fn push_first_word(&mut self)
     { self.push_state(State::FirstWord); }    
@@ -596,9 +610,10 @@ impl<'a> Lexer<'a>
         }
     }
     
-    fn read_string_word(&mut self, s: &mut String, is_simple_word: bool, settings: &Settings) -> ParserResult<bool>
+    fn read_string_word(&mut self, s: &mut String, is_simple_word: bool, settings: &Settings) -> ParserResult<(bool, bool)>
     {
         let mut can_be_keyword = true;
+        let mut is_quoted = false;
         loop {
             match self.get_char(settings)? {
                 (None, _) => break,
@@ -611,6 +626,7 @@ impl<'a> Lexer<'a>
                         },
                         (Some('\n'), _) => (),
                         (Some(c2), _) => {
+                            is_quoted = true;
                             if is_simple_word {
                                 match c2 {
                                     '\\' | '?' | '*' | '[' | ']' | ':' | '!' | '^' | '-' | '~' => s.push('\\'),
@@ -640,7 +656,7 @@ impl<'a> Lexer<'a>
                 },
             }
         }
-        Ok(can_be_keyword)
+        Ok((can_be_keyword, is_quoted))
     }
     
     fn read_singly_quoted_word(&mut self, s: &mut String, settings: &Settings) -> ParserResult<()>
@@ -671,7 +687,9 @@ impl<'a> Lexer<'a>
                     }
                 },
                 (Some(c @ '"'), pos) => {
-                    self.unget_char(c, &pos, settings);
+                    if is_simple_word {
+                        self.unget_char(c, &pos, settings);
+                    }
                     break;
                 },
                 (Some(c), pos) => {
@@ -691,11 +709,18 @@ impl<'a> Lexer<'a>
     fn get_here_doc_word(&mut self, token_pos: &Position, settings: &Settings) -> ParserResult<(Token, Position)>
     {
         let mut s = String::new();
+        let mut is_quoted = false;
         loop {
             match self.get_char(settings)? {
                 (None, _) => break,
-                (Some('\''), _) => self.read_singly_quoted_word(&mut s, settings)?,
-                (Some('"'), _) => self.read_doubly_quoted_word(&mut s, false, settings)?, 
+                (Some('\''), _) => {
+                    is_quoted = true;
+                    self.read_singly_quoted_word(&mut s, settings)?;
+                },
+                (Some('"'), _) => {
+                    is_quoted = true;
+                    self.read_doubly_quoted_word(&mut s, false, settings)?
+                },
                 (Some(c @ (';' | '<' | '>' | '&' | '|' | '(' | ')' | '#')), pos) => {
                     self.unget_char(c, &pos, settings);
                     break;
@@ -706,11 +731,11 @@ impl<'a> Lexer<'a>
                 },
                 (Some(c), pos) => {
                     self.unget_char(c, &pos, settings);
-                    self.read_string_word(&mut s, false, settings)?;
+                    is_quoted |= self.read_string_word(&mut s, false, settings)?.1;
                 },
             }
         }
-        Ok((Token::HereDocWord(s), *token_pos))
+        Ok((Token::HereDocWord(s, is_quoted), *token_pos))
     }
     
     fn get_var_name(&mut self, c: char, settings: &Settings) -> ParserResult<ParameterName>
@@ -930,7 +955,7 @@ impl<'a> Lexer<'a>
     fn get_string_simple_word_elem_for_word_elem(&mut self, settings: &Settings) -> ParserResult<(SimpleWordElement, bool)>
     {
         let mut s = String::new();
-        let can_be_keyword = self.read_string_word(&mut s, true, settings)?;
+        let can_be_keyword = self.read_string_word(&mut s, true, settings)?.0;
         Ok((SimpleWordElement::String(s), can_be_keyword))
     }
     
@@ -1098,7 +1123,24 @@ impl<'a> Lexer<'a>
         Ok(())
     }
     
-    fn get_here_doc(&mut self, delim: &str, is_minus: bool, token_pos: &Position, settings: &Settings) -> ParserResult<(Token, Position)>
+    fn read_string_simple_word_elem_for_here_doc(&mut self, simple_word_elems: &mut Vec<SimpleWordElement>, settings: &Settings) -> ParserResult<()>
+    {
+        let mut s = String::new();
+        loop {
+            match self.get_char(settings)? {
+                (None, pos) => return Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
+                (Some('\n'), _) => {
+                    s.push('\n');
+                    break;
+                },
+                (Some(c), _) => s.push(c),
+            }
+        }
+        simple_word_elems.push(SimpleWordElement::String(s));
+        Ok(())
+    }
+    
+    fn get_here_doc(&mut self, delim: &str, is_minus: bool, is_quoted: bool, token_pos: &Position, settings: &Settings) -> ParserResult<(Token, Position)>
     {
         let mut simple_word_elems: Vec<SimpleWordElement> = Vec::new();
         loop {
@@ -1145,9 +1187,13 @@ impl<'a> Lexer<'a>
             for (c, pos) in &chars_with_poses {
                 self.unget_char(*c, pos, settings);
             }
-            self.read_simple_word_elems_for_here_doc(&mut simple_word_elems, settings)?;
+            if is_quoted {
+                self.read_string_simple_word_elem_for_here_doc(&mut simple_word_elems, settings)?;
+            } else {
+                self.read_simple_word_elems_for_here_doc(&mut simple_word_elems, settings)?;
+            }
         }
-        Ok((Token::HereDoc(simple_word_elems, is_minus), *token_pos))
+        Ok((Token::HereDoc(simple_word_elems, is_minus, is_quoted), *token_pos))
     }
     
     pub fn next_token(&mut self, settings: &Settings) -> ParserResult<(Token, Position)>
@@ -1176,11 +1222,12 @@ impl<'a> Lexer<'a>
                             },
                         }
                     },
-                    State::InHereDocument(delim_r, is_minus_r) => {
+                    State::InHereDocument(delim_r, is_minus_r, is_quoted_r) => {
                         let token_pos = self.pos;
                         let delim = delim_r.clone();
                         let is_minus = *is_minus_r;
-                        self.get_here_doc(delim.as_str(), is_minus, &token_pos, settings)
+                        let is_quoted = *is_quoted_r;
+                        self.get_here_doc(delim.as_str(), is_minus, is_quoted, &token_pos, settings)
                     },
                     _ => {
                         self.skip_spaces(false, settings)?;

@@ -1554,10 +1554,11 @@ fn test_lexer_next_token_returns_here_document_word()
     lexer.push_state(State::HereDocumentWord);
     let settings = Settings::new();
     match lexer.next_token(&settings) {
-        Ok((Token::HereDocWord(s), pos)) => {
+        Ok((Token::HereDocWord(s, is_quoted), pos)) => {
             assert_eq!(1, pos.line);
             assert_eq!(1, pos.column);
             assert_eq!(String::from("abc$var"), s);
+            assert_eq!(false, is_quoted);
         },
         _ => assert!(false),
     }
@@ -1577,10 +1578,10 @@ EOT
     let mut cursor = Cursor::new(s2.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
     let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
-    lexer.push_state(State::InHereDocument(String::from("EOT"), false));
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false, false));
     let settings = Settings::new();
     match lexer.next_token(&settings) {
-        Ok((Token::HereDoc(simple_word_elems, is_minus), pos)) => {
+        Ok((Token::HereDoc(simple_word_elems, is_minus, is_quoted), pos)) => {
             assert_eq!(1, pos.line);
             assert_eq!(1, pos.column);
             assert_eq!(5, simple_word_elems.len());
@@ -1615,6 +1616,7 @@ EOT
                 _ => assert!(false),
             }
             assert_eq!(false, is_minus);
+            assert_eq!(false, is_quoted);
         },
         _ => assert!(false),
     }
@@ -1633,10 +1635,10 @@ EOT";
     let mut cursor = Cursor::new(s2.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
     let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
-    lexer.push_state(State::InHereDocument(String::from("EOT"), false));
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false, false));
     let settings = Settings::new();
     match lexer.next_token(&settings) {
-        Ok((Token::HereDoc(simple_word_elems, is_minus), pos)) => {
+        Ok((Token::HereDoc(simple_word_elems, is_minus, is_quoted), pos)) => {
             assert_eq!(1, pos.line);
             assert_eq!(1, pos.column);
             assert_eq!(5, simple_word_elems.len());
@@ -1671,6 +1673,7 @@ EOT";
                 _ => assert!(false),
             }
             assert_eq!(false, is_minus);
+            assert_eq!(false, is_quoted);
         },
         _ => assert!(false),
     }
@@ -1690,10 +1693,10 @@ fn test_lexer_next_token_returns_here_document_with_minus()
     let mut cursor = Cursor::new(s2.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
     let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
-    lexer.push_state(State::InHereDocument(String::from("EOT"), true));
+    lexer.push_state(State::InHereDocument(String::from("EOT"), true, false));
     let settings = Settings::new();
     match lexer.next_token(&settings) {
-        Ok((Token::HereDoc(simple_word_elems, is_minus), pos)) => {
+        Ok((Token::HereDoc(simple_word_elems, is_minus, is_quoted), pos)) => {
             assert_eq!(1, pos.line);
             assert_eq!(1, pos.column);
             assert_eq!(5, simple_word_elems.len());
@@ -1728,6 +1731,7 @@ fn test_lexer_next_token_returns_here_document_with_minus()
                 _ => assert!(false),
             }
             assert_eq!(true, is_minus);
+            assert_eq!(false, is_quoted);
         },
         _ => assert!(false),
     }
@@ -3102,7 +3106,7 @@ jkl mno
     let mut cursor = Cursor::new(s2.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
     let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
-    lexer.push_state(State::InHereDocument(String::from("EOT"), false));
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false, false));
     let settings = Settings::new();
     match lexer.next_token(&settings) {
         Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
@@ -3129,7 +3133,7 @@ fn test_lexer_next_token_complains_on_unexpected_end_of_file_here_document_with_
     let mut cursor = Cursor::new(s2.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
     let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
-    lexer.push_state(State::InHereDocument(String::from("EOT"), true));
+    lexer.push_state(State::InHereDocument(String::from("EOT"), true, false));
     let settings = Settings::new();
     match lexer.next_token(&settings) {
         Err(ParserError::Syntax(path, pos, msg, is_cont)) => {
@@ -5202,8 +5206,8 @@ fn test_format_with_here_document_word_str_formats_here_document_word_string()
     lexer.push_state(State::HereDocumentWord);
     let settings = Settings::new();
     match lexer.next_token(&settings) {
-        Ok((Token::HereDocWord(s), _)) => {
-            assert_eq!(String::from("abc\\$var"), format!("{}", HereDocumentWordStr(s.as_str())));
+        Ok((Token::HereDocWord(s, is_quoted), _)) => {
+            assert_eq!(String::from("abc$var"), format!("{}", HereDocumentWordStr(s.as_str(), is_quoted)));
         },
         _ => assert!(false),
     }
@@ -5221,11 +5225,11 @@ EOT
     let mut cursor = Cursor::new(s2.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
     let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
-    lexer.push_state(State::InHereDocument(String::from("EOT"), false));
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false, false));
     let settings = Settings::new();
     match lexer.next_token(&settings) {
-        Ok((Token::HereDoc(simple_word_elems, _), _)) => {
-            assert_eq!(String::from("abcdef\n"), format!("{}", HereDocumentSimpleWordElement(&simple_word_elems[0])));
+        Ok((Token::HereDoc(simple_word_elems, _, is_quoted), _)) => {
+            assert_eq!(String::from("abcdef\n"), format!("{}", HereDocumentSimpleWordElement(&simple_word_elems[0], is_quoted)));
         },
         _ => assert!(false),
     }
@@ -5243,11 +5247,11 @@ EOT
     let mut cursor = Cursor::new(s2.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
     let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
-    lexer.push_state(State::InHereDocument(String::from("EOT"), false));
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false, false));
     let settings = Settings::new();
     match lexer.next_token(&settings) {
-        Ok((Token::HereDoc(simple_word_elems, _), _)) => {
-            assert_eq!(String::from("abc\\\\ \t'\";<>&|()\\$\\`\n"), format!("{}", HereDocumentSimpleWordElement(&simple_word_elems[0])));
+        Ok((Token::HereDoc(simple_word_elems, _, is_quoted), _)) => {
+            assert_eq!(String::from("abc\\\\ \t'\";<>&|()\\$\\`\n"), format!("{}", HereDocumentSimpleWordElement(&simple_word_elems[0], is_quoted)));
         },
         _ => assert!(false),
     }

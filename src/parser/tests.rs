@@ -1794,6 +1794,7 @@ EOT
                             assert_eq!(5, pos2.column);
                             assert_eq!(String::from("EOT"), here_doc.borrow().delim);
                             assert_eq!(false, here_doc.borrow().has_minus);
+                            assert_eq!(false, here_doc.borrow().has_quoted);
                             assert_eq!(2, here_doc.borrow().simple_word_elems.len());
                             match &here_doc.borrow().simple_word_elems[0] {
                                 SimpleWordElement::String(s) => {
@@ -1871,6 +1872,7 @@ cat <<- EOT
                             assert_eq!(5, pos2.column);
                             assert_eq!(String::from("EOT"), here_doc.borrow().delim);
                             assert_eq!(true, here_doc.borrow().has_minus);
+                            assert_eq!(false, here_doc.borrow().has_quoted);
                             assert_eq!(2, here_doc.borrow().simple_word_elems.len());
                             match &here_doc.borrow().simple_word_elems[0] {
                                 SimpleWordElement::String(s) => {
@@ -2511,6 +2513,7 @@ EOT
                             assert_eq!(0, *n);
                             assert_eq!(String::from("EOT"), here_doc.borrow().delim);
                             assert_eq!(false, here_doc.borrow().has_minus);
+                            assert_eq!(false, here_doc.borrow().has_quoted);
                             assert_eq!(2, here_doc.borrow().simple_word_elems.len());
                             match &here_doc.borrow().simple_word_elems[0] {
                                 SimpleWordElement::String(s) => {
@@ -2589,6 +2592,7 @@ cat 0<<- EOT
                             assert_eq!(0, *n);
                             assert_eq!(String::from("EOT"), here_doc.borrow().delim);
                             assert_eq!(true, here_doc.borrow().has_minus);
+                            assert_eq!(false, here_doc.borrow().has_quoted);
                             assert_eq!(2, here_doc.borrow().simple_word_elems.len());
                             match &here_doc.borrow().simple_word_elems[0] {
                                 SimpleWordElement::String(s) => {
@@ -2667,6 +2671,7 @@ EOT2
                             assert_eq!(5, pos2.column);
                             assert_eq!(String::from("EOT"), here_doc.borrow().delim);
                             assert_eq!(false, here_doc.borrow().has_minus);
+                            assert_eq!(false, here_doc.borrow().has_quoted);
                             assert_eq!(1, here_doc.borrow().simple_word_elems.len());
                             match &here_doc.borrow().simple_word_elems[0] {
                                 SimpleWordElement::String(s) => {
@@ -2714,6 +2719,7 @@ EOT2
                             assert_eq!(17, pos2.column);
                             assert_eq!(String::from("EOT2"), here_doc.borrow().delim);
                             assert_eq!(false, here_doc.borrow().has_minus);
+                            assert_eq!(false, here_doc.borrow().has_quoted);
                             assert_eq!(1, here_doc.borrow().simple_word_elems.len());
                             match &here_doc.borrow().simple_word_elems[0] {
                                 SimpleWordElement::String(s) => {

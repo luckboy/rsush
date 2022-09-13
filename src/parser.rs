@@ -82,6 +82,7 @@ pub struct HereDocument
 {
     pub delim: String,
     pub has_minus: bool,
+    pub has_quoted: bool, 
     pub simple_word_elems: Vec<SimpleWordElement>,
 }
 
@@ -90,7 +91,7 @@ impl fmt::Display for HereDocument
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
     {
         for simple_word_elem in &self.simple_word_elems {
-            write!(f, "{}", HereDocumentSimpleWordElement(simple_word_elem))?;
+            write!(f, "{}", HereDocumentSimpleWordElement(simple_word_elem, self.has_quoted))?;
         }
         write!(f, "{}\n", self.delim)
     }
@@ -190,7 +191,7 @@ impl Redirection
                     Some(n) => write!(f, "{}", n)?,
                     None => (),
                 }
-                write!(f, "<< {}", HereDocumentWordStr(here_doc.borrow().delim.as_str()))?;
+                write!(f, "<< {}", HereDocumentWordStr(here_doc.borrow().delim.as_str(), here_doc.borrow().has_quoted))?;
                 here_docs.push(here_doc.clone());
                 Ok(())
             },
@@ -974,9 +975,9 @@ impl Parser
     {
         for here_doc in &self.here_docs {
             let mut here_doc = here_doc.borrow_mut();
-            lexer.push_in_here_doc(here_doc.delim.as_str(), here_doc.has_minus);
+            lexer.push_in_here_doc(here_doc.delim.as_str(), here_doc.has_minus, here_doc.has_quoted);
             match lexer.next_token(settings)? {
-                (Token::HereDoc(simple_word_elems, _), _) => here_doc.simple_word_elems = simple_word_elems,
+                (Token::HereDoc(simple_word_elems, _, _), _) => here_doc.simple_word_elems = simple_word_elems,
                 (_, _) => panic!("token isn't here document"), 
             }
             lexer.pop_state();
@@ -1015,13 +1016,13 @@ impl Parser
         }
     }
 
-    fn parse_here_doc_word<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<String>
+    fn parse_here_doc_word<'a>(&mut self, lexer: &mut Lexer<'a>, settings: &Settings) -> ParserResult<(String, bool)>
     {
         lexer.push_here_doc_word();
         match lexer.next_token(settings)? {
-            (Token::HereDocWord(s), _) => {
+            (Token::HereDocWord(s, is_quoted), _) => {
                 lexer.pop_state();
-                Ok(s)
+                Ok((s, is_quoted))
             },
             (Token::EOF, pos) => {
                 lexer.pop_state();
@@ -1058,10 +1059,11 @@ impl Parser
                     lexer.pop_state();
                     self.has_first_word_or_third_word = false;
                 }
-                let s = self.parse_here_doc_word(lexer, settings)?;
+                let (s, is_quoted) = self.parse_here_doc_word(lexer, settings)?;
                 let here_doc = HereDocument {
                     delim: s,
                     has_minus: false,
+                    has_quoted: is_quoted,
                     simple_word_elems: Vec::new(),
                 };
                 let here_doc = Rc::new(RefCell::new(here_doc));
@@ -1073,10 +1075,11 @@ impl Parser
                     lexer.pop_state();
                     self.has_first_word_or_third_word = false;
                 }
-                let s = self.parse_here_doc_word(lexer, settings)?;
+                let (s, is_quoted) = self.parse_here_doc_word(lexer, settings)?;
                 let here_doc = HereDocument {
                     delim: s,
                     has_minus: true,
+                    has_quoted: is_quoted,
                     simple_word_elems: Vec::new(),
                 };
                 let here_doc = Rc::new(RefCell::new(here_doc));
