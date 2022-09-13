@@ -5559,6 +5559,62 @@ abc
 }
 
 #[sealed_test(before=setup(), after=teardown())]
+fn test_interpreter_interpret_logical_commands_prints_commands_for_extxtrace_that_is_set()
+{
+    let s = "
+unset VAR1 VAR2
+VAR1=abc VAR2=def
+VAR3=ghi ./rsush_test args abc
+./rsush_test args $VAR1
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            let mut exec = Executor::new();
+            let mut interp = Interpreter::new();
+            let mut env = Environment::new();
+            let mut settings = Settings::new();
+            settings.extxtrace_flag = true;
+            settings.arg0 = String::from("rsush");
+            initialize_builtin_funs(&mut env);
+            initialize_test_builtin_funs(&mut env);
+            initialize_vars(&mut env);
+            env.unset_var("PS4");
+            write_file("stdin.txt", "Some line\nSecond line\n");
+            exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+            exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+            exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+            exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+            let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+            exec.clear_files();
+            assert_eq!(0, status);
+            assert_eq!(0, interp.last_status);
+            assert_eq!(ReturnState::None, interp.return_state);
+            assert_eq!(false, interp.exec_redirect_flag);
+            let expected_stdout_content = "
+abc
+abc
+";
+            assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+            let expected_stderr_content = "
++ test.sh: 1.1: unset VAR1 VAR2
++ test.sh: 2.1: VAR1=abc VAR2=def
++ test.sh: 3.1: VAR3=ghi ./rsush_test args abc
++ test.sh: 4.1: ./rsush_test args abc
+";
+            assert_eq!(String::from(&expected_stderr_content[1..]), read_file("stderr.txt"));
+            assert_eq!(String::new(), read_file("stderr2.txt"));
+        },
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
 fn test_interpreter_interpret_logical_commands_interprets_redirections()
 {
     let s = "

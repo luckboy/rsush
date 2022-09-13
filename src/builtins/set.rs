@@ -66,6 +66,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
                             fprintln!(&mut line_stdout, "emacs           {}", on_or_off(settings.emacs_flag));
                             fprintln!(&mut line_stdout, "xtrace          {}", on_or_off(settings.xtrace_flag));
                             fprintln!(&mut line_stdout, "strlossy        {}", on_or_off(settings.strlossy_flag));
+                            fprintln!(&mut line_stdout, "extxtrace       {}", on_or_off(settings.extxtrace_flag));
                         },
                         None => xsfprintln!(exec, 2, "No standard output"),
                     }
@@ -91,6 +92,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
                             fprintln!(&mut line_stdout, "set {}o emacs", minus_or_plus(settings.emacs_flag));
                             fprintln!(&mut line_stdout, "set {}o xtrace", minus_or_plus(settings.xtrace_flag));
                             fprintln!(&mut line_stdout, "set {}o strlossy", minus_or_plus(settings.strlossy_flag));
+                            fprintln!(&mut line_stdout, "set {}o extxtrace", minus_or_plus(settings.extxtrace_flag));
                         },
                         None => xsfprintln!(exec, 2, "No standard output"),
                     }
@@ -457,6 +459,7 @@ vi              off
 emacs           off
 xtrace          off
 strlossy        off
+extxtrace       off
 ";
         assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
         assert_eq!(String::new(), read_file("stderr.txt"));
@@ -517,6 +520,7 @@ set +o vi
 set +o emacs
 set +o xtrace
 set +o strlossy
+set +o extxtrace
 ";
         assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
         assert_eq!(String::new(), read_file("stderr.txt"));

@@ -108,10 +108,14 @@ fn set_vars(exec: &Executor, vars: &[(String, String)], env: &mut Environment, s
     0
 }
 
-fn print_command_for_xtrace(exec: &Executor, vars: &[(String, String)], args: &[String], env: &Environment)
+fn print_command_for_xtrace_or_extxtrace(exec: &Executor, path_and_pos: Option<(&str, &Position)>, vars: &[(String, String)], args: &[String], env: &Environment)
 {
     let ps4 = env.var("PS4").unwrap_or(String::from(DEFAULT_PS4));
     xsfprint!(exec, 2, "{}", ps4);
+    match path_and_pos {
+        Some((path, pos)) => xsfprint!(exec, 2, "{}: {}: ", path, pos),
+        None => (),
+    }
     let mut is_first = true;
     for (name, value) in vars.iter() {
         if is_first {
@@ -2188,7 +2192,7 @@ impl Interpreter
         }
     }
 
-    fn interpret_simple_command(&mut self, exec: &mut Executor, command: &SimpleCommand, env: &mut Environment, settings: &mut Settings) -> i32
+    fn interpret_simple_command(&mut self, exec: &mut Executor, path: &str, pos: &Position, command: &SimpleCommand, env: &mut Environment, settings: &mut Settings) -> i32
     {
         if settings.noexec_flag {
             return self.last_status;
@@ -2280,7 +2284,9 @@ impl Interpreter
                             match args.first() {
                                 Some(arg0) => {
                                     if settings.xtrace_flag {
-                                        print_command_for_xtrace(exec, vars.as_slice(), args.as_slice(), env);
+                                        print_command_for_xtrace_or_extxtrace(exec, None, vars.as_slice(), args.as_slice(), env);
+                                    } else if settings.extxtrace_flag {
+                                        print_command_for_xtrace_or_extxtrace(exec, Some((path, pos)), vars.as_slice(), args.as_slice(), env);
                                     }
                                     self.interpret_redirects(exec, redirects.as_slice(), self.has_special_builtin_fun(arg0.as_str(), env), env, settings, |interp, exec, env, settings| {
                                             interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], false, env, settings, || format!("{}", command)).unwrap_or(1)
@@ -2288,7 +2294,9 @@ impl Interpreter
                                 },
                                 None => {
                                     if settings.xtrace_flag {
-                                        print_command_for_xtrace(exec, vars.as_slice(), &[], env);
+                                        print_command_for_xtrace_or_extxtrace(exec, None, vars.as_slice(), &[], env);
+                                    } else if settings.extxtrace_flag {
+                                        print_command_for_xtrace_or_extxtrace(exec, Some((path, pos)), vars.as_slice(), &[], env);
                                     }
                                     self.interpret_redirects(exec, redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                                             set_vars(exec, vars.as_slice(), env, settings)
@@ -2304,7 +2312,9 @@ impl Interpreter
             },
             Some(None) => {
                 if settings.xtrace_flag {
-                    print_command_for_xtrace(exec, vars.as_slice(), &[], env);
+                    print_command_for_xtrace_or_extxtrace(exec, None, vars.as_slice(), &[], env);
+                } else if settings.extxtrace_flag {
+                    print_command_for_xtrace_or_extxtrace(exec, Some((path, pos)), vars.as_slice(), &[], env);
                 }
                 self.interpret_redirects(exec, command.redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                         set_vars(exec, vars.as_slice(), env, settings)
@@ -2556,7 +2566,7 @@ impl Interpreter
     {
         env.set_var("LINENO", format!("{}", command.pos().line).as_str(), settings);
         match command {
-            Command::Simple(_, _, simple_command) => self.interpret_simple_command(exec, &(*simple_command), env, settings),
+            Command::Simple(path, pos, simple_command) => self.interpret_simple_command(exec, path.as_str(), pos, &(*simple_command), env, settings),
             Command::Compound(_, _, compound_command, redirects) => self.interpret_compound_command(exec, &(*compound_command), redirects.as_slice(), env, settings, || format!("{}", command), || format!("{}", command)),
             Command::FunctionDefinition(_, _, name_word, fun_body) => self.interpret_fun_def(exec, &(*name_word), fun_body, env, settings),
         }

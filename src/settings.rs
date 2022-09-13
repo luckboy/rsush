@@ -55,6 +55,7 @@ pub struct Settings
     pub emacs_flag: bool,
     pub xtrace_flag: bool,
     pub strlossy_flag: bool,
+    pub extxtrace_flag: bool,
     pub arg0: String,
     arg_vec_stack: Vec<Arguments>,
     current_args: Arguments,
@@ -80,6 +81,7 @@ impl Settings
             emacs_flag: false,
             xtrace_flag: false,
             strlossy_flag: false,
+            extxtrace_flag: false,
             arg0: String::new(),
             arg_vec_stack: Vec::new(),
             current_args: Arguments::new(),
@@ -187,6 +189,8 @@ impl Settings
                                                     self.xtrace_flag = opt_type == OptionType::Minus;
                                                 } else if opt_arg == String::from("strlossy") {
                                                     self.strlossy_flag = opt_type == OptionType::Minus;
+                                                } else if opt_arg == String::from("extxtrace") {
+                                                    self.extxtrace_flag = opt_type == OptionType::Minus;
                                                 } else {
                                                     return Err(OptionError::InvalidArgument);
                                                 }

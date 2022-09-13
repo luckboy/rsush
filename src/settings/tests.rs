@@ -1136,6 +1136,48 @@ fn test_settings_parse_options_parses_plus_o_options_with_strlossy()
 }
 
 #[test]
+fn test_settings_parse_options_parses_minus_o_options_with_extxtrace()
+{
+    let mut settings = Settings::new();
+    settings.extxtrace_flag = false;
+    let args = vec![
+        String::from("test"),
+        String::from("-o"),
+        String::from("extxtrace")
+    ];
+    let res = settings.parse_options(args.as_slice(), |_, _, _| { false });
+    match res {
+        Ok((i, is_minus_minus)) => {
+            assert_eq!(3, i);
+            assert_eq!(false, is_minus_minus);
+            assert_eq!(true, settings.extxtrace_flag);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn test_settings_parse_options_parses_plus_o_options_with_extxtrace()
+{
+    let mut settings = Settings::new();
+    settings.extxtrace_flag = true;
+    let args = vec![
+        String::from("test"),
+        String::from("+o"),
+        String::from("extxtrace")
+    ];
+    let res = settings.parse_options(args.as_slice(), |_, _, _| { false });
+    match res {
+        Ok((i, is_minus_minus)) => {
+            assert_eq!(3, i);
+            assert_eq!(false, is_minus_minus);
+            assert_eq!(false, settings.extxtrace_flag);
+        },
+        _ => assert!(false),
+    }
+}
+
+#[test]
 fn test_settings_parse_options_parses_minus_o_option_with_separeted_argument()
 {
     let mut settings = Settings::new();
