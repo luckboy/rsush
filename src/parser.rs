@@ -1364,6 +1364,13 @@ impl Parser
                             self.has_first_word_or_third_word = true;
                             let commands = self.parse_logical_commands_without_last_token(lexer, settings)?;
                             match lexer.next_token(settings)? {
+                                (token @ Token::Esac, pos) => {
+                                    lexer.undo_token(&token, &pos);
+                                    if self.has_first_word_or_third_word {
+                                        lexer.pop_state();
+                                        self.has_first_word_or_third_word = false;
+                                    }
+                                },
                                 (Token::SemiSemi, _) => {
                                     if self.has_first_word_or_third_word {
                                         lexer.pop_state();
