@@ -2425,7 +2425,7 @@ impl Interpreter
                                         for pair in pairs.iter() {
                                             let mut is_matched = true;
                                             for pattern_word in &pair.pattern_words {
-                                                match interp.perform_word_expansion_as_string(exec, &(*pattern_word), env, settings) {
+                                                match interp.perform_pattern_word_expansion_as_string(exec, &(*pattern_word), env, settings) {
                                                     Some(pattern) => {
                                                         is_matched = fnmatch(&pattern, &value, 0);
                                                         if is_matched { break; }
