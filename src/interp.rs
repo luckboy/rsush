@@ -1451,7 +1451,7 @@ impl Interpreter
         true
     }
 
-    fn add_word_elem_expansions(&mut self, exec: &mut Executor, elems: &[WordElement], ss: &mut Vec<String>, env: &mut Environment, settings: &mut Settings) -> bool
+    fn add_word_elem_expansions(&mut self, exec: &mut Executor, elems: &[WordElement], ss: &mut Vec<String>, is_var_or_pattern: bool, env: &mut Environment, settings: &mut Settings) -> bool
     {
         let mut is_first = true;
         let mut is_empty = true;
@@ -1481,15 +1481,19 @@ impl Interpreter
                 WordElement::Simple(SimpleWordElement::Parameter(param_name, modifier_and_words)) => {
                     match self.perform_param_expansion(exec, param_name, modifier_and_words, env, settings) {
                         Some(Some(Value::String(s))) => {
-                            ts.push(s.clone());
+                            ts.push(escape_str_for_backslashes(s.as_str()));
                             is_split = true;
                         },
                         Some(Some(Value::AtArray(ss))) => {
-                            ts.extend(ss);
+                            for s in ss {
+                                ts.push(escape_str_for_backslashes(s.as_str()));
+                            }
                             is_split = true;
                         },
                         Some(Some(Value::StarArray(ss))) => {
-                            ts.extend(ss);
+                            for s in ss {
+                                ts.push(escape_str_for_backslashes(s.as_str()));
+                            }
                             is_split = true;
                         },
                         Some(Some(Value::ExpansionArray(ss))) => ts.extend(ss),
@@ -1499,21 +1503,21 @@ impl Interpreter
                 },
                 WordElement::Simple(SimpleWordElement::ParameterLength(param_name)) => {
                     match self.perform_param_len_expansion(exec, param_name, env, settings) {
-                        Some(s) => ts.push(s),
+                        Some(s) => ts.push(escape_str_for_backslashes(s.as_str())),
                         None => return false,
                     }
                     is_split = true;
                 },
                 WordElement::Simple(SimpleWordElement::Command(commands)) => {
                     match self.substitute_command(exec, commands, env, settings) {
-                        Some(s) => ts.push(s),
+                        Some(s) => ts.push(escape_str_for_backslashes(s.as_str())),
                         None => return false,
                     }
                     is_split = true;
                 },
                 WordElement::Simple(SimpleWordElement::ArithmeticExpression(expr)) => {
                     match self.perform_arith_expansion(exec, expr, env, settings) {
-                        Some(s) => ts.push(s),
+                        Some(s) => ts.push(escape_str_for_backslashes(s.as_str())),
                         None => return false,
                     }
                     is_split = true;
@@ -1529,45 +1533,47 @@ impl Interpreter
                     }
                 },
             }
-            if is_split {
-                let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
-                let mut us: Vec<String> = Vec::new();
-                let is_space = ifs.chars().any(char::is_whitespace);
-                let spaces = ifs.replace(|c: char| !c.is_whitespace(), "");
-                if !ifs.is_empty() {
-                    for t in &ts {
-                        let mut vs: Vec<String> = split_str_for_ifs(t.as_str(), ifs.as_str()).iter().map(|s| String::from(*s)).collect();
-                        match vs.last() {
-                            Some(s) if s.is_empty() => {
-                                vs.pop();
-                            },
-                            _ => (),
+            if !is_var_or_pattern {
+                if is_split {
+                    let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
+                    let mut us: Vec<String> = Vec::new();
+                    let is_space = ifs.chars().any(char::is_whitespace);
+                    let spaces = ifs.replace(|c: char| !c.is_whitespace(), "");
+                    if !ifs.is_empty() {
+                        for t in &ts {
+                            let mut vs: Vec<String> = split_str_for_ifs(t.as_str(), ifs.as_str()).iter().map(|s| String::from(*s)).collect();
+                            match vs.last() {
+                                Some(s) if s.is_empty() => {
+                                    vs.pop();
+                                },
+                                _ => (),
+                            }
+                            us.extend(vs);
                         }
-                        us.extend(vs);
+                    } else {
+                        for t in &ts {
+                            if !t.is_empty() {
+                                us.push(t.clone());
+                            }
+                        }
                     }
+                    let mut tmp_ts: Vec<String> = Vec::new();
+                    match ts.first() {
+                        Some(s) if !is_empty && is_space && is_first_char(s, spaces.as_str()) && us.first().map(|t| !t.is_empty()).unwrap_or(false) => tmp_ts.push(String::new()),
+                        _ => (),
+                    }
+                    tmp_ts.extend(us);
+                    match ts.last() {
+                        Some(s) if is_space && is_last_char(s, spaces.as_str()) => {
+                            tmp_ts.push(String::new());
+                            is_last_s_to_pop = true;
+                        },
+                        _ => is_last_s_to_pop = false,
+                    }
+                    ts = tmp_ts;
                 } else {
-                    for t in &ts {
-                        if !t.is_empty() {
-                            us.push(t.clone());
-                        }
-                    }
+                    is_last_s_to_pop = false;
                 }
-                let mut tmp_ts: Vec<String> = Vec::new();
-                match ts.first() {
-                    Some(s) if !is_empty && is_space && is_first_char(s, spaces.as_str()) && us.first().map(|t| !t.is_empty()).unwrap_or(false) => tmp_ts.push(String::new()),
-                    _ => (),
-                }
-                tmp_ts.extend(us);
-                match ts.last() {
-                    Some(s) if is_space && is_last_char(s, spaces.as_str()) => {
-                        tmp_ts.push(String::new());
-                        is_last_s_to_pop = true;
-                    },
-                    _ => is_last_s_to_pop = false,
-                }
-                ts = tmp_ts;
-            } else {
-                is_last_s_to_pop = false;
             }
             if !is_empty {
                 if !ts.is_empty() {
@@ -1681,7 +1687,7 @@ impl Interpreter
     fn perform_var_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
         let mut ss: Vec<String> = Vec::new();
-        if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+        if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, true, env, settings) {
             return None;
         }
         match self.unescape_strings(exec, ss.as_slice(), settings) {
@@ -1694,7 +1700,7 @@ impl Interpreter
     {
         let mut ss: Vec<String> = Vec::new();
         for word in words.iter() {
-            if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+            if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, true, env, settings) {
                 return None;
             }
         }
@@ -1707,7 +1713,7 @@ impl Interpreter
     fn perform_pattern_word_expansion_as_string(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<String>
     {
         let mut ss: Vec<String> = Vec::new();
-        if self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+        if self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, true, env, settings) {
             Some(ss.join(" "))
         } else {
             None
@@ -1718,7 +1724,7 @@ impl Interpreter
     {
         let mut ss: Vec<String> = Vec::new();
         for word in words.iter() {
-            if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+            if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, true, env, settings) {
                 return None;
             }
         }
@@ -1736,7 +1742,7 @@ impl Interpreter
     fn perform_word_expansion(&mut self, exec: &mut Executor, word: &Word, env: &mut Environment, settings: &mut Settings) -> Option<Vec<String>>
     {
         let mut ss: Vec<String> = Vec::new();
-        if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+        if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, false, env, settings) {
             return None;
         }
         let mut ts: Vec<String> = Vec::new();
@@ -1759,7 +1765,7 @@ impl Interpreter
     {
         let mut ss: Vec<String> = Vec::new();
         for word in words {
-            if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, env, settings) {
+            if !self.add_word_elem_expansions(exec, word.word_elems.as_slice(), &mut ss, false, env, settings) {
                 return None;
             }
         }

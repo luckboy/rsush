@@ -599,6 +599,19 @@ pub fn escape_str(s: &str) -> String
     new_s
 }
 
+pub fn escape_str_for_backslashes(s: &str) -> String
+{
+    let mut new_s = String::new();
+    for c in s.chars() {
+        match c {
+            '\\' => new_s.push('\\'),
+            _ => (),
+        }
+        new_s.push(c);
+    }
+    new_s
+}
+
 pub fn unescape_path_pattern<S: AsRef<OsStr>>(s: S) -> PathBuf
 {
     let mut buf: Vec<u8> = Vec::new();
