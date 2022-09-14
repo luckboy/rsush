@@ -297,6 +297,14 @@ impl Interpreter
             _ => false,
         }
     }
+
+    pub fn has_return_or_exit(&self) -> bool
+    {
+        match self.return_state {
+            ReturnState::Return | ReturnState::Exit(_) => true,
+            _ => false,
+        }
+    }
     
     pub fn has_exit(&self) -> bool
     {
@@ -2469,33 +2477,46 @@ impl Interpreter
                                 interp.non_simple_comamnd_count += 1;
                                 let cond_status = interp.interpret_logical_commands(exec, cond_commands.as_slice(), env, settings);
                                 interp.non_simple_comamnd_count -= 1;
-                                if cond_status == 0 {
-                                    interp.interpret_logical_commands(exec, commands.as_slice(), env, settings)
-                                } else {
-                                    let mut elif_cond = false;
-                                    let mut status = interp.last_status;
-                                    for pair in pairs {
-                                        if settings.noexec_flag {
-                                            return interp.last_status;
-                                        }
-                                        interp.non_simple_comamnd_count += 1;
-                                        let cond_status2 = interp.interpret_logical_commands(exec, pair.cond_commands.as_slice(), env, settings);
-                                        interp.non_simple_comamnd_count -= 1;
-                                        if cond_status2 == 0 {
-                                            elif_cond = true;
-                                            status = interp.interpret_logical_commands(exec, pair.commands.as_slice(), env, settings);
-                                            break;
-                                        }
-                                    }
-                                    if !elif_cond {
-                                        match else_commands {
-                                            Some(else_commands) => interp.interpret_logical_commands(exec, else_commands.as_slice(), env, settings),
-                                            None => status,
-                                        }
+                                if !interp.has_break_or_continue_or_return_or_exit() {
+                                    if cond_status == 0 {
+                                        interp.interpret_logical_commands(exec, commands.as_slice(), env, settings)
                                     } else {
-                                        interp.last_status = 0;
-                                        0
+                                        let mut elif_cond = false;
+                                        let mut is_cond_return = false;
+                                        let mut status = interp.last_status;
+                                        for pair in pairs {
+                                            if settings.noexec_flag {
+                                                return interp.last_status;
+                                            }
+                                            interp.non_simple_comamnd_count += 1;
+                                            let cond_status2 = interp.interpret_logical_commands(exec, pair.cond_commands.as_slice(), env, settings);
+                                            interp.non_simple_comamnd_count -= 1;
+                                            if interp.has_break_or_continue_or_return_or_exit() {
+                                                is_cond_return = true;
+                                                break;
+                                            }
+                                            if cond_status2 == 0 {
+                                                elif_cond = true;
+                                                status = interp.interpret_logical_commands(exec, pair.commands.as_slice(), env, settings);
+                                                break;
+                                            }
+                                        }
+                                        if !is_cond_return {
+                                            if !elif_cond {
+                                                match else_commands {
+                                                    Some(else_commands) => interp.interpret_logical_commands(exec, else_commands.as_slice(), env, settings),
+                                                    None => status,
+                                                }
+                                            } else {
+                                                interp.last_status = 0;
+                                                0
+                                            }
+                                        } else {
+                                            interp.last_status
+                                        }
                                     }
+                                } else {
+                                    interp.last_status
                                 }
                         })
                     },
@@ -2508,6 +2529,13 @@ impl Interpreter
                                     interp.non_simple_comamnd_count += 1;
                                     let cond_status = interp.interpret_logical_commands(exec, cond_commands.as_slice(), env, settings);
                                     interp.non_simple_comamnd_count -= 1;
+                                    if interp.has_break_or_continue_or_return_or_exit() {
+                                        if interp.has_return_or_exit() {
+                                            status = cond_status;
+                                            break;
+                                        }
+                                        interp.clear_return_state();
+                                    }
                                     if cond_status == 0 {
                                         if settings.noexec_flag { break; }
                                         status = interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
@@ -2538,6 +2566,13 @@ impl Interpreter
                                     interp.non_simple_comamnd_count += 1;
                                     let cond_status = interp.interpret_logical_commands(exec, cond_commands.as_slice(), env, settings);
                                     interp.non_simple_comamnd_count -= 1;
+                                    if interp.has_break_or_continue_or_return_or_exit() {
+                                        if interp.has_return_or_exit() {
+                                            status = cond_status;
+                                            break;
+                                        }
+                                        interp.clear_return_state();
+                                    }
                                     if cond_status != 0 {
                                         status = interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
                                         if interp.has_continue_with_one() {
