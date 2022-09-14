@@ -2375,7 +2375,11 @@ impl Interpreter
                                 }
                                 match interp.perform_word_expansion_as_string(exec, &(*name_word), env, settings) {
                                     Some(name) => {
-                                        match interp.perform_word_expansions(exec, words.as_slice(), env, settings) {
+                                        let elems = match words {
+                                            Some(words) => interp.perform_word_expansions(exec, words.as_slice(), env, settings),
+                                            None => Some(settings.current_args().args().to_vec()),
+                                        };
+                                        match elems {
                                             Some(elems) => {
                                                 interp.current_loop_count += 1;
                                                 for elem in elems {

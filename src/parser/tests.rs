@@ -3421,7 +3421,7 @@ done
             assert_eq!(false, logical_commands[0].first_command.is_negative);
             assert_eq!(1, logical_commands[0].first_command.commands.len());
             match &(*logical_commands[0].first_command.commands[0]) {
-                Command::Compound(path, pos, CompoundCommand::For(var_word, words, logical_commands2), redirects) => {
+                Command::Compound(path, pos, CompoundCommand::For(var_word, Some(words), logical_commands2), redirects) => {
                     assert_eq!(&String::from("test.sh"), path);
                     assert_eq!(1, pos.line);
                     assert_eq!(1, pos.column);
@@ -3587,7 +3587,7 @@ done
             assert_eq!(false, logical_commands[0].first_command.is_negative);
             assert_eq!(1, logical_commands[0].first_command.commands.len());
             match &(*logical_commands[0].first_command.commands[0]) {
-                Command::Compound(path, pos, CompoundCommand::For(var_word, words, logical_commands2), redirects) => {
+                Command::Compound(path, pos, CompoundCommand::For(var_word, Some(words), logical_commands2), redirects) => {
                     assert_eq!(&String::from("test.sh"), path);
                     assert_eq!(1, pos.line);
                     assert_eq!(1, pos.column);
@@ -3752,7 +3752,7 @@ done
             assert_eq!(false, logical_commands[0].first_command.is_negative);
             assert_eq!(1, logical_commands[0].first_command.commands.len());
             match &(*logical_commands[0].first_command.commands[0]) {
-                Command::Compound(path, pos, CompoundCommand::For(var_word, words, logical_commands2), redirects) => {
+                Command::Compound(path, pos, CompoundCommand::For(var_word, Some(words), logical_commands2), redirects) => {
                     assert_eq!(&String::from("test.sh"), path);
                     assert_eq!(1, pos.line);
                     assert_eq!(1, pos.column);
@@ -3887,7 +3887,7 @@ done
             assert_eq!(false, logical_commands[0].first_command.is_negative);
             assert_eq!(1, logical_commands[0].first_command.commands.len());
             match &(*logical_commands[0].first_command.commands[0]) {
-                Command::Compound(path, pos, CompoundCommand::For(var_word, words, logical_commands2), redirects) => {
+                Command::Compound(path, pos, CompoundCommand::For(var_word, None, logical_commands2), redirects) => {
                     assert_eq!(&String::from("test.sh"), path);
                     assert_eq!(1, pos.line);
                     assert_eq!(1, pos.column);
@@ -3901,7 +3901,6 @@ done
                         },
                         _ => assert!(false),
                     }
-                    assert_eq!(true, words.is_empty());
                     assert_eq!(2, logical_commands2.len());
                     assert_eq!(String::from("test.sh"), logical_commands2[0].path);
                     assert_eq!(2, logical_commands2[0].pos.line);
@@ -4022,7 +4021,7 @@ done
             assert_eq!(false, logical_commands[0].first_command.is_negative);
             assert_eq!(1, logical_commands[0].first_command.commands.len());
             match &(*logical_commands[0].first_command.commands[0]) {
-                Command::Compound(path, pos, CompoundCommand::For(var_word, words, logical_commands2), redirects) => {
+                Command::Compound(path, pos, CompoundCommand::For(var_word, None, logical_commands2), redirects) => {
                     assert_eq!(&String::from("test.sh"), path);
                     assert_eq!(1, pos.line);
                     assert_eq!(1, pos.column);
@@ -4036,7 +4035,6 @@ done
                         },
                         _ => assert!(false),
                     }
-                    assert_eq!(true, words.is_empty());
                     assert_eq!(2, logical_commands2.len());
                     assert_eq!(String::from("test.sh"), logical_commands2[0].path);
                     assert_eq!(2, logical_commands2[0].pos.line);
@@ -4156,7 +4154,7 @@ done
             assert_eq!(false, logical_commands[0].first_command.is_negative);
             assert_eq!(1, logical_commands[0].first_command.commands.len());
             match &(*logical_commands[0].first_command.commands[0]) {
-                Command::Compound(path, pos, CompoundCommand::For(var_word, words, logical_commands2), redirects) => {
+                Command::Compound(path, pos, CompoundCommand::For(var_word, Some(words), logical_commands2), redirects) => {
                     assert_eq!(&String::from("test.sh"), path);
                     assert_eq!(1, pos.line);
                     assert_eq!(1, pos.column);

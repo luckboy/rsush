@@ -288,7 +288,7 @@ pub enum CompoundCommand
 {
     BraceGroup(Vec<Rc<LogicalCommand>>),
     Subshell(Vec<Rc<LogicalCommand>>),
-    For(Rc<Word>, Vec<Rc<Word>>, Vec<Rc<LogicalCommand>>),
+    For(Rc<Word>, Option<Vec<Rc<Word>>>, Vec<Rc<LogicalCommand>>),
     Case(Rc<Word>, Vec<CasePair>),
     If(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>, Vec<ElifPair>, Option<Vec<Rc<LogicalCommand>>>),
     While(Vec<Rc<LogicalCommand>>, Vec<Rc<LogicalCommand>>),
@@ -311,9 +311,15 @@ impl CompoundCommand
                 write!(f, ")")
             },
             CompoundCommand::For(name_word, words, commands) => {
-                write!(f, "for {} in", name_word)?;
-                for word in words {
-                    write!(f, " {}", word)?;
+                write!(f, "for {}", name_word)?;
+                match words {
+                    Some(words) => {
+                        write!(f, " in")?;
+                        for word in words {
+                            write!(f, " {}", word)?;
+                        }
+                    },
+                    None => (),
                 }
                 write!(f, "; do ")?;
                 LogicalCommandSliceWithLastSemicolon(commands.as_slice()).fmt_and_add_here_docs(f, here_docs)?;
@@ -1287,7 +1293,7 @@ impl Parser
                                 self.has_first_word_or_third_word = true;
                                 self.skip_newlines(lexer, settings)?;
                                 let commands = self.parse_do_clause(lexer, false, settings)?;
-                                Ok(CompoundCommand::For(Rc::new(word), words, commands))
+                                Ok(CompoundCommand::For(Rc::new(word), Some(words), commands))
                             },
                             (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                             (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
@@ -1295,7 +1301,7 @@ impl Parser
                     },
                     (Token::Do, _) => {
                         let commands = self.parse_do_clause(lexer, true, settings)?;
-                        Ok(CompoundCommand::For(Rc::new(word), Vec::new(), commands))
+                        Ok(CompoundCommand::For(Rc::new(word), None, commands))
                     },
                     (token @ (Token::Newline | Token::Semi), _) => {
                         match token {
@@ -1308,7 +1314,7 @@ impl Parser
                         self.has_first_word_or_third_word = true;
                         self.skip_newlines(lexer, settings)?;
                         let commands = self.parse_do_clause(lexer, false, settings)?;
-                        Ok(CompoundCommand::For(Rc::new(word), Vec::new(), commands))
+                        Ok(CompoundCommand::For(Rc::new(word), None, commands))
                     },
                     (Token::EOF, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), self.has_error_cont)),
                     (_, pos) => Err(ParserError::Syntax(lexer.path().clone(), pos, String::from("unexpected token"), false)),
