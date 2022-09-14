@@ -554,6 +554,8 @@ pub fn is_fd(fd: i32) -> bool
 pub fn glob<S: AsRef<OsStr>>(pattern: S, flags: i32, err_f: Option<extern "C" fn(*const libc::c_char, i32) -> i32>) -> GlobResult
 {
     let mut tmp_glob: libc::glob_t = unsafe { MaybeUninit::uninit().assume_init() };
+    tmp_glob.gl_pathv = null_mut();
+    tmp_glob.gl_pathc = 0;
     tmp_glob.gl_offs = 0;
     let pattern_cstring = CString::new(pattern.as_ref().as_bytes()).unwrap();
     let res = unsafe { libc::glob(pattern_cstring.as_ptr(), flags, err_f, &mut tmp_glob as *mut libc::glob_t) };
