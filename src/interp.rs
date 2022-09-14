@@ -2381,6 +2381,7 @@ impl Interpreter
                                         };
                                         match elems {
                                             Some(elems) => {
+                                                let mut status = 0;
                                                 interp.current_loop_count += 1;
                                                 for elem in elems {
                                                     if env.read_only_var_attr(name.as_str()) {
@@ -2390,7 +2391,7 @@ impl Interpreter
                                                     }
                                                     env.set_var(name.as_str(), elem.as_str(), settings);
                                                     if settings.noexec_flag { break; }
-                                                    interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
+                                                    status = interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
                                                     if interp.has_continue_with_one() {
                                                         interp.clear_return_state();
                                                         continue;
@@ -2403,7 +2404,8 @@ impl Interpreter
                                                 if interp.has_break_or_continue() {
                                                     interp.clear_return_state_for_break_or_continue();
                                                 }
-                                                interp.last_status
+                                                interp.last_status = status;
+                                                status
                                             },
                                             None => {
                                                 interp.last_status = 1;
@@ -2426,6 +2428,7 @@ impl Interpreter
                                 match interp.perform_word_expansion_as_string(exec, &(*value_word), env, settings) {
                                     Some(value) => {
                                         let mut is_success = true;
+                                        let mut status = 0;
                                         for pair in pairs.iter() {
                                             let mut is_matched = true;
                                             for pattern_word in &pair.pattern_words {
@@ -2442,12 +2445,13 @@ impl Interpreter
                                             }
                                             if !is_success { break; }
                                             if is_matched {
-                                                interp.interpret_logical_commands(exec, pair.commands.as_slice(), env, settings);
+                                                status = interp.interpret_logical_commands(exec, pair.commands.as_slice(), env, settings);
                                                 break;
                                             }
                                         }
                                         if is_success {
-                                            interp.last_status
+                                            interp.last_status = status;
+                                            status
                                         } else {
                                             interp.last_status = 1;
                                             1
@@ -2489,13 +2493,15 @@ impl Interpreter
                                             None => status,
                                         }
                                     } else {
-                                        status
+                                        interp.last_status = 0;
+                                        0
                                     }
                                 }
                         })
                     },
                     CompoundCommand::While(cond_commands, commands) => {
                         exec.interpret(|exec| {
+                                let mut status = 0;
                                 interp.current_loop_count += 1;
                                 loop {
                                     if settings.noexec_flag { break; }
@@ -2504,7 +2510,7 @@ impl Interpreter
                                     interp.non_simple_comamnd_count -= 1;
                                     if cond_status == 0 {
                                         if settings.noexec_flag { break; }
-                                        interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
+                                        status = interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
                                         if interp.has_continue_with_one() {
                                             interp.clear_return_state();
                                             continue;
@@ -2520,18 +2526,20 @@ impl Interpreter
                                 if interp.has_break_or_continue() {
                                     interp.clear_return_state_for_break_or_continue();
                                 }
-                                interp.last_status
+                                interp.last_status = status;
+                                status
                         })
                     },
                     CompoundCommand::Until(cond_commands, commands) => {
                         exec.interpret(|exec| {
+                                let mut status = 0;
                                 interp.current_loop_count += 1;
                                 loop {
                                     interp.non_simple_comamnd_count += 1;
                                     let cond_status = interp.interpret_logical_commands(exec, cond_commands.as_slice(), env, settings);
                                     interp.non_simple_comamnd_count -= 1;
                                     if cond_status != 0 {
-                                        interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
+                                        status = interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
                                         if interp.has_continue_with_one() {
                                             interp.clear_return_state();
                                             continue;
@@ -2547,7 +2555,8 @@ impl Interpreter
                                 if interp.has_break_or_continue() {
                                     interp.clear_return_state_for_break_or_continue();
                                 }
-                                interp.last_status
+                                interp.last_status = status;
+                                status
                         })
                     },
                 }

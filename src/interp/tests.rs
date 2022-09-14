@@ -9020,8 +9020,8 @@ fi
             exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
             let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
             exec.clear_files();
-            assert_eq!(1, status);
-            assert_eq!(1, interp.last_status);
+            assert_eq!(0, status);
+            assert_eq!(0, interp.last_status);
             assert_eq!(ReturnState::Exit(true), interp.return_state);
             assert_eq!(false, interp.exec_redirect_flag);
             let expected_stdout_content = "
@@ -9068,8 +9068,8 @@ done
             exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
             let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
             exec.clear_files();
-            assert_eq!(1, status);
-            assert_eq!(1, interp.last_status);
+            assert_eq!(0, status);
+            assert_eq!(0, interp.last_status);
             assert_eq!(ReturnState::None, interp.return_state);
             assert_eq!(false, interp.exec_redirect_flag);
             let expected_stdout_content = "
@@ -9177,8 +9177,8 @@ done
             exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
             let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
             exec.clear_files();
-            assert_eq!(1, status);
-            assert_eq!(1, interp.last_status);
+            assert_eq!(0, status);
+            assert_eq!(0, interp.last_status);
             assert_eq!(ReturnState::None, interp.return_state);
             assert_eq!(false, interp.exec_redirect_flag);
             let expected_stdout_content = "
@@ -9293,8 +9293,8 @@ done
             exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
             let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
             exec.clear_files();
-            assert_eq!(1, status);
-            assert_eq!(1, interp.last_status);
+            assert_eq!(0, status);
+            assert_eq!(0, interp.last_status);
             assert_eq!(ReturnState::None, interp.return_state);
             assert_eq!(false, interp.exec_redirect_flag);
             let expected_stdout_content = "
