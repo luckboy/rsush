@@ -85,7 +85,7 @@ enum InterpreterRedirection
 pub struct Interpreter
 {
     last_status: i32,
-    non_simple_comamnd_count: usize,
+    non_simple_command_count: usize,
     return_state: ReturnState,
     exec_redirect_flag: bool,
     loop_count_stack: Vec<usize>,
@@ -236,7 +236,7 @@ impl Interpreter
         special_builtin_fun_names.insert(String::from("unset"));
         Interpreter {
             last_status: 0,
-            non_simple_comamnd_count: 0,
+            non_simple_command_count: 0,
             return_state: ReturnState::None,
             exec_redirect_flag: false,
             loop_count_stack: Vec::new(),
@@ -2337,7 +2337,7 @@ impl Interpreter
             None => 1,
         };
         self.last_status = status;
-        if status != 0 && settings.errexit_flag && self.non_simple_comamnd_count == 0 {
+        if status != 0 && settings.errexit_flag && self.non_simple_command_count == 0 {
             self.exit(status, true)
         } else {
             status
@@ -2474,9 +2474,9 @@ impl Interpreter
                                 if settings.noexec_flag {
                                     return interp.last_status;
                                 }
-                                interp.non_simple_comamnd_count += 1;
+                                interp.non_simple_command_count += 1;
                                 let cond_status = interp.interpret_logical_commands(exec, cond_commands.as_slice(), env, settings);
-                                interp.non_simple_comamnd_count -= 1;
+                                interp.non_simple_command_count -= 1;
                                 if !interp.has_break_or_continue_or_return_or_exit() {
                                     if cond_status == 0 {
                                         interp.interpret_logical_commands(exec, commands.as_slice(), env, settings)
@@ -2488,9 +2488,9 @@ impl Interpreter
                                             if settings.noexec_flag {
                                                 return interp.last_status;
                                             }
-                                            interp.non_simple_comamnd_count += 1;
+                                            interp.non_simple_command_count += 1;
                                             let cond_status2 = interp.interpret_logical_commands(exec, pair.cond_commands.as_slice(), env, settings);
-                                            interp.non_simple_comamnd_count -= 1;
+                                            interp.non_simple_command_count -= 1;
                                             if interp.has_break_or_continue_or_return_or_exit() {
                                                 is_cond_return = true;
                                                 break;
@@ -2526,9 +2526,9 @@ impl Interpreter
                                 interp.current_loop_count += 1;
                                 loop {
                                     if settings.noexec_flag { break; }
-                                    interp.non_simple_comamnd_count += 1;
+                                    interp.non_simple_command_count += 1;
                                     let cond_status = interp.interpret_logical_commands(exec, cond_commands.as_slice(), env, settings);
-                                    interp.non_simple_comamnd_count -= 1;
+                                    interp.non_simple_command_count -= 1;
                                     if interp.has_break_or_continue_or_return_or_exit() {
                                         if interp.has_return_or_exit() {
                                             status = cond_status;
@@ -2563,9 +2563,9 @@ impl Interpreter
                                 let mut status = 0;
                                 interp.current_loop_count += 1;
                                 loop {
-                                    interp.non_simple_comamnd_count += 1;
+                                    interp.non_simple_command_count += 1;
                                     let cond_status = interp.interpret_logical_commands(exec, cond_commands.as_slice(), env, settings);
-                                    interp.non_simple_comamnd_count -= 1;
+                                    interp.non_simple_command_count -= 1;
                                     if interp.has_break_or_continue_or_return_or_exit() {
                                         if interp.has_return_or_exit() {
                                             status = cond_status;
@@ -2634,13 +2634,13 @@ impl Interpreter
         }
         if command.commands.len() <= 1 {
             if command.is_negative {
-                self.non_simple_comamnd_count += 1;
+                self.non_simple_command_count += 1;
             }
             if !command.commands.is_empty() {
                 status = self.interpret_command(exec, &(*command.commands[0]), env, settings);
             }
             if command.is_negative {
-                self.non_simple_comamnd_count -= 1;
+                self.non_simple_command_count -= 1;
             }
         } else {
             exec.interpret(|exec| {
@@ -2657,7 +2657,7 @@ impl Interpreter
                     }
                     if !is_success { return; }
                     exec.set_pipes(pipes);
-                    self.non_simple_comamnd_count += 1;
+                    self.non_simple_command_count += 1;
                     let mut pids: Vec<Option<i32>> = Vec::new();
                     for i in 0..command.commands.len() {
                         let res = exec.create_process(false, settings, |exec, settings| {
@@ -2672,9 +2672,9 @@ impl Interpreter
                                     is_writing_file = true;
                                 }
                                 exec.clear_pipes();
-                                self.non_simple_comamnd_count += 1;
+                                self.non_simple_command_count += 1;
                                 status = self.interpret_command(exec, &(*command.commands[i]), env, settings);
-                                self.non_simple_comamnd_count -= 1;
+                                self.non_simple_command_count -= 1;
                                 if is_writing_file {
                                     exec.pop_file(1);
                                 }
@@ -2691,7 +2691,7 @@ impl Interpreter
                             },
                         }
                     }
-                    self.non_simple_comamnd_count -= 1;
+                    self.non_simple_command_count -= 1;
                     exec.clear_pipes();
                     status = 1;
                     let pgid = pids.last().map(|pid| *pid).unwrap_or(None);
@@ -2732,7 +2732,7 @@ impl Interpreter
             } else {
                 exec.interpret(|exec| {
                         if settings.noexec_flag { return self.last_status; }
-                        self.non_simple_comamnd_count += 1;
+                        self.non_simple_command_count += 1;
                         let mut status = self.interpret_pipe_command(exec, &(*command.first_command), env, settings);
                         if !self.has_break_or_continue_or_return_or_exit() {
                             for pair in &command.pairs {
@@ -2753,7 +2753,7 @@ impl Interpreter
                                 }
                             }
                         }
-                        self.non_simple_comamnd_count -= 1;
+                        self.non_simple_command_count -= 1;
                         status
                 })
             }
