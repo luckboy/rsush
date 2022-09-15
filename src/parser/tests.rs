@@ -4813,7 +4813,7 @@ esac
 }
 
 #[test]
-fn test_parser_parse_logical_commands_parses_case_clause_with_case_without_semisemi()
+fn test_parser_parse_logical_commands_parses_case_clause_with_last_case_without_semisemi()
 {
     let s = "
 case abc in
