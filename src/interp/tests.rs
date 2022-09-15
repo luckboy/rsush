@@ -11035,3 +11035,52 @@ done
         _ => assert!(false),
     }
 }
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_interpreter_interpret_logical_commands_performs_expansions_for_bug_of_last_expansion_character()
+{
+    let s = "
+unset VAR
+VAR='abc:'
+./rsush_test args abc${VAR}def
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_logical_commands(&mut lexer, &settings) {
+        Ok(logical_commands) => {
+            let mut exec = Executor::new();
+            let mut interp = Interpreter::new();
+            let mut env = Environment::new();
+            let mut settings = Settings::new();
+            settings.arg0 = String::from("rsush");
+            initialize_builtin_funs(&mut env);
+            initialize_test_builtin_funs(&mut env);
+            initialize_vars(&mut env);
+            env.unset_var("IFS");
+            env.set_unexported_var("IFS", ":");
+            write_file("stdin.txt", "Some line\nSecond line\n");
+            exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+            exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+            exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+            exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+            let status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+            exec.clear_files();
+            assert_eq!(0, status);
+            assert_eq!(0, interp.last_status);
+            assert_eq!(ReturnState::None, interp.return_state);
+            assert_eq!(false, interp.exec_redirect_flag);
+            let expected_stdout_content = "
+abcabc
+def
+";
+            assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+            assert_eq!(String::new(), read_file("stderr.txt"));
+            assert_eq!(String::new(), read_file("stderr2.txt"));
+        },
+        _ => assert!(false),
+    }
+}

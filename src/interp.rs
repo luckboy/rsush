@@ -1572,7 +1572,7 @@ impl Interpreter
                     }
                     tmp_ts.extend(us);
                     match ts.last() {
-                        Some(s) if is_space && is_last_char(s, spaces.as_str()) => {
+                        Some(s) if is_last_char(s, ifs.as_str()) => {
                             tmp_ts.push(String::new());
                             is_last_s_to_pop = true;
                         },
