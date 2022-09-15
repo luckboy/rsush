@@ -1566,6 +1566,70 @@ fn test_lexer_next_token_returns_here_document_word()
 }
 
 #[test]
+fn test_lexer_next_token_returns_singly_quoted_here_document_word()
+{
+    let s = "'abc'";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::HereDocumentWord);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDocWord(s, is_quoted), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("abc"), s);
+            assert_eq!(true, is_quoted);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_returns_doubly_quoted_here_document_word()
+{
+    let s = "\"abc\"";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::HereDocumentWord);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDocWord(s, is_quoted), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("abc"), s);
+            assert_eq!(true, is_quoted);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+
+#[test]
+fn test_lexer_next_token_returns_quoted_here_document_word_by_backslash()
+{
+    let s = "\\abc";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::HereDocumentWord);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDocWord(s, is_quoted), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(String::from("abc"), s);
+            assert_eq!(true, is_quoted);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
 fn test_lexer_next_token_returns_here_document_without_minus()
 {
     let s = "
@@ -1732,6 +1796,52 @@ fn test_lexer_next_token_returns_here_document_with_minus()
             }
             assert_eq!(true, is_minus);
             assert_eq!(false, is_quoted);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_returns_here_document_with_quoted_here_ducoment_word()
+{
+    let s = "
+abc def
+ghi$var
+jkl mno
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false, true));
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDoc(simple_word_elems, is_minus, is_quoted), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(3, simple_word_elems.len());
+            match &simple_word_elems[0] {
+                SimpleWordElement::String(s) => {
+                    assert_eq!(&String::from("abc def\n"), s);
+                },
+                _ => assert!(false),
+            }
+            match &simple_word_elems[1] {
+                SimpleWordElement::String(s) => {
+                    assert_eq!(&String::from("ghi$var\n"), s);
+                },
+                _ => assert!(false),
+            }
+            match &simple_word_elems[2] {
+                SimpleWordElement::String(s) => {
+                    assert_eq!(&String::from("jkl mno\n"), s);
+                },
+                _ => assert!(false),
+            }
+            assert_eq!(false, is_minus);
+            assert_eq!(true, is_quoted);
         },
         _ => assert!(false),
     }
@@ -5215,6 +5325,24 @@ fn test_format_with_here_document_word_str_formats_here_document_word_string()
 }
 
 #[test]
+fn test_format_with_here_document_word_str_formats_quoted_here_document_word_string()
+{
+    let s = "\\abc$var";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::HereDocumentWord);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDocWord(s, is_quoted), _)) => {
+            assert_eq!(String::from("\\abc$var"), format!("{}", HereDocumentWordStr(s.as_str(), is_quoted)));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
 fn test_format_with_here_document_simple_word_element_formats_here_document_simple_word()
 {
     let s = "
@@ -5252,6 +5380,28 @@ EOT
     match lexer.next_token(&settings) {
         Ok((Token::HereDoc(simple_word_elems, _, is_quoted), _)) => {
             assert_eq!(String::from("abc\\\\ \t'\";<>&|()\\$\\`\n"), format!("{}", HereDocumentSimpleWordElement(&simple_word_elems[0], is_quoted)));
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_format_with_here_document_simple_word_element_formats_here_document_simple_word_with_quoted_here_document_word()
+{
+    let s = "
+abc\\ \t'\";<>&|()$`
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false, true));
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDoc(simple_word_elems, _, is_quoted), _)) => {
+            assert_eq!(String::from("abc\\ \t'\";<>&|()$`\n"), format!("{}", HereDocumentSimpleWordElement(&simple_word_elems[0], is_quoted)));
         },
         _ => assert!(false),
     }
