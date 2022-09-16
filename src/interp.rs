@@ -38,7 +38,7 @@ use crate::xsfprintln;
 pub const DEFAULT_IFS: &'static str = " \t\n";
 pub const DEFAULT_PS4: &'static str = "+ ";
 
-const MAX_PARAM_EXPR_COUNT: u32 = 15;
+const MAX_PARAM_EXPR_COUNT: u32 = 16;
 
 #[derive(Clone, Debug)]
 pub enum Value
