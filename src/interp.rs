@@ -38,6 +38,7 @@ use crate::xsfprintln;
 pub const DEFAULT_IFS: &'static str = " \t\n";
 pub const DEFAULT_PS4: &'static str = "+ ";
 
+const MAX_PARAM_EXPR_COUNT: u32 = 15;
 
 #[derive(Clone, Debug)]
 pub enum Value
@@ -996,7 +997,7 @@ impl Interpreter
         }
     }
 
-    fn evaluate_arith_expr(&mut self, exec: &Executor, expr: &ArithmeticExpression, env: &mut Environment, settings: &Settings) -> Option<i64>
+    fn evaluate_arith_expr(&mut self, exec: &Executor, expr: &ArithmeticExpression, param_expr_count: u32, env: &mut Environment, settings: &Settings) -> Option<i64>
     {
         match expr {
             ArithmeticExpression::Number(_, _, x) => Some(*x),
@@ -1004,22 +1005,42 @@ impl Interpreter
                 match self.param_to_string(exec, param_name, env, settings)? {
                     Some(s) => {
                         if !s.is_empty() {
-                            if is_number_str(s.as_str()) {
-                                match str_to_number(s.as_str()) {
-                                    Ok(x) => Some(x),
-                                    Err(_) => {
-                                        if !s.starts_with('-') {
-                                            xsfprintln!(exec, 2, "{}: Too large number", param_name);
-                                        } else {
-                                            xsfprintln!(exec, 2, "{}: Too small number", param_name);
-                                        }
-                                        self.set_exit(false);
+                            if param_expr_count < MAX_PARAM_EXPR_COUNT {
+                                let mut cursor = Cursor::new(s.as_bytes());
+                                let mut cr = CharReader::new(&mut cursor);
+                                let mut lexer = Lexer::new("(parameter)", &Position::new(1, 1), &mut cr, 0, false);
+                                lexer.push_in_arith_expr_and_param();
+                                let mut parser = Parser::new();
+                                parser.set_error_cont(false);
+                                match parser.parse_arith_expr(&mut lexer, settings) {
+                                    Ok(param_expr) => {
+                                        lexer.pop_state();
+                                        self.evaluate_arith_expr(exec, &param_expr, param_expr_count + 1, env, settings)
+                                    },
+                                    Err(err) => {
+                                        xsfprintln!(exec, 2, "{}", err);
                                         None
                                     },
                                 }
+                                
                             } else {
-                                xsfprintln!(exec, 2, "{}: Invalid number", param_name);
-                                None
+                                if is_number_str(s.as_str()) {
+                                    match str_to_number(s.as_str()) {
+                                        Ok(x) => Some(x),
+                                        Err(_) => {
+                                            if !s.starts_with('-') {
+                                                xsfprintln!(exec, 2, "{}: Too large number", param_name);
+                                            } else {
+                                                xsfprintln!(exec, 2, "{}: Too small number", param_name);
+                                            }
+                                            self.set_exit(false);
+                                            None
+                                        },
+                                    }
+                                } else {
+                                    xsfprintln!(exec, 2, "{}: Invalid number", param_name);
+                                    None
+                                }
                             }
                         } else {
                             Some(0)
@@ -1037,7 +1058,7 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Unary(_, _, UnaryOperator::Negate, expr1) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
                 match x.checked_neg() {
                     Some(y) => Some(y),
                     None => {
@@ -1048,11 +1069,11 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Unary(_, _, UnaryOperator::Not, expr1) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
                 Some(!x)
             },
             ArithmeticExpression::Unary(_, _, UnaryOperator::LogicalNot, expr1) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
                 if x != 0 {
                     Some(0)
                 } else {
@@ -1060,8 +1081,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Multiply, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 match x.checked_mul(y) {
                     Some(z) => Some(z),
                     None => {
@@ -1072,8 +1093,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Divide, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 if y != 0 {
                     match x.checked_div(y) {
                         Some(z) => Some(z),
@@ -1090,8 +1111,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Module, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 if y != 0 {
                     match x.checked_rem(y) {
                         Some(z) => Some(z),
@@ -1108,8 +1129,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Add, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 match x.checked_add(y) {
                     Some(z) => Some(z),
                     None => {
@@ -1120,8 +1141,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Substract, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 match x.checked_sub(y) {
                     Some(z) => Some(z),
                     None => {
@@ -1132,8 +1153,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ShiftLeft, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
                         Some(z) => Some(z),
@@ -1150,8 +1171,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ShiftRight, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
                         Some(z) => Some(z),
@@ -1168,75 +1189,75 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::LessThan, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 Some(if x < y { 1 } else { 0 })
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::GreaterEqual, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 Some(if x >= y { 1 } else { 0 })
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::GreaterThan, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 Some(if x > y { 1 } else { 0 })
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::LessEqual, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 Some(if x <= y { 1 } else { 0 })
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Equal, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 Some(if x == y { 1 } else { 0 })
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::NotEqual, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 Some(if x != y { 1 } else { 0 })
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::And, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 Some(x & y)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ExclusiveOr, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 Some(x ^ y)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Or, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 Some(x | y)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::LogicalAnd, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
                 if x != 0 {
-                    let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                    let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                     Some(y)
                 } else {
                     Some(x)
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::LogicalOr, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
                 if x == 0 {
-                    let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                    let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                     Some(y)
                 } else {
                     Some(x)
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Assign, expr2) => {
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 self.assign_to_arith_expr(exec, &(*expr1), y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::MultiplyAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 match x.checked_mul(y) {
                     Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                     None => {
@@ -1247,8 +1268,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::DivideAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 if y != 0 {
                     match x.checked_div(y) {
                         Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
@@ -1265,8 +1286,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ModuleAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 if y != 0 {
                     match x.checked_rem(y) {
                         Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
@@ -1283,8 +1304,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::AddAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 match x.checked_add(y) {
                     Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                     None => {
@@ -1295,8 +1316,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::SubstractAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 match x.checked_sub(y) {
                     Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
                     None => {
@@ -1307,8 +1328,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ShiftLeftAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
                         Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
@@ -1325,8 +1346,8 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ShiftRightAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 if y <= u32::MAX as i64 && y >= 0 {
                     match x.checked_shl(y as u32) {
                         Some(z) => self.assign_to_arith_expr(exec, &(*expr1), z, env, settings),
@@ -1343,26 +1364,26 @@ impl Interpreter
                 }
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::AndAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 self.assign_to_arith_expr(exec, &(*expr1), x & y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::ExclusiveOrAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 self.assign_to_arith_expr(exec, &(*expr1), x ^ y, env, settings)
             },
             ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::OrAssign, expr2) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
-                let y = self.evaluate_arith_expr(exec, &(*expr2), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
+                let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 self.assign_to_arith_expr(exec, &(*expr1), x | y, env, settings)
             },
             ArithmeticExpression::Conditional(_, _, expr1, expr2, expr3) => {
-                let x = self.evaluate_arith_expr(exec, &(*expr1), env, settings)?;
+                let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
                 if x != 0 {
-                    self.evaluate_arith_expr(exec, &(*expr2), env, settings)
+                    self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)
                 } else {
-                    self.evaluate_arith_expr(exec, &(*expr3), env, settings)
+                    self.evaluate_arith_expr(exec, &(*expr3), param_expr_count, env, settings)
                 }
             },
         }
@@ -1370,7 +1391,7 @@ impl Interpreter
     
     fn perform_arith_expansion(&mut self, exec: &Executor, expr: &ArithmeticExpression, env: &mut Environment, settings: &Settings) -> Option<String>
     {
-        match self.evaluate_arith_expr(exec, expr, env, settings) {
+        match self.evaluate_arith_expr(exec, expr, 0, env, settings) {
             Some(x) => Some(format!("{}", x)),
             None => None,
         }

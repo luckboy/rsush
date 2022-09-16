@@ -9582,6 +9582,46 @@ fn test_parser_parse_arith_expr_parses_expression1_with_conditionals()
 }
 
 #[test]
+fn test_parser_parse_arith_expr_parses_expression_for_in_arithmetic_expression_and_parameter()
+{
+    let s = "1 + 2";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_in_arith_expr_and_param();
+    let mut parser = Parser::new();
+    let settings = Settings::new();
+    match parser.parse_arith_expr(&mut lexer, &settings) {
+        Ok(ArithmeticExpression::Binary(path, pos, expr1, op, expr2)) => {
+            assert_eq!(String::from("test.sh"), path);
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(BinaryOperator::Add, op);
+            match &(*expr1) {
+                ArithmeticExpression::Number(path1, pos1, n1) => {
+                    assert_eq!(&String::from("test.sh"), path1);
+                    assert_eq!(1, pos1.line);
+                    assert_eq!(1, pos1.column);
+                    assert_eq!(1, *n1);
+                },
+                _ => assert!(false),
+            }
+            match &(*expr2) {
+                ArithmeticExpression::Number(path2, pos2, n2) => {
+                    assert_eq!(&String::from("test.sh"), path2);
+                    assert_eq!(1, pos2.line);
+                    assert_eq!(5, pos2.column);
+                    assert_eq!(2, *n2);
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(true, parser.here_docs.is_empty());
+}
+
+#[test]
 fn test_parser_parse_arith_expr_complains_on_syntax_error()
 {
     let s = "))";

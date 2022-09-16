@@ -36,6 +36,7 @@ enum State
     ThirdWord,
     InArithmeticExpression,
     InArithmeticExpressionAndParentheses,
+    InArithmeticExpressionAndParameter,
 }
 
 fn fmt_str(s: &str, f: &mut fmt::Formatter<'_>, is_double_quote: bool, is_here_doc: bool, is_here_doc_word: bool, is_quoted: bool) -> fmt::Result
@@ -445,6 +446,9 @@ impl<'a> Lexer<'a>
 
     pub fn push_in_arith_expr_and_paren(&mut self)
     { self.push_state(State::InArithmeticExpressionAndParentheses); }
+
+    pub fn push_in_arith_expr_and_param(&mut self)
+    { self.push_state(State::InArithmeticExpressionAndParameter); }
     
     fn push_state(&mut self, state: State)
     {
@@ -1208,6 +1212,9 @@ impl<'a> Lexer<'a>
                     State::InArithmeticExpressionAndParentheses => {
                         panic!("current state is in arithmetic expression and parentheses");
                     },
+                    State::InArithmeticExpressionAndParameter => {
+                        panic!("current state is in arithmetic expression and parameter");
+                    },
                     State::HereDocumentWord => {
                         self.skip_spaces(false, settings)?;
                         let token_pos = self.pos;
@@ -1379,19 +1386,27 @@ impl<'a> Lexer<'a>
             Some((arith_token, pos)) => Ok((arith_token, pos)),
             None => {
                 match &self.current_state {
-                    State::InArithmeticExpression | State::InArithmeticExpressionAndParentheses => {
+                    State::InArithmeticExpression | State::InArithmeticExpressionAndParentheses | State::InArithmeticExpressionAndParameter => {
                         self.skip_spaces(true, settings)?;
                         let arith_token_pos = self.pos;
                         match self.get_char(settings)? {
-                            (None, pos) => Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true)),
+                            (None, pos) => {
+                                if self.current_state == State::InArithmeticExpressionAndParameter {
+                                    Ok((ArithmeticToken::EOF, arith_token_pos))
+                                } else {
+                                    Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected end of file"), true))
+                                }
+                            },
                             (Some('('), _) => Ok((ArithmeticToken::LParen, arith_token_pos)),
-                            (Some(')'), _) => {
+                            (Some(')'), pos) => {
                                 if self.current_state == State::InArithmeticExpression {
                                     match self.get_char(settings)? {
                                         (None, pos2) => Err(ParserError::Syntax(self.path.clone(), pos2, String::from("unexpected end of file"), true)),
                                         (Some(')'), _) => Ok((ArithmeticToken::EOF, arith_token_pos)),
                                         (Some(_), pos2) => Err(ParserError::Syntax(self.path.clone(), pos2, String::from("unexpected character"), false)),
                                     }
+                                } else if self.current_state == State::InArithmeticExpressionAndParameter {
+                                    Err(ParserError::Syntax(self.path.clone(), pos, String::from("unexpected character"), false))
                                 } else {
                                     Ok((ArithmeticToken::RParen, arith_token_pos))
                                 }

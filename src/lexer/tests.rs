@@ -3504,6 +3504,32 @@ fn test_lexer_next_arith_token_returns_eof()
 }
 
 #[test]
+fn test_lexer_next_arith_token_returns_eof_for_in_arithmetic_expression_and_parameter()
+{
+    let s = "+";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InArithmeticExpressionAndParameter);
+    let settings = Settings::new();
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::Plus, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+        },
+        _ => assert!(false),            
+    }
+    match lexer.next_arith_token(&settings) {
+        Ok((ArithmeticToken::EOF, pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(2, pos.column);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
 fn test_lexer_undo_arith_token_undoes_tokens()
 {
     let s = "+ -";
