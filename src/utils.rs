@@ -457,7 +457,8 @@ pub fn times() -> Result<Tms>
 {
     let mut libc_tms: libc::tms = unsafe { MaybeUninit::uninit().assume_init() };
     let res = unsafe { libc::times(&mut libc_tms as *mut libc::tms) };
-    if res != -1 {
+    let fail: libc::clock_t = (-1 as i64) as libc::clock_t;
+    if res != fail {
         let tms = Tms {
             utime: libc_tms.tms_utime as i64,
             stime: libc_tms.tms_stime as i64,
