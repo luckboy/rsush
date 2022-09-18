@@ -1,13 +1,12 @@
 # Rsush
 
-Rsush is Rust single Unix shell. This program is written in Rust programming language. This program is
-Unix shell.
+Rsush is Rust single Unix shell. This program is written in the Rust programming language and is a Unix shell.
 
 ## Compliance with standard
 
 This shell is most compliant with the SUSv3 (Single UNIX Specification Version 3). Non-compliance
-with the SUSv3 is most caused size of the shell. This shell contains the built-in commands. These
-built-in commands are from the SUSv3. This program doesn't contain non-standard built-in commands.
+with the SUSv3 is mostly caused by the size of the shell.
+This shell contains the built-in commands from the SUSv3 and does not contain non-standard built-in commands.
 
 ## Installation
 
