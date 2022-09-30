@@ -17,6 +17,12 @@
 //
 use libc;
 
+pub fn set_signals_for_execute()
+{
+    unsafe { libc::signal(libc::SIGTTIN, libc::SIG_DFL); }
+    unsafe { libc::signal(libc::SIGTTOU, libc::SIG_DFL); }
+}
+
 pub fn initialize_signals()
 {
     unsafe { libc::signal(libc::SIGTTIN, libc::SIG_IGN); }

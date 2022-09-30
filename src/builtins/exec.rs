@@ -23,6 +23,7 @@ use crate::env::*;
 use crate::exec::*;
 use crate::interp::*;
 use crate::settings::*;
+use crate::signals::*;
 
 pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, _settings: &mut Settings) -> i32
 {
@@ -34,6 +35,7 @@ pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter
             }
             match exec.close_and_move_files_for_execute() {
                 Ok(()) => {
+                    set_signals_for_execute();
                     let mut cmd = Command::new(prog);
                     cmd.args(&args[2..]);
                     let err = cmd.exec();

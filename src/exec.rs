@@ -32,6 +32,7 @@ use crate::args::*;
 use crate::env::*;
 use crate::interp::*;
 use crate::settings::*;
+use crate::signals::*;
 use crate::utils::*;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -633,6 +634,7 @@ impl Executor
                                 }
                                 match exec.close_and_move_files_for_execute() {
                                     Ok(()) => {
+                                        set_signals_for_execute();
                                         let mut cmd = Command::new(arg0);
                                         cmd.args(args);
                                         let err = cmd.exec();
