@@ -343,7 +343,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
         let ps1 = env.var("PS1").unwrap_or(String::from(default_ps1()));
         match editor.readline(ps1.as_str()) {
             Ok(buf) => {
-                let saved_editor_sigaction = get_sigaction_for_interrupt();
+                let mut saved_editor_sigaction = get_sigaction_for_interrupt();
                 set_sigaction_for_interrupt(&saved_shell_sigaction);
                 if !settings.nolog_flag {
                     editor.add_history_entry(&buf);
@@ -362,6 +362,8 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                             let ps2 = env.var("PS2").unwrap_or(String::from(DEFAULT_PS2));
                             match editor.readline(ps2.as_str()) {
                                 Ok(buf2) => {
+                                    saved_editor_sigaction = get_sigaction_for_interrupt();
+                                    set_sigaction_for_interrupt(&saved_shell_sigaction);
                                     if !settings.nolog_flag {
                                         editor.add_history_entry(&buf2);
                                     }
@@ -381,8 +383,11 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                                             return 1;
                                         },
                                     }
+                                    saved_shell_sigaction = get_sigaction_for_interrupt();
+                                    set_sigaction_for_interrupt(&saved_editor_sigaction);
                                 },
                                 Err(ReadlineError::Interrupted) => {
+                                    saved_editor_sigaction = get_sigaction_for_interrupt();
                                     set_sigaction_for_interrupt(&saved_shell_sigaction);
                                     set_signal_flag(libc::SIGINT);
                                     let saved_last_status = interp.last_status();
@@ -400,10 +405,13 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                                     break None
                                 },
                                 Err(ReadlineError::Eof) => {
+                                    saved_editor_sigaction = get_sigaction_for_interrupt();
+                                    set_sigaction_for_interrupt(&saved_shell_sigaction);
                                     xsfprintln!(exec, 2, "{}", err);
                                     break None
                                 },
                                 Err(err2) => {
+                                    set_sigaction_for_interrupt(&saved_shell_sigaction);
                                     xsfprintln!(exec, 2, "{}", err2);
                                     return 1;
                                 },
@@ -468,12 +476,14 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
             },
             Err(ReadlineError::Eof) => {
                 if !settings.ignoreeof_flag {
+                    set_sigaction_for_interrupt(&saved_shell_sigaction);
                     break interp.last_status();
                 } else {
                     update_jobs(interp, exec, settings);
                 }
             },
             Err(err) => {
+                set_sigaction_for_interrupt(&saved_shell_sigaction);
                 xsfprintln!(exec, 2, "{}", err);
                 return 1;
             },
