@@ -356,9 +356,9 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                     Ok(None) => break interp.last_status(),
                     Ok(Some(tmp_commands)) => Some(tmp_commands),
                     Err(mut err @ ParserError::Syntax(_, _, _, true)) => {
+                        saved_shell_sigaction = get_sigaction_for_interrupt();
+                        set_sigaction_for_interrupt(&saved_editor_sigaction);
                         loop {
-                            saved_shell_sigaction = get_sigaction_for_interrupt();
-                            set_sigaction_for_interrupt(&saved_editor_sigaction);
                             let ps2 = env.var("PS2").unwrap_or(String::from(DEFAULT_PS2));
                             match editor.readline(ps2.as_str()) {
                                 Ok(buf2) => {
@@ -396,7 +396,6 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                                         },
                                         None => (),
                                     }
-                                    set_sigaction_for_interrupt(&saved_editor_sigaction);
                                     xsfprintln!(exec, 2, "{}", err);
                                     break None
                                 },
