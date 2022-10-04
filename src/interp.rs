@@ -30,6 +30,7 @@ use crate::io::*;
 use crate::lexer::*;
 use crate::parser::*;
 use crate::settings::*;
+use crate::signals::*;
 use crate::utils::*;
 use crate::xcfprintln;
 use crate::xsfprint;
@@ -95,6 +96,8 @@ pub struct Interpreter
     last_job_pid: Option<i32>,
     signal_names: HashMap<i32, String>,
     special_builtin_fun_names: HashSet<String>,
+    action_flag: bool,
+    actions: HashMap<i32, String>,
 }
 
 fn set_vars(exec: &Executor, vars: &[(String, String)], env: &mut Environment, settings: &Settings) -> i32
@@ -246,11 +249,16 @@ impl Interpreter
             last_job_pid: None,
             signal_names: sig_names,
             special_builtin_fun_names,
+            action_flag: false,
+            actions: HashMap::new(),
         }
     }
 
     pub fn last_status(&self) -> i32
     { self.last_status }
+    
+    pub fn set_last_status(&mut self, status: i32)
+    { self.last_status = status; }
 
     pub fn has_none(&self) -> bool
     { self.return_state == ReturnState::None }
@@ -425,6 +433,18 @@ impl Interpreter
     fn has_special_builtin_fun(&self, name: &str, env: &Environment) -> bool
     { self.special_builtin_fun_names.contains(&String::from(name)) && env.builtin_fun(name).is_some() }
     
+    pub fn set_action_flag(&mut self)
+    { self.action_flag = true; }
+    
+    pub fn actions(&self) -> &HashMap<i32, String>
+    { &self.actions }
+    
+    pub fn set_action(&mut self, sig: i32, action: String)
+    { self.actions.insert(sig, action); }
+
+    pub fn unset_action(&mut self, sig: i32)
+    { self.actions.remove(&sig); }
+
     fn execute<F>(&mut self, exec: &mut Executor, vars: &[(String, String)], arg0: &str, args: &[String], is_exit_for_err: bool, env: &mut Environment, settings: &mut Settings, name_f: F) -> Option<i32>
         where F: FnOnce() -> String
     {
@@ -2746,6 +2766,10 @@ impl Interpreter
         if settings.noexec_flag {
             return self.last_status;
         }
+        match self.do_actions(exec, env, settings) {
+            Some(tmp_status) => return tmp_status,
+            None => (),
+        }
         let mut f = |exec: &mut Executor, settings: &mut Settings| -> i32 {
             if command.pairs.is_empty() {
                 if settings.noexec_flag { return self.last_status; }
@@ -2779,7 +2803,7 @@ impl Interpreter
                 })
             }
         };
-        if command.is_in_background {
+        let status = if command.is_in_background {
             if settings.noexec_flag { return self.last_status; }
             match exec.create_process(true, settings, f) {
                 Ok(Some(pid)) => {
@@ -2799,7 +2823,12 @@ impl Interpreter
             self.last_status
         } else {
             f(exec, settings)
+        };
+        match self.do_actions(exec, env, settings) {
+            Some(tmp_status) => return tmp_status,
+            None => (),
         }
+        status
     }
     
     pub fn interpret_logical_commands(&mut self, exec: &mut Executor, commands: &[Rc<LogicalCommand>], env: &mut Environment, settings: &mut Settings) -> i32
@@ -2826,6 +2855,72 @@ impl Interpreter
             self.clear_return_state();
         }
         status
+    }
+    
+    pub fn do_action(&mut self, exec: &mut Executor, sig: i32, env: &mut Environment, settings: &mut Settings) -> Option<i32>
+    {
+        if self.action_flag {
+            self.action_flag = false;
+            let res = match self.actions.get(&sig).map(|a| a.clone()) {
+                Some(action) => {
+                    let saved_non_simple_command_count = self.non_simple_command_count;
+                    let saved_fun_count = self.fun_count;
+                    let saved_last_status = self.last_status;
+                    let saved_return_state = self.return_state;
+                    self.non_simple_command_count = 0;
+                    self.fun_count = 0;
+                    self.push_loop_count(0);
+                    self.last_status = 0;
+                    self.return_state = ReturnState::None;
+                    let mut cursor = Cursor::new(action.as_bytes());
+                    let mut cr = CharReader::new(&mut cursor);
+                    let mut lexer = Lexer::new("(action)", &Position::new(1, 1), &mut cr, 0, false);
+                    let mut parser = Parser::new();
+                    parser.set_error_cont(false);
+                    let tmp_res = match parser.parse_logical_commands(&mut lexer, settings) {
+                        Ok(commands) => {
+                            let status = self.interpret_logical_commands(exec, commands.as_slice(), env, settings);
+                            if self.has_exit() {
+                                Some(status)
+                            } else {
+                                self.return_state = saved_return_state;
+                                self.last_status = saved_last_status;
+                                None
+                            }
+                        }
+                        Err(err) => {
+                            xsfprintln!(exec, 2, "{}", err);
+                            Some(self.exit(1, false))
+                        },
+                    };
+                    self.pop_loop_count();
+                    self.fun_count = saved_fun_count;
+                    self.non_simple_command_count = saved_non_simple_command_count;
+                    tmp_res
+                },
+                None => None,
+            };
+            self.action_flag = true;
+            res
+        } else {
+            None
+        }
+    }    
+    
+    pub fn do_actions(&mut self, exec: &mut Executor, env: &mut Environment, settings: &mut Settings) -> Option<i32>
+    {
+        if self.action_flag {
+            for sig in 1..MAX_SIGNAL_COUNT {
+                if has_signal(sig) {
+                    unset_signal_flag(sig);
+                    match self.do_action(exec, sig, env, settings) {
+                        Some(status) => return Some(status),
+                        None => (),
+                    }
+                }
+            }
+        }
+        None
     }
 }
 

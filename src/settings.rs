@@ -59,6 +59,7 @@ pub struct Settings
     pub arg0: String,
     arg_vec_stack: Vec<Arguments>,
     current_args: Arguments,
+    pub interactive_flag: bool,
 }
 
 impl Settings
@@ -85,6 +86,7 @@ impl Settings
             arg0: String::new(),
             arg_vec_stack: Vec::new(),
             current_args: Arguments::new(),
+            interactive_flag: false,
         }
     }
     

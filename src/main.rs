@@ -73,6 +73,9 @@ use io::*;
 use lexer::*;
 use parser::*;
 use settings::*;
+use signals::set_signal_flag;
+use signals::get_sigaction_for_interrupt;
+use signals::set_sigaction_for_interrupt;
 use signals::initialize_signals;
 use utils::*;
 use vars::initialize_vars;
@@ -209,6 +212,8 @@ fn update_jobs(interp: &mut Interpreter, exec: &mut Executor, settings: &Setting
 
 fn intepret_str(s: &str, interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings) -> i32
 {
+    initialize_signals(false);
+    interp.set_action_flag();
     let mut cursor = Cursor::new(s.as_bytes());
     let mut cr = CharReader::new(&mut cursor);
     let mut lexer = Lexer::new("(command string)", &Position::new(1, 1), &mut cr, 0, false);
@@ -225,6 +230,8 @@ fn intepret_str(s: &str, interp: &mut Interpreter, exec: &mut Executor, env: &mu
 
 fn interpret_stream(path: &str, cr: &mut dyn CharRead, interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings, is_ignored_eof: bool) -> (i32, bool)
 {
+    initialize_signals(false);
+    interp.set_action_flag();
     let mut lexer = Lexer::new(path, &Position::new(1, 1), cr, 0, is_ignored_eof);
     let mut parser = Parser::new();
     loop {
@@ -301,7 +308,9 @@ fn parse_stdin_str(s: &str, line: u64, settings: &Settings) -> ParserResult<Opti
 
 fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings) -> i32
 {
-    initialize_signals();
+    settings.interactive_flag = true;
+    initialize_signals(true);
+    interp.set_action_flag();
     exec.set_foreground();
     let _res = setpgid(exec.shell_pid(), exec.shell_pid());
     exec.set_foreground_for_shell(settings);
@@ -321,6 +330,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
         Err(err) if err.kind() == ErrorKind::NotFound => (),
         Err(err) => xsfprintln!(exec, 2, "{}: {}", path, err),
     }
+    let mut saved_shell_sigaction = get_sigaction_for_interrupt();
     let mut editor = match new_rustyline_editor(settings) {
         Ok(tmp_editor) => tmp_editor,
         Err(err) => {
@@ -333,6 +343,8 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
         let ps1 = env.var("PS1").unwrap_or(String::from(default_ps1()));
         match editor.readline(ps1.as_str()) {
             Ok(buf) => {
+                let saved_editor_sigaction = get_sigaction_for_interrupt();
+                set_sigaction_for_interrupt(&saved_shell_sigaction);
                 if !settings.nolog_flag {
                     editor.add_history_entry(&buf);
                 }
@@ -345,6 +357,8 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                     Ok(Some(tmp_commands)) => Some(tmp_commands),
                     Err(mut err @ ParserError::Syntax(_, _, _, true)) => {
                         loop {
+                            saved_shell_sigaction = get_sigaction_for_interrupt();
+                            set_sigaction_for_interrupt(&saved_editor_sigaction);
                             let ps2 = env.var("PS2").unwrap_or(String::from(DEFAULT_PS2));
                             match editor.readline(ps2.as_str()) {
                                 Ok(buf2) => {
@@ -368,7 +382,25 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                                         },
                                     }
                                 },
-                                Err(ReadlineError::Interrupted | ReadlineError::Eof) => {
+                                Err(ReadlineError::Interrupted) => {
+                                    set_sigaction_for_interrupt(&saved_shell_sigaction);
+                                    set_signal_flag(libc::SIGINT);
+                                    let saved_last_status = interp.last_status();
+                                    match interp.do_actions(exec, env, settings) {
+                                        Some(action_status) => {
+                                            if interp.has_exit_with_interactive() {
+                                                return action_status
+                                            }
+                                            interp.clear_return_state();
+                                            interp.set_last_status(saved_last_status);
+                                        },
+                                        None => (),
+                                    }
+                                    set_sigaction_for_interrupt(&saved_editor_sigaction);
+                                    xsfprintln!(exec, 2, "{}", err);
+                                    break None
+                                },
+                                Err(ReadlineError::Eof) => {
                                     xsfprintln!(exec, 2, "{}", err);
                                     break None
                                 },
@@ -412,9 +444,29 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                     },
                     None => (),
                 }
+                saved_shell_sigaction = get_sigaction_for_interrupt();
+                set_sigaction_for_interrupt(&saved_editor_sigaction);
                 update_jobs(interp, exec, settings);
             }
-            Err(ReadlineError::Interrupted) => update_jobs(interp, exec, settings),
+            Err(ReadlineError::Interrupted) => {
+                let saved_editor_sigaction = get_sigaction_for_interrupt();
+                set_sigaction_for_interrupt(&saved_shell_sigaction);
+                set_signal_flag(libc::SIGINT);
+                let saved_last_status = interp.last_status();
+                match interp.do_actions(exec, env, settings) {
+                    Some(action_status) => {
+                        if interp.has_exit_with_interactive() {
+                            return action_status
+                        }
+                        interp.clear_return_state();
+                        interp.set_last_status(saved_last_status);
+                    },
+                    None => (),
+                }
+                saved_shell_sigaction = get_sigaction_for_interrupt();
+                set_sigaction_for_interrupt(&saved_editor_sigaction);
+                update_jobs(interp, exec, settings);
+            },
             Err(ReadlineError::Eof) => {
                 if !settings.ignoreeof_flag {
                     break interp.last_status();
@@ -435,7 +487,7 @@ fn interpret(shell_commands: ShellCommands, interp: &mut Interpreter, exec: &mut
     exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(unsafe { File::from_raw_fd(0) })));
     exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(unsafe { File::from_raw_fd(1) })));
     exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(unsafe { File::from_raw_fd(2) })));
-    let status = match shell_commands {
+    let mut status = match shell_commands {
         ShellCommands::FromString(s) => intepret_str(s.as_str(), interp, exec, env, settings),
         ShellCommands::FromFile(None) => {
             if opts.interactive_flag.unwrap_or(isatty(0).unwrap_or(false)) {
@@ -456,6 +508,10 @@ fn interpret(shell_commands: ShellCommands, interp: &mut Interpreter, exec: &mut
             }
         },
     };
+    match interp.do_action(exec, 0, env, settings) {
+        Some(action_status) => status = action_status,
+        None => (),
+    }
     exec.clear_files();
     status
 }
