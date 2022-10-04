@@ -61,6 +61,13 @@ pub fn initialize_signals(sigs: &mut HashMap<String, i32>)
     sigs.insert(String::from("XFSZ"), libc::SIGXFSZ);
 }
 
+fn initialize_signal_names(sigs: &HashMap<String, i32>, sig_names: &mut HashMap<i32, String>)
+{
+    for (sig_name, sig) in sigs.iter() {
+        sig_names.insert(*sig, sig_name.clone());
+    }
+}
+
 pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interpreter, exec: &mut Executor, _env: &mut Environment, settings: &mut Settings) -> i32
 {
     let mut sigs: HashMap<String, i32> = HashMap::new();
@@ -120,15 +127,15 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
         None => {
             match exec.current_file(1) {
                 Some(stdout_file) => {
+                    let mut sig_names: HashMap<i32, String> = HashMap::new();
+                    initialize_signal_names(&sigs, &mut sig_names);
                     let mut stdout_file_r = stdout_file.borrow_mut();
                     let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
                     for (sig, action) in interp.actions().iter() {
                         let mut sig_name = format!("{}", sig);
-                        for (tmp_sig_name, tmp_sig) in sigs.iter() {
-                            if sig == tmp_sig {
-                                sig_name = tmp_sig_name.clone();
-                                break;
-                            }
+                        match sig_names.get(sig) {
+                            Some(tmp_sig_name) => sig_name = tmp_sig_name.clone(),
+                            None => (),
                         }
                         fprintln!(&mut line_stdout, "trap -- {} {}", singly_quote_str(action.as_str()), sig_name);
                     }
