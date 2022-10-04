@@ -21,7 +21,7 @@ use std::ptr::null;
 use std::ptr::null_mut;
 use libc;
 
-pub const MAX_SIGNAL_COUNT: i32 = 256;
+pub const MAX_SIGNAL_COUNT: i32 = 257;
 
 #[derive(Copy, Clone)]
 pub struct Sigaction
