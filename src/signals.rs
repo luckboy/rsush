@@ -24,7 +24,7 @@ use libc;
 pub const MAX_SIGNAL_COUNT: i32 = 257;
 
 #[derive(Copy, Clone)]
-pub struct Sigaction
+pub struct SigAction
 {
     libc_sigaction: libc::sigaction,
 }
@@ -84,9 +84,9 @@ pub fn set_signal(sig: i32, is_handler: bool, is_interactive: bool) -> Result<()
     }
 }
 
-pub fn get_sigaction(sig: i32) -> Result<Sigaction>
+pub fn get_sigaction(sig: i32) -> Result<SigAction>
 {
-    let mut sigact: Sigaction = unsafe { MaybeUninit::uninit().assume_init() };
+    let mut sigact: SigAction = unsafe { MaybeUninit::uninit().assume_init() };
     let res = unsafe { libc::sigaction(sig, null(), &mut sigact.libc_sigaction as *mut libc::sigaction) };
     if res != -1 {
         Ok(sigact)
@@ -95,7 +95,7 @@ pub fn get_sigaction(sig: i32) -> Result<Sigaction>
     }
 }
 
-pub fn set_sigaction(sig: i32, sigact: &Sigaction) -> Result<()>
+pub fn set_sigaction(sig: i32, sigact: &SigAction) -> Result<()>
 {
     let res = unsafe { libc::sigaction(sig, &sigact.libc_sigaction as *const libc::sigaction, null_mut()) };
     if res != -1 {
@@ -105,10 +105,10 @@ pub fn set_sigaction(sig: i32, sigact: &Sigaction) -> Result<()>
     }
 }
 
-pub fn get_sigaction_for_interrupt() -> Sigaction
+pub fn get_sigaction_for_interrupt() -> SigAction
 { get_sigaction(libc::SIGINT).unwrap() }
 
-pub fn set_sigaction_for_interrupt(sigact: &Sigaction)
+pub fn set_sigaction_for_interrupt(sigact: &SigAction)
 { let _res = set_sigaction(libc::SIGINT, sigact); }
 
 pub fn set_signals_for_execute()
