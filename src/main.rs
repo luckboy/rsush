@@ -435,13 +435,18 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                     Some(commands) => {
                         let old_edit_mode_flags = EditModeFlags::from_settings(settings);
                         let status = interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
+                        saved_shell_sigaction = get_sigaction_for_interrupt();
+                        set_sigaction_for_interrupt(&saved_editor_sigaction);
                         match update_rustyline_edit_mode(editor, &old_edit_mode_flags, settings) {
                             Ok(tmp_editor) => editor = tmp_editor,
                             Err(err) => {
+                                set_sigaction_for_interrupt(&saved_shell_sigaction);
                                 xsfprintln!(exec, 2, "{}", err);
                                 return 1;
                             }
                         }
+                        saved_editor_sigaction = get_sigaction_for_interrupt();
+                        set_sigaction_for_interrupt(&saved_shell_sigaction);
                         if interp.has_break_or_continue_or_return_or_exit() {
                             if interp.has_exit_with_interactive() {
                                 break status;
