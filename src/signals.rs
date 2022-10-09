@@ -74,7 +74,7 @@ pub fn set_signal(sig: i32, is_handler: bool, is_interactive: bool) -> Result<()
         }
     }
     unsafe { libc::sigfillset(&mut sigact.sa_mask as *mut libc::sigset_t); }
-    sigact.sa_flags = 0;
+    sigact.sa_flags = libc::SA_RESTART;
     let res = unsafe { libc::sigaction(sig, &sigact as *const libc::sigaction, null_mut()) };
     if res != -1 {
         Ok(())
