@@ -1437,7 +1437,7 @@ fn test_executor_set_job_last_status_sets_job_last_status()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_add_job_adds_job_without_pids()
+fn test_executor_add_job_adds_job_without_pids_and_process_names()
 {
     let mut exec = Executor::new();
     match exec.add_job(&Job::new(1234, "test")) {
@@ -1448,6 +1448,7 @@ fn test_executor_add_job_adds_job_without_pids()
         Some(job) => {
             assert_eq!(Vec::<i32>::new(), job.pids);
             assert_eq!(Vec::<WaitStatus>::new(), job.statuses);
+            assert_eq!(Vec::<String>::new(), job.process_names);
             assert_eq!(1234, job.last_pid);
             assert_eq!(WaitStatus::None, job.last_status);
             assert_eq!(1234, job.pgid);
@@ -1461,10 +1462,10 @@ fn test_executor_add_job_adds_job_without_pids()
 }
 
 #[sealed_test(before=setup(), after=teardown())]
-fn test_executor_add_job_adds_job_with_pids()
+fn test_executor_add_job_adds_job_with_pids_and_process_names()
 {
     let mut exec = Executor::new();
-    match exec.add_job(&Job::new_with_pids(vec![2345, 3456], 1234, 4567, "test")) {
+    match exec.add_job(&Job::new_with_pids_and_process_names(vec![2345, 3456], vec![String::from("test1"), String::from("test2")], 1234, "test3", 4567, "test")) {
         Some(job_id) => assert_eq!(job_id, 1),
         _ => assert!(false),
     }
@@ -1476,8 +1477,14 @@ fn test_executor_add_job_adds_job_with_pids()
                 WaitStatus::None
             ];
             assert_eq!(expected_statuses, job.statuses);
+            let expected_process_names = vec![
+                String::from("test1"),
+                String::from("test2")
+            ];
+            assert_eq!(expected_process_names, job.process_names);
             assert_eq!(1234, job.last_pid);
             assert_eq!(WaitStatus::None, job.last_status);
+            assert_eq!(String::from("test3"), job.last_process_name);
             assert_eq!(4567, job.pgid);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(false, job.show_flag);
@@ -1492,7 +1499,7 @@ fn test_executor_add_job_adds_job_with_pids()
 fn test_executor_set_job_status_sets_job_status()
 {
     let mut exec = Executor::new();
-    match exec.add_job(&Job::new_with_pids(vec![2345, 3456], 1234, 4567, "test")) {
+    match exec.add_job(&Job::new_with_pids_and_process_names(vec![2345, 3456], vec![String::from("test1"), String::from("test2")], 1234, "test3", 4567, "test")) {
         Some(job_id) => assert_eq!(job_id, 1),
         _ => assert!(false),
     }
@@ -1505,8 +1512,14 @@ fn test_executor_set_job_status_sets_job_status()
                 WaitStatus::None
             ];
             assert_eq!(expected_statuses, job.statuses);
+            let expected_process_names = vec![
+                String::from("test1"),
+                String::from("test2")
+            ];
+            assert_eq!(expected_process_names, job.process_names);
             assert_eq!(1234, job.last_pid);
             assert_eq!(WaitStatus::None, job.last_status);
+            assert_eq!(String::from("test3"), job.last_process_name);
             assert_eq!(4567, job.pgid);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(false, job.show_flag);
@@ -1521,7 +1534,7 @@ fn test_executor_set_job_status_sets_job_status()
 fn test_executor_set_job_statuses_sets_job_statuses()
 {
     let mut exec = Executor::new();
-    match exec.add_job(&Job::new_with_pids(vec![2345, 3456], 1234, 4567, "test")) {
+    match exec.add_job(&Job::new_with_pids_and_process_names(vec![2345, 3456], vec![String::from("test1"), String::from("test2")], 1234, "test3", 4567, "test")) {
         Some(job_id) => assert_eq!(job_id, 1),
         _ => assert!(false),
     }
@@ -1534,8 +1547,14 @@ fn test_executor_set_job_statuses_sets_job_statuses()
                 WaitStatus::Signaled(2, false)
             ];
             assert_eq!(expected_statuses, job.statuses);
+            let expected_process_names = vec![
+                String::from("test1"),
+                String::from("test2")
+            ];
+            assert_eq!(expected_process_names, job.process_names);
             assert_eq!(1234, job.last_pid);
             assert_eq!(WaitStatus::None, job.last_status);
+            assert_eq!(String::from("test3"), job.last_process_name);
             assert_eq!(4567, job.pgid);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(false, job.show_flag);
@@ -1550,7 +1569,7 @@ fn test_executor_set_job_statuses_sets_job_statuses()
 fn test_executor_set_job_show_flag_sets_job_show_flag()
 {
     let mut exec = Executor::new();
-    match exec.add_job(&Job::new_with_pids(vec![2345, 3456], 1234, 4567, "test")) {
+    match exec.add_job(&Job::new_with_pids_and_process_names(vec![2345, 3456], vec![String::from("test1"), String::from("test2")], 1234, "test3", 4567, "test")) {
         Some(job_id) => assert_eq!(job_id, 1),
         _ => assert!(false),
     }
@@ -1563,8 +1582,14 @@ fn test_executor_set_job_show_flag_sets_job_show_flag()
                 WaitStatus::None
             ];
             assert_eq!(expected_statuses, job.statuses);
+            let expected_process_names = vec![
+                String::from("test1"),
+                String::from("test2")
+            ];
+            assert_eq!(expected_process_names, job.process_names);
             assert_eq!(1234, job.last_pid);
             assert_eq!(WaitStatus::None, job.last_status);
+            assert_eq!(String::from("test3"), job.last_process_name);
             assert_eq!(4567, job.pgid);
             assert_eq!(String::from("test"), job.name);
             assert_eq!(true, job.show_flag);

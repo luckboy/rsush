@@ -33,6 +33,7 @@ mod exit;
 mod export;
 mod fg;
 mod getopts;
+mod jobs;
 mod read;
 mod readonly;
 mod r#return;
@@ -61,6 +62,7 @@ pub fn initialize_builtin_funs(env: &mut Environment)
     env.set_builtin_fun("export", export::main);
     env.set_builtin_fun("fg", fg::main);
     env.set_builtin_fun("getopts", getopts::main);
+    env.set_builtin_fun("jobs", jobs::main);
     env.set_builtin_fun("read", read::main);
     env.set_builtin_fun("readonly", readonly::main);
     env.set_builtin_fun("return", r#return::main);

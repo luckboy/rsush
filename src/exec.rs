@@ -87,8 +87,10 @@ pub struct Job
 {
     pub pids: Vec<i32>,
     pub statuses: Vec<WaitStatus>,
+    pub process_names: Vec<String>,
     pub last_pid: i32,
     pub last_status: WaitStatus,
+    pub last_process_name: String,
     pub pgid: i32,
     pub name: String,
     pub show_flag: bool,
@@ -103,8 +105,10 @@ impl Job
         Job {
             pids: Vec::new(),
             statuses: Vec::new(),
+            process_names: Vec::new(),
             last_pid,
             last_status: WaitStatus::None,
+            last_process_name: String::from(name),
             pgid: last_pid,
             name: String::from(name),
             show_flag: false,
@@ -113,14 +117,16 @@ impl Job
         }
     }
     
-    pub fn new_with_pids(pids: Vec<i32>, last_pid: i32, pgid: i32, name: &str) -> Job
+    pub fn new_with_pids_and_process_names(pids: Vec<i32>, process_names: Vec<String>, last_pid: i32, last_process_name: &str, pgid: i32, name: &str) -> Job
     {
         let len = pids.len();
         Job {
             pids,
             statuses: vec![WaitStatus::None; len],
+            process_names,
             last_pid,
             last_status: WaitStatus::None,
+            last_process_name: String::from(last_process_name),
             pgid: pgid,
             name: String::from(name),
             show_flag: false,

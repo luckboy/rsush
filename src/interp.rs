@@ -100,6 +100,14 @@ pub struct Interpreter
     actions: HashMap<i32, String>,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum JobFormatFlag
+{
+    None,
+    Long,
+    Process,
+}
+
 fn set_vars(exec: &Executor, vars: &[(String, String)], env: &mut Environment, settings: &Settings) -> i32
 {
     for (name, value) in vars.iter() {
@@ -157,11 +165,12 @@ fn add_job_for_sigtstp<F>(exec: &mut Executor, last_pid: i32, name_f: F) -> bool
 }
 
 fn add_job_with_pids_for_sigtstp<F>(exec: &mut Executor, pids: &[i32], last_pid: i32, pgid: i32, name_f: F) -> bool
-    where F: FnOnce() -> String
+    where F: FnOnce(usize) -> (Vec<String>, String, String)
 {
     let mut tmp_pids: Vec<i32> = Vec::new();
     tmp_pids.extend_from_slice(pids);
-    match exec.add_job(&Job::new_with_pids(tmp_pids, last_pid, pgid, name_f().as_str())) {
+    let (process_names, last_process_name, name) = name_f(pids.len());
+    match exec.add_job(&Job::new_with_pids_and_process_names(tmp_pids, process_names, last_pid, last_process_name.as_str(), pgid, name.as_str())) {
         Some(job_id) => {
             exec.set_job_statuses(job_id, vec![WaitStatus::Stopped(libc::SIGTSTP); pids.len()]);
             exec.set_job_last_status(job_id, WaitStatus::Stopped(libc::SIGTSTP));
@@ -528,7 +537,7 @@ impl Interpreter
     }
 
     pub fn wait_for_processes<F>(&mut self, exec: &mut Executor, pids: &[Option<i32>], pgid: Option<i32>, count: usize, is_exit_for_err: bool, settings: &Settings, name_f: F) -> (Option<i32>, bool)
-        where F: FnOnce() -> String
+        where F: FnOnce(usize) -> (Vec<String>, String, String)
     {
         let mut job_pids: Vec<i32> = Vec::new();
         let mut res: Option<i32> = None;
@@ -1837,7 +1846,7 @@ impl Interpreter
     
     fn interpret_redirects<F, G>(&mut self, exec: &mut Executor, redirects: &[Rc<Redirection>], is_special_builtin_fun: bool, env: &mut Environment, settings: &mut Settings, f: F, name_f: G) -> i32
         where F: FnOnce(&mut Self, &mut Executor, &mut Environment, &mut Settings) -> i32,
-              G: FnOnce() -> String
+              G: FnOnce(usize) -> (Vec<String>, String, String)
     {
         let mut is_success = true;
         let mut interp_redirects: Vec<InterpreterRedirection> = Vec::new();
@@ -2343,9 +2352,15 @@ impl Interpreter
                                     } else if settings.extxtrace_flag {
                                         print_command_for_xtrace_or_extxtrace(exec, Some((path, pos)), vars.as_slice(), args.as_slice(), env);
                                     }
+                                    let name0 = settings.arg0.clone();
+                                    let name_f = |count: usize| {
+                                        let process_names = vec![name0; count];
+                                        let name = format!("{}", command);
+                                        (process_names, name.clone(), name)
+                                    };
                                     self.interpret_redirects(exec, redirects.as_slice(), self.has_special_builtin_fun(arg0.as_str(), env), env, settings, |interp, exec, env, settings| {
                                             interp.execute(exec, vars.as_slice(), arg0.as_str(), &args[1..], false, env, settings, || format!("{}", command)).unwrap_or(1)
-                                    }, || format!("{}", command))
+                                    }, name_f)
                                 },
                                 None => {
                                     if settings.xtrace_flag {
@@ -2353,9 +2368,15 @@ impl Interpreter
                                     } else if settings.extxtrace_flag {
                                         print_command_for_xtrace_or_extxtrace(exec, Some((path, pos)), vars.as_slice(), &[], env);
                                     }
+                                    let name0 = settings.arg0.clone();
+                                    let name_f = |count: usize| {
+                                        let process_names = vec![name0; count];
+                                        let name = format!("{}", command);
+                                        (process_names, name.clone(), name)
+                                    };
                                     self.interpret_redirects(exec, redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                                             set_vars(exec, vars.as_slice(), env, settings)
-                                    }, || format!("{}", command))
+                                    }, name_f)
                                 },
                             }
                         } else {
@@ -2371,9 +2392,15 @@ impl Interpreter
                 } else if settings.extxtrace_flag {
                     print_command_for_xtrace_or_extxtrace(exec, Some((path, pos)), vars.as_slice(), &[], env);
                 }
+                let name0 = settings.arg0.clone();
+                let name_f = |count: usize| {
+                    let process_names = vec![name0; count];
+                    let name = format!("{}", command);
+                    (process_names, name.clone(), name)
+                };
                 self.interpret_redirects(exec, command.redirects.as_slice(), false, env, settings, |_, exec, env, settings| {
                         set_vars(exec, vars.as_slice(), env, settings)
-                }, || format!("{}", command))
+                }, name_f)
             },
             None => 1,
         };
@@ -2387,7 +2414,7 @@ impl Interpreter
 
     fn interpret_compound_command<F, G>(&mut self, exec: &mut Executor, command: &CompoundCommand, redirects: &[Rc<Redirection>], env: &mut Environment, settings: &mut Settings, name_f: F, name_g: G) -> i32
         where F: FnOnce() -> String,
-              G: FnOnce() -> String
+              G: FnOnce(usize) -> (Vec<String>, String, String)
     {
         self.interpret_redirects(exec, redirects, false, env, settings, |interp, exec, env, settings| {
                 match command {
@@ -2662,7 +2689,15 @@ impl Interpreter
         env.set_var("LINENO", format!("{}", command.pos().line).as_str(), settings);
         match command {
             Command::Simple(path, pos, simple_command) => self.interpret_simple_command(exec, path.as_str(), pos, &(*simple_command), env, settings),
-            Command::Compound(_, _, compound_command, redirects) => self.interpret_compound_command(exec, &(*compound_command), redirects.as_slice(), env, settings, || format!("{}", command), || format!("{}", command)),
+            Command::Compound(_, _, compound_command, redirects) => {
+                let name0 = settings.arg0.clone();
+                let name_g = |count: usize| {
+                    let process_names = vec![name0; count];
+                    let name = format!("{}", command);
+                    (process_names, name.clone(), name)
+                };
+                self.interpret_compound_command(exec, &(*compound_command), redirects.as_slice(), env, settings, || format!("{}", command), name_g)
+            },
             Command::FunctionDefinition(_, _, name_word, fun_body) => self.interpret_fun_def(exec, &(*name_word), fun_body, env, settings),
         }
     }
@@ -2737,7 +2772,16 @@ impl Interpreter
                     status = 1;
                     let pgid = pids.last().map(|pid| *pid).unwrap_or(None);
                     set_process_group_and_foreground_for_processes(exec, pids.as_slice(), pgid, settings);
-                    match self.wait_for_processes(exec, pids.as_slice(), pgid, pids.len(), false, settings, || format!("{}", command)) {
+                    let name_f = |_: usize| {
+                        let commands = &command.commands[0..(command.commands.len() - 1)];
+                        let mut process_names: Vec<String> = Vec::new();
+                        for tmp_command in commands {
+                            process_names.push(format!("{} |", tmp_command));
+                        }
+                        let last_process_name = format!("{}", command.commands[(command.commands.len() - 1)]);
+                        (process_names, last_process_name, format!("{}", command))
+                    };
+                    match self.wait_for_processes(exec, pids.as_slice(), pgid, pids.len(), false, settings, name_f) {
                         (Some(tmp_status), _) => {
                             if command.commands.len() == pids.len() {
                                 status = tmp_status
@@ -2848,7 +2892,13 @@ impl Interpreter
     {
         self.fun_count += 1;
         self.push_loop_count(0);
-        let status = self.interpret_compound_command(exec, &fun_body.command, fun_body.redirects.as_slice(), env, settings, || format!("{}", fun_body), || format!("{}", fun_body));
+        let name0 = settings.arg0.clone();
+        let name_g = |count: usize| {
+            let process_names = vec![name0; count];
+            let name = format!("{}", fun_body);
+            (process_names, name.clone(), name)
+        };
+        let status = self.interpret_compound_command(exec, &fun_body.command, fun_body.redirects.as_slice(), env, settings, || format!("{}", fun_body), name_g);
         self.pop_loop_count();
         self.fun_count -= 1;
         if self.has_break_or_continue_or_return() {
@@ -2921,6 +2971,57 @@ impl Interpreter
             }
         }
         None
+    }
+    
+    pub fn job_to_string(&self, exec: &Executor, job_id: u32, job: &Job, wait_status: Option<WaitStatus>, job_format_flag: JobFormatFlag) -> String
+    {
+        match job_format_flag {
+            JobFormatFlag::Process => format!("{}", job.last_pid),
+            _ => {
+                let current = if exec.current_job_id().map(|id| id == job_id).unwrap_or(false) {
+                    '+'
+                } else if exec.prev_current_job_id().map(|id| id == job_id).unwrap_or(false) {
+                    '-'
+                } else {
+                    ' '
+                };
+                let wait_status = match wait_status {
+                    Some(tmp_wait_status) => tmp_wait_status,
+                    None => job.last_status,
+                };
+                let mut status = match wait_status {
+                    WaitStatus::None => String::from("Running"),
+                    WaitStatus::Exited(0) => String::from("Done"),
+                    WaitStatus::Exited(status) => format!("Done ({})", status),
+                    WaitStatus::Signaled(sig, is_coredump) => self.signal_string(sig, is_coredump),
+                    WaitStatus::Stopped(sig) => self.signal_string(sig, false),
+                };
+                let mut job_id_and_current = format!("[{}]{}", job_id, current);
+                match job_format_flag {
+                    JobFormatFlag::None => {
+                        format!("{:<5} {:<35} {}", job_id_and_current, status, job.name)
+                    },
+                    _ => {
+                        let mut s = String::new();
+                        let mut is_first = true;
+                        for (pid, process_name) in job.pids.iter().zip(job.process_names.iter()) {
+                            if !is_first {
+                                s.push('\n');
+                            }
+                            s.push_str(format!("{:<5} {:5} {:<35} {}", job_id_and_current, pid, status, process_name).as_str());
+                            status = String::new();
+                            job_id_and_current = String::new();
+                            is_first = false;
+                        }
+                        if !is_first {
+                            s.push('\n');
+                        }
+                        s.push_str(format!("{:<5} {:5} {:<35} {}", job_id_and_current, job.last_pid, status, job.last_process_name).as_str());
+                        s
+                    },
+                }
+            },
+        }
     }
 }
 

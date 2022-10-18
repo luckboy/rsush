@@ -183,22 +183,7 @@ fn update_jobs(interp: &mut Interpreter, exec: &mut Executor, settings: &Setting
         if settings.notify_flag {
             match wait_status {
                 WaitStatus::None => (),
-                _ => {
-                    let current = if exec.current_job_id().map(|id| id == *job_id).unwrap_or(false) {
-                        '+'
-                    } else if exec.prev_current_job_id().map(|id| id == *job_id).unwrap_or(false) {
-                        '-'
-                    } else {
-                        ' '
-                    };
-                    let status = match wait_status {
-                        WaitStatus::None => String::new(),
-                        WaitStatus::Exited(_) => String::from("Done"),
-                        WaitStatus::Signaled(sig, is_coredump) => interp.signal_string(sig, is_coredump),
-                        WaitStatus::Stopped(sig) => interp.signal_string(sig, false),
-                    };
-                    xsfprintln!(exec, 2, "[{}]{} {} {}", job_id, current, status, job.name);
-                },
+                _ => xsfprintln!(exec, 2, "{}", interp.job_to_string(exec, *job_id, job, Some(wait_status), JobFormatFlag::None)),
             }
         }
     }
