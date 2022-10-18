@@ -86,14 +86,27 @@ pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpret
     let mut status = 0;
     if args.len() > 1 {
         for arg in &args[1..] {
-            match arg.parse::<u32>() {
+            match exec.parse_job_id(arg.as_str()) {
                 Ok(job_id) => {
                     if !run_job_in_background(job_id, exec, settings) {
                         status = 1;
                     }
                 },
-                Err(_) => {
-                    xcfprintln!(exec, 2, "Invalid number");
+                Err(JobIdError::NoPercent) => {
+                    match arg.parse::<u32>() {
+                        Ok(job_id) => {
+                            if !run_job_in_background(job_id, exec, settings) {
+                                status = 1;
+                            }
+                        },
+                        Err(_) => {
+                            xcfprintln!(exec, 2, "Invalid number");
+                            status = 1;
+                        },
+                    }
+                },
+                Err(err) => {
+                    xcfprintln!(exec, 2, "{}", err);
                     status = 1;
                 },
             }

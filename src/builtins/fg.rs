@@ -30,16 +30,23 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
 {
     let job_id = match args.get(1) {
         Some(arg) => {
-            match arg.parse::<u32>() {
-                Ok(tmp_job_id) => {
-                    if args.len() > 2 {
-                        xcfprintln!(exec, 2, "Too many arguments");
-                        return 1;
+            if args.len() > 2 {
+                xcfprintln!(exec, 2, "Too many arguments");
+                return 1;
+            }
+            match exec.parse_job_id(arg.as_str()) {
+                Ok(tmp_job_id) => tmp_job_id,
+                Err(JobIdError::NoPercent) => {
+                    match arg.parse::<u32>() {
+                        Ok(tmp_job_id) => tmp_job_id,
+                        Err(_) => {
+                            xcfprintln!(exec, 2, "Invalid number");
+                            return 1;
+                        },
                     }
-                    tmp_job_id
                 },
-                Err(_) => {
-                    xcfprintln!(exec, 2, "Invalid number");
+                Err(err) => {
+                    xcfprintln!(exec, 2, "{}", err);
                     return 1;
                 },
             }

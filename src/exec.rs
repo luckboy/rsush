@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::cell::*;
 use std::io::*;
+use std::fmt;
 use std::fs::*;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::FromRawFd;
@@ -27,6 +28,7 @@ use std::process;
 use std::process::Command;
 use std::process::exit;
 use std::rc::*;
+use std::result;
 use libc;
 use crate::args::*;
 use crate::env::*;
@@ -661,12 +663,85 @@ impl Executor
             },
         }
     }
+    
+    pub fn parse_job_id(&self, s: &str) -> JobIdResult
+    {
+        if s == "%%" || s == "%+" {
+            match self.current_job_id() {
+                Some(job_id) => Ok(job_id),
+                None => Err(JobIdError::NoJob),
+            }
+        } else if s == "%-" {
+            match self.prev_current_job_id() {
+                Some(job_id) => Ok(job_id),
+                None => Err(JobIdError::NoJob),
+            }
+        } else if s.starts_with("%?") {
+            let mut job_id: Option<u32> = None;
+            for (tmp_job_id, tmp_job) in self.jobs.iter() {
+                if tmp_job.name.contains(&s[2..]) {
+                    if job_id.is_some() {
+                        return Err(JobIdError::Ambiguous);
+                    }
+                    job_id = Some(*tmp_job_id);
+                }
+            }
+            match job_id {
+                Some(job_id) => Ok(job_id),
+                None => Err(JobIdError::NotFound),
+            }
+        } else if s.starts_with("%") {
+            match s[1..].parse::<u32>() {
+                Ok(job_id) => Ok(job_id),
+                Err(_) => {
+                    let mut job_id: Option<u32> = None;
+                    for (tmp_job_id, tmp_job) in self.jobs.iter() {
+                        if tmp_job.name.starts_with(&s[1..]) {
+                            if job_id.is_some() {
+                                return Err(JobIdError::Ambiguous);
+                            }
+                            job_id = Some(*tmp_job_id);
+                        }
+                    }
+                    match job_id {
+                        Some(job_id) => Ok(job_id),
+                        None => Err(JobIdError::NotFound),
+                    }
+                },
+            }
+        } else {
+            Err(JobIdError::NoPercent)
+        }
+    }
 }
 
 pub fn set_process_group(pid: i32, pgid: i32, settings: &Settings)
 {
     if settings.monitor_flag {
         let _res = setpgid(pid, pgid);
+    }
+}
+
+pub type JobIdResult = result::Result<u32, JobIdError>;
+
+pub enum JobIdError
+{
+    NoPercent,
+    Ambiguous,
+    NotFound,
+    NoJob,
+}
+
+impl fmt::Display for JobIdError
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    {
+        match self {
+            JobIdError::NoPercent => write!(f, "No percent"),
+            JobIdError::Ambiguous => write!(f, "String is ambiguous"),
+            JobIdError::NotFound => write!(f, "Can't find job"),
+            JobIdError::NoJob => write!(f, "NoJob"),
+        }
     }
 }
 
