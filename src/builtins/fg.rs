@@ -116,7 +116,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
             },
         }
         exec.remove_job(job_id);
-        interp.wait_for_processes(exec, pids.as_slice(), Some(job.pgid), pids.len(), false, settings, |_: usize| (job.process_names.clone(), job.last_process_name.clone(), job.name.clone())).0.unwrap_or(1)
+        interp.wait_for_processes(exec, pids.as_slice(), Some(job.pgid), pids.len(), true, false, settings, |_: usize| (job.process_names.clone(), job.last_process_name.clone(), job.name.clone())).0.unwrap_or(1)
     } else {
         1
     }

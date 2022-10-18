@@ -494,25 +494,31 @@ impl Interpreter
         res
     }
     
-    pub fn wait_for_process<F>(&mut self, exec: &mut Executor, pid: Option<i32>, is_exit_for_err: bool, settings: &Settings, name_f: F) -> Option<i32>
-        where F: FnOnce() -> String
+    pub fn wait_for_process<F, G>(&mut self, exec: &mut Executor, pid: Option<i32>, is_untraced: bool, is_exit_for_err: bool, settings: &Settings, name_f: F, g: G) -> Option<i32>
+        where F: FnOnce() -> String,
+              G: FnOnce(&mut Executor, WaitStatus)
     {
         let mut job_pid: Option<i32> = None;
         let res = loop {
-            match exec.wait_for_process(pid, true, true, true, settings) {
+            match exec.wait_for_process(pid, true, is_untraced, true, settings) {
                 Ok(WaitStatus::None) => panic!("wait status is none"),
-                Ok(WaitStatus::Exited(status)) => break Some(status),
-                Ok(WaitStatus::Signaled(sig, is_coredump)) => {
+                Ok(wait_status @ WaitStatus::Exited(status)) => {
+                    g(exec, wait_status);
+                    break Some(status);
+                },
+                Ok(wait_status @ WaitStatus::Signaled(sig, is_coredump)) => {
+                    g(exec, wait_status);
                     if is_exit_for_err {
-                    xsfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
+                        xsfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
                     } else {
                         xcfprintln!(exec, 2, "{}", self.signal_string(sig, is_coredump));
                     }
                     break Some(sig + 128);
                 },
-                Ok(WaitStatus::Stopped(sig @ libc::SIGTSTP)) => {
+                Ok(wait_status @ WaitStatus::Stopped(sig @ libc::SIGTSTP)) => {
                     exec.set_foreground_for_shell(settings);
                     job_pid = pid;
+                    g(exec, wait_status);
                     if is_exit_for_err {
                         xsfprintln!(exec, 2, "{}", self.signal_string(sig, false));
                     } else {
@@ -536,7 +542,7 @@ impl Interpreter
         res
     }
 
-    pub fn wait_for_processes<F>(&mut self, exec: &mut Executor, pids: &[Option<i32>], pgid: Option<i32>, count: usize, is_exit_for_err: bool, settings: &Settings, name_f: F) -> (Option<i32>, bool)
+    pub fn wait_for_processes<F>(&mut self, exec: &mut Executor, pids: &[Option<i32>], pgid: Option<i32>, count: usize, is_untraced: bool, is_exit_for_err: bool, settings: &Settings, name_f: F) -> (Option<i32>, bool)
         where F: FnOnce(usize) -> (Vec<String>, String, String)
     {
         let mut job_pids: Vec<i32> = Vec::new();
@@ -544,7 +550,7 @@ impl Interpreter
         let mut is_success_for_first_processes = true;
         for (i, pid) in pids.iter().enumerate() {
             let tmp_res = loop {
-                match exec.wait_for_process(*pid, true, true, i == pids.len() - 1, settings) {
+                match exec.wait_for_process(*pid, true, is_untraced, i == pids.len() - 1, settings) {
                     Ok(WaitStatus::None) => panic!("wait status is none"),
                     Ok(WaitStatus::Exited(status)) => break Some(status),
                     Ok(WaitStatus::Signaled(sig, is_coredump)) => {
@@ -986,7 +992,7 @@ impl Interpreter
                         },
                     }
                     s = String::from(s.trim_end_matches('\n'));
-                    match self.wait_for_process(exec, pid, true, settings, || format!("{}", LogicalCommandSlice(commands))) {
+                    match self.wait_for_process(exec, pid, true, true, settings, || format!("{}", LogicalCommandSlice(commands)), |_, _| ()) {
                         Some(status) => self.last_status = status,
                         None => is_success = false,
                     }
@@ -2162,7 +2168,7 @@ impl Interpreter
                         exec.clear_pipes();
                         let pgid = pids.last().map(|pid| *pid).unwrap_or(None);
                         set_process_group_and_foreground_for_processes(exec, pids.as_slice(), pgid, settings);
-                        match self.wait_for_processes(exec, pids.as_slice(), pgid, j, is_special_builtin_fun, settings, name_f) {
+                        match self.wait_for_processes(exec, pids.as_slice(), pgid, j, true, is_special_builtin_fun, settings, name_f) {
                             (Some(tmp_status), tmp_is_success_for_interp_redirects) => {
                                 is_success_for_interp_redirects &= tmp_is_success_for_interp_redirects;
                                 if is_fun_process {
@@ -2434,7 +2440,7 @@ impl Interpreter
                         });
                         match res {
                             Ok(pid) => {
-                                let status = interp.wait_for_process(exec, pid, false, settings, name_f).unwrap_or(1);
+                                let status = interp.wait_for_process(exec, pid, true, false, settings, name_f, |_, _| ()).unwrap_or(1);
                                 interp.last_status = status;
                                 status
                             },
@@ -2781,7 +2787,7 @@ impl Interpreter
                         let last_process_name = format!("{}", command.commands[(command.commands.len() - 1)]);
                         (process_names, last_process_name, format!("{}", command))
                     };
-                    match self.wait_for_processes(exec, pids.as_slice(), pgid, pids.len(), false, settings, name_f) {
+                    match self.wait_for_processes(exec, pids.as_slice(), pgid, pids.len(), true, false, settings, name_f) {
                         (Some(tmp_status), _) => {
                             if command.commands.len() == pids.len() {
                                 status = tmp_status

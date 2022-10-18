@@ -44,6 +44,7 @@ mod trap;
 mod umask;
 mod unalias;
 mod unset;
+mod wait;
 
 pub type BuiltinFunction = fn(&[(String, String)], &[String], &mut Interpreter, &mut Executor, &mut Environment, &mut Settings) -> i32;
 
@@ -73,4 +74,5 @@ pub fn initialize_builtin_funs(env: &mut Environment)
     env.set_builtin_fun("umask", umask::main);
     env.set_builtin_fun("unalias", unalias::main);
     env.set_builtin_fun("unset", unset::main);
+    env.set_builtin_fun("wait", wait::main);
 }
