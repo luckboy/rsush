@@ -439,7 +439,7 @@ impl Interpreter
         format!("{}{}", self.signal_name(sig).unwrap_or("Unknown signal"), coredump_s)
     }
 
-    fn has_special_builtin_fun(&self, name: &str, env: &Environment) -> bool
+    pub fn has_special_builtin_fun(&self, name: &str, env: &Environment) -> bool
     { self.special_builtin_fun_names.contains(&String::from(name)) && env.builtin_fun(name).is_some() }
     
     pub fn set_action_flag(&mut self)
@@ -454,7 +454,7 @@ impl Interpreter
     pub fn unset_action(&mut self, sig: i32)
     { self.actions.remove(&sig); }
 
-    fn execute<F>(&mut self, exec: &mut Executor, vars: &[(String, String)], arg0: &str, args: &[String], is_exit_for_err: bool, env: &mut Environment, settings: &mut Settings, name_f: F) -> Option<i32>
+    pub fn execute<F>(&mut self, exec: &mut Executor, vars: &[(String, String)], arg0: &str, args: &[String], is_exit_for_err: bool, env: &mut Environment, settings: &mut Settings, name_f: F) -> Option<i32>
         where F: FnOnce() -> String
     {
         let mut job_pid: Option<i32> = None;

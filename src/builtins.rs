@@ -26,6 +26,7 @@ mod alias;
 mod bg;
 mod r#break;
 mod cd;
+mod command;
 mod r#continue;
 mod eval;
 mod exec;
@@ -56,6 +57,7 @@ pub fn initialize_builtin_funs(env: &mut Environment)
     env.set_builtin_fun("bg", bg::main);
     env.set_builtin_fun("break", r#break::main);
     env.set_builtin_fun("cd", cd::main);
+    env.set_builtin_fun("command", command::main);
     env.set_builtin_fun("continue", r#continue::main);
     env.set_builtin_fun("eval", eval::main);
     env.set_builtin_fun("exec", exec::main);
