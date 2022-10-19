@@ -24,6 +24,7 @@ use crate::interp::*;
 use crate::settings::*;
 use crate::fprintln;
 use crate::xcfprintln;
+use crate::xsfprintln;
 
 struct Options
 {
@@ -108,7 +109,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
             }
         },
         None => {
-            xcfprintln!(exec, 2, "No standard output");
+            xsfprintln!(exec, 2, "No standard output");
             status = 1;
         },
     }
