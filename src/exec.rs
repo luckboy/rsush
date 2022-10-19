@@ -18,9 +18,9 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::cell::*;
-use std::io::*;
 use std::fmt;
 use std::fs::*;
+use std::io::*;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::FromRawFd;
 use std::os::unix::process::CommandExt;
