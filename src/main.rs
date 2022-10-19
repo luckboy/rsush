@@ -19,6 +19,7 @@ use std::cell::*;
 use std::fs::*;
 use std::io::*;
 use std::os::unix::io::FromRawFd;
+use std::path::*;
 use std::process::exit;
 use std::rc::*;
 use rustyline;
@@ -81,6 +82,7 @@ use utils::*;
 use vars::initialize_vars;
 
 const DEFAULT_PS2: &'static str = "> ";
+const DEFAULT_HISTORY_SIZE: usize = 500;
 
 enum CommandFlag
 {
@@ -268,11 +270,12 @@ fn new_rustyline_editor(settings: &Settings) -> rustyline::Result<Editor<()>>
     Editor::<()>::with_config(config)
 }
 
-fn update_rustyline_edit_mode(editor: Editor<()>, old_edit_mode_flags: &EditModeFlags, settings: &Settings) -> rustyline::Result<Editor<()>>
+fn update_rustyline_edit_mode(editor: Editor<()>, old_edit_mode_flags: &EditModeFlags, history_size: usize, settings: &Settings) -> rustyline::Result<Editor<()>>
 {
     if old_edit_mode_flags.vi_flag != settings.vi_flag || old_edit_mode_flags.emacs_flag != settings.emacs_flag {
         let history: Vec<String> = editor.history().iter().map(|s| s.clone()).collect();
         let mut new_editor = new_rustyline_editor(settings)?;
+        new_editor.history_mut().set_max_len(history_size);
         for entry in history {
             new_editor.add_history_entry(entry);
         }
@@ -289,6 +292,23 @@ fn parse_stdin_str(s: &str, line: u64, settings: &Settings) -> ParserResult<Opti
     let mut lexer = Lexer::new("(standard input)", &Position::new(line, 1), &mut cr, 0, false);
     let mut parser = Parser::new();
     parser.parse_logical_commands_for_line(&mut lexer, settings)
+}
+
+fn load_history<P: AsRef<Path>>(editor: &mut Editor<()>, path: &P, exec: &mut Executor)
+{
+    match editor.load_history(path.as_ref()) {
+        Ok(()) => (),
+        Err(ReadlineError::Io(io_err)) if io_err.kind() == ErrorKind::NotFound => (),
+        Err(err) => xsfprintln!(exec, 2, "{}: {}", path.as_ref().to_string_lossy(), err),
+    }
+}
+
+fn save_history<P: AsRef<Path>>(editor: &mut Editor<()>, path: &P, exec: &mut Executor)
+{
+    match editor.save_history(path.as_ref()) {
+        Ok(()) => (),
+        Err(err) => xsfprintln!(exec, 2, "{}: {}", path.as_ref().to_string_lossy(), err),
+    }
 }
 
 fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings) -> i32
@@ -323,6 +343,21 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
             return 1;
         },
     };
+    let history_size = match env.var("RSUSH_HISTSIZE") {
+        Some(rsush_histsize) => {
+            match rsush_histsize.parse::<usize>() {
+                Ok(tmp_history_size) => tmp_history_size,
+                Err(_) => {
+                    xsfprintln!(exec, 2, "Invalid history size");
+                    DEFAULT_HISTORY_SIZE
+                },
+            }
+        },
+        None => DEFAULT_HISTORY_SIZE,
+    };
+    let history_path = format!("{}/.rsush_history", home);
+    editor.history_mut().set_max_len(history_size);
+    load_history(&mut editor, &history_path, exec);
     let mut line: u64 = 1;
     loop {
         let ps1 = env.var("PS1").unwrap_or(String::from(default_ps1()));
@@ -365,6 +400,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                                         },
                                         Err(err2) => {
                                             xsfprintln!(exec, 2, "{}", err2);
+                                            save_history(&mut editor, &history_path, exec);
                                             return 1;
                                         },
                                     }
@@ -398,6 +434,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                                 Err(err2) => {
                                     set_sigaction_for_interrupt(&saved_shell_sigaction);
                                     xsfprintln!(exec, 2, "{}", err2);
+                                    save_history(&mut editor, &history_path, exec);
                                     return 1;
                                 },
                             }
@@ -409,6 +446,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                     },
                     Err(err) => {
                         xsfprintln!(exec, 2, "{}", err);
+                        save_history(&mut editor, &history_path, exec);
                         return 1;
                     },
                 };
@@ -422,7 +460,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                         let status = interp.interpret_logical_commands(exec, commands.as_slice(), env, settings);
                         saved_shell_sigaction = get_sigaction_for_interrupt();
                         set_sigaction_for_interrupt(&saved_editor_sigaction);
-                        match update_rustyline_edit_mode(editor, &old_edit_mode_flags, settings) {
+                        match update_rustyline_edit_mode(editor, &old_edit_mode_flags, history_size, settings) {
                             Ok(tmp_editor) => editor = tmp_editor,
                             Err(err) => {
                                 set_sigaction_for_interrupt(&saved_shell_sigaction);
@@ -434,6 +472,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
                         set_sigaction_for_interrupt(&saved_shell_sigaction);
                         if interp.has_break_or_continue_or_return_or_exit() {
                             if interp.has_exit_with_interactive() {
+                                save_history(&mut editor, &history_path, exec);
                                 break status;
                             }
                             interp.clear_return_state();
@@ -467,6 +506,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
             Err(ReadlineError::Eof) => {
                 if !settings.ignoreeof_flag {
                     set_sigaction_for_interrupt(&saved_shell_sigaction);
+                    save_history(&mut editor, &history_path, exec);
                     break interp.last_status();
                 } else {
                     update_jobs(interp, exec, settings);
@@ -475,6 +515,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
             Err(err) => {
                 set_sigaction_for_interrupt(&saved_shell_sigaction);
                 xsfprintln!(exec, 2, "{}", err);
+                save_history(&mut editor, &history_path, exec);
                 return 1;
             },
         }
