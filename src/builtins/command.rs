@@ -17,6 +17,7 @@
 //
 use std::fs;
 use std::io::*;
+use std::path;
 use std::path::*;
 use getopt;
 use getopt::Opt;
@@ -117,16 +118,23 @@ pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter
                                             },
                                             None => {
                                                 let mut res: Result<PathBuf> = Err(Error::from_raw_os_error(libc::ENOENT));
-                                                let path = env.var("PATH").unwrap_or(String::from("/bin:/usr/bin"));
-                                                for dir_path in path.split(':') {
-                                                    let mut prog_path_buf = PathBuf::from(dir_path);
-                                                    prog_path_buf.push(name.as_str());
-                                                    match fs::metadata(prog_path_buf.as_path()) {
-                                                        Ok(_) => {
-                                                            res = Ok(prog_path_buf);
-                                                            break;
-                                                        },
+                                                if name.contains(path::MAIN_SEPARATOR) {
+                                                    match fs::metadata(name) {
+                                                        Ok(_) => res = Ok(PathBuf::from(name)),
                                                         Err(err) => res = Err(err),
+                                                    }
+                                                } else {
+                                                    let path = env.var("PATH").unwrap_or(String::from("/bin:/usr/bin"));
+                                                    for dir_path in path.split(':') {
+                                                        let mut prog_path_buf = PathBuf::from(dir_path);
+                                                        prog_path_buf.push(name.as_str());
+                                                        match fs::metadata(prog_path_buf.as_path()) {
+                                                            Ok(_) => {
+                                                                res = Ok(prog_path_buf);
+                                                                break;
+                                                            },
+                                                            Err(err) => res = Err(err),
+                                                        }
                                                     }
                                                 }
                                                 match res {
