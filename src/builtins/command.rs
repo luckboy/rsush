@@ -44,6 +44,24 @@ struct Options
     verbose_flag: VerboseFlag,
 }
 
+fn check_prog<P: AsRef<Path>>(path: P) -> Result<()>
+{
+    match fs::metadata(path.as_ref()) {
+        Ok(metadata) => {
+            if metadata.file_type().is_dir() {
+                Err(Error::from_raw_os_error(libc::EACCES))
+            } else {
+                match access(path.as_ref(), libc::X_OK) {
+                    Ok(true) => Ok(()),
+                    Ok(false) => Err(Error::from_raw_os_error(libc::EACCES)),
+                    Err(err) => Err(err),
+                }
+            }
+        },
+        Err(err) => Err(err),
+    }
+}
+
 pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings) -> i32
 {
     let mut opt_parser = getopt::Parser::new(args, "pVv");
@@ -119,8 +137,8 @@ pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter
                                             None => {
                                                 let mut res: Result<PathBuf> = Err(Error::from_raw_os_error(libc::ENOENT));
                                                 if name.contains(path::MAIN_SEPARATOR) {
-                                                    match fs::metadata(name) {
-                                                        Ok(_) => res = Ok(PathBuf::from(name)),
+                                                    match check_prog(name) {
+                                                        Ok(()) => res = Ok(PathBuf::from(name)),
                                                         Err(err) => res = Err(err),
                                                     }
                                                 } else {
@@ -128,7 +146,7 @@ pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter
                                                     for dir_path in path.split(':') {
                                                         let mut prog_path_buf = PathBuf::from(dir_path);
                                                         prog_path_buf.push(name.as_str());
-                                                        match fs::metadata(prog_path_buf.as_path()) {
+                                                        match check_prog(prog_path_buf.as_path()) {
                                                             Ok(_) => {
                                                                 res = Ok(prog_path_buf);
                                                                 break;

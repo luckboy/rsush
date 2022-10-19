@@ -504,6 +504,21 @@ pub fn tcsetpgrp(fd: i32, pgrp: i32) -> Result<()>
     }
 }
 
+pub fn access<P: AsRef<Path>>(path: P, mode: i32) -> Result<bool>
+{
+    let path_cstring = CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
+    let res = unsafe { libc::access(path_cstring.as_ptr(), mode) };
+    if res != -1 {
+        Ok(true)
+    } else {
+        let err = Error::last_os_error();
+        match err.raw_os_error() {
+            Some(os_err) if os_err == libc::EACCES => Ok(false),
+            _ => Err(err),
+        }
+    }
+}
+
 pub fn pipe_with_cloexec() -> Result<PipeFds>
 {
     let pipe_fds = pipe()?;
