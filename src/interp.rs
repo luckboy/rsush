@@ -13,7 +13,7 @@
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+// along with this program.  If not, see <http://www.gnu.org/licensesn/>.
 //
 use std::cell::*;
 use std::collections::HashMap;
@@ -2358,7 +2358,7 @@ impl Interpreter
                                     } else if settings.extxtrace_flag {
                                         print_command_for_xtrace_or_extxtrace(exec, Some((path, pos)), vars.as_slice(), args.as_slice(), env);
                                     }
-                                    let name0 = settings.arg0.clone();
+                                    let name0 = singly_quote_str(settings.arg0.as_str());
                                     let name_f = |count: usize| {
                                         let process_names = vec![name0; count];
                                         let name = format!("{}", command);
@@ -2374,7 +2374,7 @@ impl Interpreter
                                     } else if settings.extxtrace_flag {
                                         print_command_for_xtrace_or_extxtrace(exec, Some((path, pos)), vars.as_slice(), &[], env);
                                     }
-                                    let name0 = settings.arg0.clone();
+                                    let name0 = singly_quote_str(settings.arg0.as_str());
                                     let name_f = |count: usize| {
                                         let process_names = vec![name0; count];
                                         let name = format!("{}", command);
@@ -2398,7 +2398,7 @@ impl Interpreter
                 } else if settings.extxtrace_flag {
                     print_command_for_xtrace_or_extxtrace(exec, Some((path, pos)), vars.as_slice(), &[], env);
                 }
-                let name0 = settings.arg0.clone();
+                let name0 = singly_quote_str(settings.arg0.as_str());
                 let name_f = |count: usize| {
                     let process_names = vec![name0; count];
                     let name = format!("{}", command);
@@ -2696,7 +2696,7 @@ impl Interpreter
         match command {
             Command::Simple(path, pos, simple_command) => self.interpret_simple_command(exec, path.as_str(), pos, &(*simple_command), env, settings),
             Command::Compound(_, _, compound_command, redirects) => {
-                let name0 = settings.arg0.clone();
+                let name0 = singly_quote_str(settings.arg0.as_str());
                 let name_g = |count: usize| {
                     let process_names = vec![name0; count];
                     let name = format!("{}", command);
@@ -2898,7 +2898,7 @@ impl Interpreter
     {
         self.fun_count += 1;
         self.push_loop_count(0);
-        let name0 = settings.arg0.clone();
+        let name0 = singly_quote_str(settings.arg0.as_str());
         let name_g = |count: usize| {
             let process_names = vec![name0; count];
             let name = format!("{}", fun_body);
