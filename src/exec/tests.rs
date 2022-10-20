@@ -2221,3 +2221,215 @@ f() {
         _ => assert!(false),
     }
 }
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_parses_percent_percent()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%%") {
+        Ok(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_parses_percent_plus()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%+") {
+        Ok(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_parses_percent_minus()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test1")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(5678, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%-") {
+        Ok(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_parses_percent_number()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test1")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(5678, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%2") {
+        Ok(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_parses_percent_string()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test1 abc")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(5678, "test2 abc")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%test2") {
+        Ok(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_parses_percent_ques_string()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test1 abc")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(5678, "test2 def")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%?def") {
+        Ok(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_complains_on_no_precent()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("1") {
+        Err(JobIdError::NoPercent) => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_complains_on_no_job_for_percent_percent()
+{
+    let exec = Executor::new();
+    match exec.parse_job_id("%%") {
+        Err(JobIdError::NoJob) => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_complains_on_no_job_for_percent_plus()
+{
+    let exec = Executor::new();
+    match exec.parse_job_id("%+") {
+        Err(JobIdError::NoJob) => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_complains_on_no_job_for_percent_minus()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%-") {
+        Err(JobIdError::NoJob) => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_complains_on_not_found_for_percent_string()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%test2") {
+        Err(JobIdError::NotFound) => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_complains_on_ambiguous_for_percent_string()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test1")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(5678, "test2")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%test") {
+        Err(JobIdError::Ambiguous) => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_complains_on_not_found_for_percent_ques_string()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test abc")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%?def") {
+        Err(JobIdError::NotFound) => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[sealed_test(before=setup(), after=teardown())]
+fn test_executor_parse_job_id_complains_on_ambiguous_for_percent_ques_string()
+{
+    let mut exec = Executor::new();
+    match exec.add_job(&Job::new(1234, "test1 abc")) {
+        Some(job_id) => assert_eq!(job_id, 1),
+        _ => assert!(false),
+    }
+    match exec.add_job(&Job::new(5678, "test2 abc")) {
+        Some(job_id) => assert_eq!(job_id, 2),
+        _ => assert!(false),
+    }
+    match exec.parse_job_id("%?abc") {
+        Err(JobIdError::Ambiguous) => assert!(true),
+        _ => assert!(false),
+    }
+}

@@ -108,7 +108,7 @@ pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter
                 Some(stdout_file) => {
                     let mut stdout_file_r = stdout_file.borrow_mut();
                     let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                    let mut status = 1;
+                    let mut status = 0;
                     let names: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
                     for name in &names {
                         match env.builtin_fun(name.as_str()) {
@@ -182,5 +182,542 @@ pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter
                 },
             }
         },
+    }
+}
+
+#[cfg(test)]
+mod tests
+{
+    use std::cell::*;
+    use std::rc::*;
+    use super::*;
+    use crate::io::*;
+    use crate::lexer::*;
+    use crate::parser::*;
+    use crate::builtins::*;
+    use crate::test_builtins::*;
+    use crate::vars::*;
+    use crate::test_helpers::*;
+    use sealed_test::prelude::*;
+
+    fn setup()
+    { symlink_rsush_test(); }
+
+    fn teardown()
+    { remove_rsush_test(); }
+
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_executes_command()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("./rsush_test"),
+            String::from("args"),
+            String::from("abc"),
+            String::from("def")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        let expected_stdout_content = "
+abc
+def
+";
+        assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }
+
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_executes_command_for_p_option()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-p"),
+            String::from("./rsush_test"),
+            String::from("args"),
+            String::from("abc"),
+            String::from("def")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        let expected_stdout_content = "
+abc
+def
+";
+        assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }
+    
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_builtin_functions()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-v"),
+            String::from("alias"),
+            String::from("break")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        let expected_stdout_content = "
+alias
+break
+";
+        assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }
+
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_function()
+    {
+        let s = "
+f() {
+    echo abc
+}
+";
+        let s2 = &s[1..];
+        let mut cursor = Cursor::new(s2.as_bytes());
+        let mut cr = CharReader::new(&mut cursor);
+        let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+        let mut parser = Parser::new();
+        let settings = Settings::new();
+        match parser.parse_logical_commands(&mut lexer, &settings) {
+            Ok(logical_commands) => {
+                let mut exec = Executor::new();
+                let mut interp = Interpreter::new();
+                let mut env = Environment::new();
+                let mut settings = Settings::new();
+                settings.arg0 = String::from("rsush");
+                initialize_builtin_funs(&mut env);
+                initialize_test_builtin_funs(&mut env);
+                initialize_vars(&mut env);
+                write_file("stdin.txt", "Some line\nSecond line\n");
+                exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+                exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+                exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+                exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+                let interp_status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+                assert_eq!(0, interp_status);
+                let args = vec![
+                    String::from("command"),
+                    String::from("-v"),
+                    String::from("f")
+                ];
+                let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+                exec.clear_files();
+                assert_eq!(0, status);
+                assert!(interp.has_none());
+                assert_eq!(false, interp.exec_redirect_flag());
+                let expected_stdout_content = "
+f
+";
+                assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+                assert_eq!(String::new(), read_file("stderr.txt"));
+                assert_eq!(String::new(), read_file("stderr2.txt"));
+            },
+            _ => assert!(false),
+        }
+    }
+    
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_alias()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        env.set_alias("alias1", "echo abc");
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-v"),
+            String::from("alias1")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        let expected_stdout_content = "
+alias alias1='echo abc'
+";
+        assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }    
+
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_program_path()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-v"),
+            String::from("cp")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        assert!(read_file("stdout.txt").contains("/cp\n"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }    
+
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_program_path_for_program_path()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-v"),
+            String::from("./rsush_test")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        let expected_stdout_content = "
+./rsush_test
+";
+        assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }
+
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_builtin_function_descriptions()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-V"),
+            String::from("alias"),
+            String::from("break")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        let expected_stdout_content = "
+alias is built-in command
+break is built-in command
+";
+        assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }
+
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_function_description()
+    {
+        let s = "
+f() {
+    echo abc
+}
+";
+        let s2 = &s[1..];
+        let mut cursor = Cursor::new(s2.as_bytes());
+        let mut cr = CharReader::new(&mut cursor);
+        let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+        let mut parser = Parser::new();
+        let settings = Settings::new();
+        match parser.parse_logical_commands(&mut lexer, &settings) {
+            Ok(logical_commands) => {
+                let mut exec = Executor::new();
+                let mut interp = Interpreter::new();
+                let mut env = Environment::new();
+                let mut settings = Settings::new();
+                settings.arg0 = String::from("rsush");
+                initialize_builtin_funs(&mut env);
+                initialize_test_builtin_funs(&mut env);
+                initialize_vars(&mut env);
+                write_file("stdin.txt", "Some line\nSecond line\n");
+                exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+                exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+                exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+                exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+                let interp_status = interp.interpret_logical_commands(&mut exec, logical_commands.as_slice(), &mut env, &mut settings);
+                assert_eq!(0, interp_status);
+                let args = vec![
+                    String::from("command"),
+                    String::from("-V"),
+                    String::from("f")
+                ];
+                let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+                exec.clear_files();
+                assert_eq!(0, status);
+                assert!(interp.has_none());
+                assert_eq!(false, interp.exec_redirect_flag());
+                let expected_stdout_content = "
+f is function
+";
+                assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+                assert_eq!(String::new(), read_file("stderr.txt"));
+                assert_eq!(String::new(), read_file("stderr2.txt"));
+            },
+            _ => assert!(false),
+        }
+    }
+    
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_alias_description()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        env.set_alias("alias1", "echo abc");
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-V"),
+            String::from("alias1")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        let expected_stdout_content = "
+alias1 is alias to echo abc
+";
+        assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }
+    
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_program_description()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-V"),
+            String::from("cp")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        let stdout_content = read_file("stdout.txt");
+        assert!(stdout_content.starts_with("cp is "));
+        assert!(stdout_content.contains("/cp\n"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }
+    
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_prints_program_description_for_program_path()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-V"),
+            String::from("./rsush_test")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        let expected_stdout_content = "
+./rsush_test is ./rsush_test
+";
+        assert_eq!(String::from(&expected_stdout_content[1..]), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+    }
+    
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_complains_on_not_found_for_name()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-v"),
+            String::from("./xxx")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(1, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        assert_eq!(String::new(), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert!(read_file("stderr2.txt").starts_with("./xxx: "));
+    }
+
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_command_builtin_function_complains_on_not_found_for_description()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        write_file("stdin.txt", "Some line\nSecond line\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("command"),
+            String::from("-V"),
+            String::from("./xxx")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(1, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        assert_eq!(String::new(), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert!(read_file("stderr2.txt").starts_with("./xxx: "));
     }
 }
