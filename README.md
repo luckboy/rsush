@@ -24,6 +24,12 @@ This shell reads two following configuration files in interactive mode:
 
 These configuration files are scripts for this shell.
 
+## History
+
+This shell loads and saves the ~/.rsush_history file that is history file in interactive mode. This
+file contains command lines which were invoked in this shell. The history size is defined by the
+RSUSH_HISTSIZE variable in lines. If this variable isn't set, the history size is 500 lines.
+
 ## License
 
 This program is licensed under the GNU General Public License v3 or later. See the LICENSE file for
