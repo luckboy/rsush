@@ -5433,3 +5433,66 @@ EOT
     }
     assert_eq!(String::new(), lexer.content_for_verbose);
 }
+
+#[test]
+fn test_lexer_next_token_returns_word_with_doubly_quoted_string_for_bug_of_doubly_quoted_backslashes()
+{
+    let s = "\"\\a\\b\\c \\$var\"";
+    let mut cursor = Cursor::new(s.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::Word(word_elems), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(1, word_elems.len());
+            match &word_elems[0] {
+                WordElement::DoublyQuoted(simple_word_elems) => {
+                    assert_eq!(1, simple_word_elems.len());
+                    match &simple_word_elems[0] {
+                        SimpleWordElement::String(s) => {
+                            assert_eq!(&String::from("\\a\\b\\c $var"), s);
+                        },
+                        _ => assert!(false),
+                    }
+                },
+                _ => assert!(false),
+            }
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}
+
+#[test]
+fn test_lexer_next_token_returns_here_document_for_bug_of_doubly_quoted_backslashes()
+{
+    let s = "
+\\a\\b\\c \\$var
+EOT
+";
+    let s2 = &s[1..];
+    let mut cursor = Cursor::new(s2.as_bytes());
+    let mut cr = CharReader::new(&mut cursor);
+    let mut lexer = Lexer::new("test.sh", &Position::new(1, 1), &mut cr, 0, false);
+    lexer.push_state(State::InHereDocument(String::from("EOT"), false, false));
+    let settings = Settings::new();
+    match lexer.next_token(&settings) {
+        Ok((Token::HereDoc(simple_word_elems, is_minus, is_quoted), pos)) => {
+            assert_eq!(1, pos.line);
+            assert_eq!(1, pos.column);
+            assert_eq!(1, simple_word_elems.len());
+            match &simple_word_elems[0] {
+                SimpleWordElement::String(s) => {
+                    assert_eq!(&String::from("\\a\\b\\c $var\n"), s);
+                },
+                _ => assert!(false),
+            }
+            assert_eq!(false, is_minus);
+            assert_eq!(false, is_quoted);
+        },
+        _ => assert!(false),
+    }
+    assert_eq!(String::new(), lexer.content_for_verbose);
+}

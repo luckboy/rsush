@@ -687,7 +687,13 @@ impl<'a> Lexer<'a>
                             break;
                         },
                         (Some('\n'), _) => (),
-                        (Some(c2), _) => s.push(c2),
+                        (Some(c2), _) => {
+                            match c2 {
+                                '\\' | '$' | '`' | '"'  => (),
+                                _ => s.push('\\'),
+                            }
+                            s.push(c2);
+                        },
                     }
                 },
                 (Some(c @ '"'), pos) => {
@@ -1083,7 +1089,13 @@ impl<'a> Lexer<'a>
                             break;
                         },
                         (Some('\n'), _) => (),
-                        (Some(c2), _) => s.push(c2),
+                        (Some(c2), _) => {
+                            match c2 {
+                                '\\' | '$' | '`'  => (),
+                                _ => s.push('\\'),
+                            }
+                            s.push(c2);
+                        },
                     }
                 },
                 (Some('\n'), _) => {
