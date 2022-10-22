@@ -54,12 +54,17 @@ pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpret
                 }
             }
             let mut s = String::new(); 
+            let mut is_eof = false;
             if !opts.ignored_escape_flag {
+                let mut is_first = true;
                 loop {
                     let mut is_stop = true;
                     let mut line = String::new();
                     match line_stdin.read_line(&mut line) {
-                        Ok(0) => break,
+                        Ok(0) => {
+                            if is_first { is_eof = true; }
+                            break;
+                        },
                         Ok(_) => {
                             let mut iter = line.chars();
                             loop {
@@ -86,11 +91,13 @@ pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpret
                         },
                     }
                     if is_stop { break; }
+                    is_first = false;
                 }
             } else {
                 let mut line = String::new();
                 match line_stdin.read_line(&mut line) {
-                    Ok(_) => {
+                    Ok(n) => {
+                        if n == 0 { is_eof = true; }
                         let line_without_newline = str_without_newline(line.as_str());
                         s.push_str(line_without_newline);
                     },
@@ -124,6 +131,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpret
                     None => env.set_var(name.as_str(), "", settings),
                 }
             }
+            if is_eof { status = 1; }
             status
     }).unwrap_or(1)
 }
@@ -293,7 +301,6 @@ mod tests
         assert_eq!(Some(String::from("abcdefghi")), env.unexported_var("var"));
         assert!(env.exported_var("var").is_none());
     }
-
     
     #[sealed_test(before=setup(), after=teardown())]
     fn test_read_builtin_function_reads_fields_for_r_option()
@@ -635,5 +642,82 @@ mod tests
         assert_eq!(String::new(), read_file("stdout.txt"));
         assert_eq!(String::new(), read_file("stderr.txt"));
         assert_eq!(String::from("var: Is read only\n"), read_file("stderr2.txt"));
+    }
+    
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_read_builtin_function_reads_fields_for_bug_of_eof_detection()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        env.unset_var("IFS");
+        env.unset_var("var1");
+        env.unset_var("var2");
+        write_file("stdin.txt", "");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("read"),
+            String::from("var1"),
+            String::from("var2")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(1, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        assert_eq!(String::new(), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+        assert_eq!(Some(String::new()), env.unexported_var("var1"));
+        assert!(env.exported_var("var1").is_none());
+        assert_eq!(Some(String::new()), env.unexported_var("var2"));
+        assert!(env.exported_var("var2").is_none());
+    }
+
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_read_builtin_function_reads_fields_for_r_option_and_bug_of_eof_detection()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        env.unset_var("IFS");
+        env.unset_var("var1");
+        env.unset_var("var2");
+        write_file("stdin.txt", "");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("read"),
+            String::from("-r"),
+            String::from("var1"),
+            String::from("var2")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(1, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        assert_eq!(String::new(), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+        assert_eq!(Some(String::new()), env.unexported_var("var1"));
+        assert!(env.exported_var("var1").is_none());
+        assert_eq!(Some(String::new()), env.unexported_var("var2"));
+        assert!(env.exported_var("var2").is_none());
     }
 }
