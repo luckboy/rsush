@@ -17,17 +17,15 @@
 //
 use std::env;
 use std::fs;
-use std::io::*;
 use std::path;
 use std::path::*;
 use getopt;
 use getopt::Opt;
 use crate::env::*;
 use crate::exec::*;
-use crate::exec_utils::*;
 use crate::interp::*;
 use crate::settings::*;
-use crate::fprintln;
+use crate::xcfprintln;
 
 #[derive(Eq, PartialEq)]
 enum PathFlag
@@ -44,82 +42,79 @@ struct Options
 
 pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings) -> i32
 {
-    with_std_files(exec, |_, stdout, stderr| {
-            let mut line_stdout = LineWriter::new(stdout);
-            let mut opt_parser = getopt::Parser::new(args, "LP");
-            let mut opts = Options {
-                path_flag: PathFlag::None,
-            };
-            loop {
-                match opt_parser.next() {
-                    Some(Ok(Opt('L', _))) => opts.path_flag = PathFlag::Logical,
-                    Some(Ok(Opt('P', _))) => opts.path_flag = PathFlag::Physical,
-                    Some(Ok(Opt(c, _))) => {
-                        fprintln!(stderr, "unknown option -- {:?}", c);
-                        return 1;
-                    },
-                    Some(Err(err)) => {
-                        fprintln!(stderr, "{}", err);
-                        return 1;
-                    },
-                    None => break,
-                }
+    let mut opt_parser = getopt::Parser::new(args, "LP");
+    let mut opts = Options {
+        path_flag: PathFlag::None,
+    };
+    loop {
+        match opt_parser.next() {
+            Some(Ok(Opt('L', _))) => opts.path_flag = PathFlag::Logical,
+            Some(Ok(Opt('P', _))) => opts.path_flag = PathFlag::Physical,
+            Some(Ok(Opt(c, _))) => {
+                xcfprintln!(exec, 2, "unknown option -- {:?}", c);
+                return 1;
+            },
+            Some(Err(err)) => {
+                xcfprintln!(exec, 2, "{}", err);
+                return 1;
+            },
+            None => break,
+        }
+    }
+    let paths: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
+    let (mut path_buf, is_pwd) = match paths.get(0) {
+        Some(path) => {
+            if paths.len() > 1 {
+                xcfprintln!(exec, 2, "Too many arguments");
+                return 1;
             }
-            let paths: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
-            let (mut path_buf, is_pwd) = match paths.get(0) {
-                Some(path) => {
-                    if paths.len() > 1 {
-                        fprintln!(stderr, "Too many arguments");
-                        return 1;
-                    }
-                    if *path == &String::from("-") {
-                        match env.var("OLDPWD") {
-                            Some(oldpwd) => (PathBuf::from(oldpwd), true),
-                            None => {
-                                fprintln!(stderr, "OLDPWD not set");
-                                return 1;
-                            },
-                        }
-                    } else {
-                        (PathBuf::from(path), false)
-                    }
-                },
-                None => {
-                    let mut sep = String::new();
-                    sep.push(path::MAIN_SEPARATOR);
-                    let home = env.var("HOME").unwrap_or(sep);
-                    (PathBuf::from(home), false)
-                },
-            };
-            if opts.path_flag != PathFlag::Physical {
-                match fs::canonicalize(path_buf.as_path()) {
-                    Ok(tmp_path_buf) => path_buf = tmp_path_buf,
-                    Err(err) => {
-                        fprintln!(stderr, "{}: {}", path_buf.as_path().to_string_lossy(), err);
+            if *path == &String::from("-") {
+                match env.var("OLDPWD") {
+                    Some(oldpwd) => (PathBuf::from(oldpwd), true),
+                    None => {
+                        xcfprintln!(exec, 2, "OLDPWD not set");
                         return 1;
                     },
                 }
+            } else {
+                (PathBuf::from(path), false)
             }
-            match env::set_current_dir(path_buf.as_path()) {
-                Ok(())   => (),
-                Err(err) => {
-                    fprintln!(stderr, "{}: {}", path_buf.as_path().to_string_lossy(), err);
-                    return 1;
-                },
-            }
-            match env::current_dir() {
-                Ok(tmp_path_buf) => path_buf = tmp_path_buf,
-                Err(err) => {
-                    fprintln!(stderr, "{}", err);
-                    return 1;
-                },
-            }
-            env.set_var("PWD", path_buf.as_path().to_string_lossy().into_owned().as_str(), settings);
-            if is_pwd {
-                fprintln!(&mut line_stdout, "{}", path_buf.as_path().to_string_lossy());
-            }
-            0
-    }).unwrap_or(1)
+        },
+        None => {
+            let mut sep = String::new();
+            sep.push(path::MAIN_SEPARATOR);
+            let home = env.var("HOME").unwrap_or(sep);
+            (PathBuf::from(home), false)
+        },
+    };
+    if opts.path_flag != PathFlag::Physical {
+        match fs::canonicalize(path_buf.as_path()) {
+            Ok(tmp_path_buf) => path_buf = tmp_path_buf,
+            Err(err) => {
+                xcfprintln!(exec, 2, "{}: {}", path_buf.as_path().to_string_lossy(), err);
+                return 1;
+            },
+        }
+    }
+    match env::set_current_dir(path_buf.as_path()) {
+        Ok(())   => (),
+        Err(err) => {
+            xcfprintln!(exec, 2, "{}: {}", path_buf.as_path().to_string_lossy(), err);
+            return 1;
+        },
+    }
+    match env::current_dir() {
+        Ok(tmp_path_buf) => path_buf = tmp_path_buf,
+        Err(err) => {
+            xcfprintln!(exec, 2, "{}", err);
+            return 1;
+        },
+    }
+    env.set_var("PWD", path_buf.as_path().to_string_lossy().into_owned().as_str(), settings);
+    if is_pwd {
+        xcfprintln!(exec, 1, "{}", path_buf.as_path().to_string_lossy());
+    }
+    0
 }
 
 #[cfg(test)]

@@ -15,16 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-use std::io::*;
 use libc;
 use crate::env::*;
 use crate::exec::*;
 use crate::interp::*;
 use crate::settings::*;
 use crate::utils::*;
-use crate::fprintln;
 use crate::xcfprintln;
-use crate::xsfprintln;
 
 fn run_job_in_background(job_id: u32, exec: &mut Executor, settings: &Settings) -> bool
 {
@@ -64,18 +61,8 @@ fn run_job_in_background(job_id: u32, exec: &mut Executor, settings: &Settings) 
         _ => (),
     }
     if is_success {
-        match exec.current_file(1) {
-            Some(stdout_file) => {
-                let mut stdout_file_r = stdout_file.borrow_mut();
-                let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                fprintln!(&mut line_stdout, "[{}] {}", job_id, job.name);
-                true
-            },
-            None => {
-                xsfprintln!(exec, 2, "No standard output");
-                false
-            },
-        }
+        xcfprintln!(exec, 1, "[{}] {}", job_id, job.name);
+        true
     } else {
         false
     }

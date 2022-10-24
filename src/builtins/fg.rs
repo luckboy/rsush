@@ -15,16 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-use std::io::*;
 use libc;
 use crate::env::*;
 use crate::exec::*;
 use crate::interp::*;
 use crate::settings::*;
 use crate::utils::*;
-use crate::fprintln;
 use crate::xcfprintln;
-use crate::xsfprintln;
 
 pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interpreter, exec: &mut Executor, _env: &mut Environment, settings: &mut Settings) -> i32
 {
@@ -97,17 +94,7 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
         _ => (),
     }
     if is_success {
-        match exec.current_file(1) {
-            Some(stdout_file) => {
-                let mut stdout_file_r = stdout_file.borrow_mut();
-                let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                fprintln!(&mut line_stdout, "{}", job.name);
-            },
-            None => {
-                xsfprintln!(exec, 2, "No standard output");
-                return 1;
-            },
-        }
+        xcfprintln!(exec, 1, "{}", job.name);
         exec.remove_job(job_id);
         interp.wait_for_processes(exec, pids.as_slice(), Some(job.pgid), pids.len(), false, settings, || job.name.clone()).0.unwrap_or(1)
     } else {

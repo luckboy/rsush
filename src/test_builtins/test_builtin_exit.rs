@@ -17,32 +17,29 @@
 //
 use crate::env::*;
 use crate::exec::*;
-use crate::exec_utils::*;
 use crate::interp::*;
 use crate::settings::*;
-use crate::fprintln;
+use crate::xcfprintln;
 
 pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpreter, exec: &mut Executor, _env: &mut Environment, _settings: &mut Settings) -> i32
 {
-    with_std_files(exec, |_, _, stderr| {
-            if args.len() < 1 {
-                fprintln!(stderr, "No built-in function name");
-                return 1;
-            }
-            match args.get(1) {
-                Some(s) => {
-                    match s.parse::<i32>() {
-                        Ok(status) => status,
-                        Err(err) => {
-                            fprintln!(stderr, "{}", err);
-                            1
-                        },
-                    }
-                },
-                None => {
-                    fprintln!(stderr, "Too few arguments");
+    if args.len() < 1 {
+        xcfprintln!(exec, 2, "No built-in function name");
+        return 1;
+    }
+    match args.get(1) {
+        Some(s) => {
+            match s.parse::<i32>() {
+                Ok(status) => status,
+                Err(err) => {
+                    xcfprintln!(exec, 2, "{}", err);
                     1
                 },
             }
-    }).unwrap_or(1)
+        },
+        None => {
+            xcfprintln!(exec, 2, "Too few arguments");
+            1
+        },
+    }
 }
