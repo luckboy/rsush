@@ -19,12 +19,12 @@ use getopt;
 use getopt::Opt;
 use crate::env::*;
 use crate::exec::*;
-use crate::exec_utils::*;
 use crate::interp::*;
 use crate::io::*;
 use crate::settings::*;
 use crate::utils::*;
-use crate::fprintln;
+use crate::xcfprintln;
+use crate::xsfprintln;
 
 struct Options
 {
@@ -33,107 +33,134 @@ struct Options
 
 pub fn main(_vars: &[(String, String)], args: &[String], _interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings) -> i32
 {
-    with_std_files(exec, |stdin, _, stderr| {
-            let mut line_stdin = LineReader::new(stdin);
-            let mut opt_parser = getopt::Parser::new(args, "r");
-            let mut opts = Options {
-                ignored_escape_flag: false,
-            };
-            loop {
-                match opt_parser.next() {
-                    Some(Ok(Opt('r', _))) => opts.ignored_escape_flag = true,
-                    Some(Ok(Opt(c, _))) => {
-                        fprintln!(stderr, "unknown option -- {:?}", c);
-                        return 1;
-                    },
-                    Some(Err(err)) => {
-                        fprintln!(stderr, "{}", err);
-                        return 1;
-                    },
-                    None => break,
+    let mut opt_parser = getopt::Parser::new(args, "r");
+    let mut opts = Options {
+        ignored_escape_flag: false,
+    };
+    loop {
+        match opt_parser.next() {
+            Some(Ok(Opt('r', _))) => opts.ignored_escape_flag = true,
+            Some(Ok(Opt(c, _))) => {
+                xcfprintln!(exec, 2, "unknown option -- {:?}", c);
+                return 1;
+            },
+            Some(Err(err)) => {
+                xcfprintln!(exec, 2, "{}", err);
+                return 1;
+            },
+            None => break,
+        }
+    }
+    let mut s = String::new(); 
+    let mut is_eof = false;
+    if !opts.ignored_escape_flag {
+        let mut is_first = true;
+        loop {
+            let mut is_stop = true;
+            let mut line = String::new();
+            let res = match exec.current_file(0) {
+                Some(stdin_file) => {
+                    let mut stdin_file_r = stdin_file.borrow_mut();
+                    let mut line_stdin = LineReader::new(&mut *stdin_file_r);
+                    line_stdin.read_line(&mut line)
                 }
-            }
-            let mut s = String::new(); 
-            let mut is_eof = false;
-            if !opts.ignored_escape_flag {
-                let mut is_first = true;
-                loop {
-                    let mut is_stop = true;
-                    let mut line = String::new();
-                    match line_stdin.read_line(&mut line) {
-                        Ok(0) => {
-                            if is_first { is_eof = true; }
-                            break;
-                        },
-                        Ok(_) => {
-                            let mut iter = line.chars();
-                            loop {
+                None => {
+                    xsfprintln!(exec, 2, "No standard input file");
+                    return 1;
+                },
+            };
+            match res {
+                Ok(0) => {
+                    if is_first { is_eof = true; }
+                    break;
+                },
+                Ok(_) => {
+                    let mut iter = line.chars();
+                    loop {
+                        match iter.next() {
+                            Some('\\') => {
                                 match iter.next() {
-                                    Some('\\') => {
-                                        match iter.next() {
-                                            Some('\n') => {
-                                                is_stop = false;
-                                                break;
-                                            },
-                                            Some(c) => s.push(c),
-                                            None => break,
-                                        }
+                                    Some('\n') => {
+                                        is_stop = false;
+                                        break;
                                     },
-                                    Some('\n') => break,
                                     Some(c) => s.push(c),
                                     None => break,
                                 }
-                            }
-                        },
-                        Err(err) => {
-                            fprintln!(stderr, "{}", err);
-                            return 1;
-                        },
+                            },
+                            Some('\n') => break,
+                            Some(c) => s.push(c),
+                            None => break,
+                        }
                     }
-                    if is_stop { break; }
-                    is_first = false;
-                }
-            } else {
-                let mut line = String::new();
-                match line_stdin.read_line(&mut line) {
-                    Ok(n) => {
-                        if n == 0 { is_eof = true; }
-                        let line_without_newline = str_without_newline(line.as_str());
-                        s.push_str(line_without_newline);
-                    },
-                    Err(err) => {
-                        fprintln!(stderr, "{}", err);
-                        return 1;
-                    },
-                }
+                },
+                Err(err) => {
+                    xcfprintln!(exec, 2, "{}", err);
+                    return 1;
+                },
             }
-            let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
-            let fields = if !ifs.is_empty() {
-                split_str_for_ifs(s.as_str(), ifs.as_str())
-            } else {
-                vec![s.as_str()]
-            };
-            let mut status = 0;
-            let names: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
-            for (i, name) in names.iter().enumerate() {
-                if !is_name_str(name) {
-                    fprintln!(stderr, "{}: Invalid variable name", name);
-                    status = 1;
-                    continue;
-                }
-                if env.read_only_var_attr(name.as_str()) {
-                    fprintln!(stderr, "{}: Is read only", name);
-                    status = 1;
-                    continue;
-                }
-                match fields.get(i) {
-                    Some(value) => env.set_var(name.as_str(), value, settings),
-                    None => env.set_var(name.as_str(), "", settings),
-                }
+            if is_stop { break; }
+            is_first = false;
+        }
+    } else {
+        let mut line = String::new();
+        let res = match exec.current_file(0) {
+            Some(stdin_file) => {
+                let mut stdin_file_r = stdin_file.borrow_mut();
+                let mut line_stdin = LineReader::new(&mut *stdin_file_r);
+                line_stdin.read_line(&mut line)
             }
-            if is_eof { status = 1; }
-            status
-    }).unwrap_or(1)
+            None => {
+                xsfprintln!(exec, 2, "No standard input file");
+                return 1;
+            },
+        };
+        match res {
+            Ok(n) => {
+                if n == 0 { is_eof = true; }
+                let line_without_newline = str_without_newline(line.as_str());
+                s.push_str(line_without_newline);
+            },
+            Err(err) => {
+                xcfprintln!(exec, 2, "{}", err);
+                return 1;
+            },
+        }
+    }
+    let ifs = env.var("IFS").unwrap_or(String::from(DEFAULT_IFS));
+    let fields = if !ifs.is_empty() {
+        split_str_for_ifs(s.as_str(), ifs.as_str())
+    } else {
+        vec![s.as_str()]
+    };
+    let mut status = 0;
+    let names: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
+    for (i, name) in names.iter().enumerate() {
+        if !is_name_str(name) {
+            xcfprintln!(exec, 2, "{}: Invalid variable name", name);
+            status = 1;
+            continue;
+        }
+        if env.read_only_var_attr(name.as_str()) {
+            xcfprintln!(exec, 2, "{}: Is read only", name);
+            status = 1;
+            continue;
+        }
+        match fields.get(i) {
+            Some(value) => {
+                if i != names.len() - 1 {
+                    env.set_var(name.as_str(), value, settings);
+                } else {
+                    let i = (value.as_ptr() as usize) - (s.as_ptr() as usize);
+                    let value_and_last_fields = &s[i..s.len()];
+                    env.set_var(name.as_str(), value_and_last_fields, settings);
+                }
+            },
+            None => env.set_var(name.as_str(), "", settings),
+        }
+    }
+    if is_eof { status = 1; }
+    status
 }
 
 #[cfg(test)]
@@ -720,4 +747,42 @@ mod tests
         assert_eq!(Some(String::new()), env.unexported_var("var2"));
         assert!(env.exported_var("var2").is_none());
     }
+    
+    #[sealed_test(before=setup(), after=teardown())]
+    fn test_read_builtin_function_reads_fields_for_bug_of_last_read_fields()
+    {
+        let mut exec = Executor::new();
+        let mut interp = Interpreter::new();
+        let mut env = Environment::new();
+        let mut settings = Settings::new();
+        settings.arg0 = String::from("rsush");
+        initialize_builtin_funs(&mut env);
+        initialize_test_builtin_funs(&mut env);
+        initialize_vars(&mut env);
+        env.unset_var("IFS");
+        env.unset_var("var1");
+        env.unset_var("var2");
+        write_file("stdin.txt", "field1 field2 field3\n");
+        exec.push_file_and_set_saved_file(0, Rc::new(RefCell::new(open_file("stdin.txt"))));
+        exec.push_file_and_set_saved_file(1, Rc::new(RefCell::new(create_file("stdout.txt"))));
+        exec.push_file_and_set_saved_file(2, Rc::new(RefCell::new(create_file("stderr.txt"))));
+        exec.push_file(2, Rc::new(RefCell::new(create_file("stderr2.txt"))));
+        let args = vec![
+            String::from("read"),
+            String::from("var1"),
+            String::from("var2")
+        ];
+        let status = main(&[], args.as_slice(), &mut interp, &mut exec, &mut env, &mut settings);
+        exec.clear_files();
+        assert_eq!(0, status);
+        assert!(interp.has_none());
+        assert_eq!(false, interp.exec_redirect_flag());
+        assert_eq!(String::new(), read_file("stdout.txt"));
+        assert_eq!(String::new(), read_file("stderr.txt"));
+        assert_eq!(String::new(), read_file("stderr2.txt"));
+        assert_eq!(Some(String::from("field1")), env.unexported_var("var1"));
+        assert!(env.exported_var("var1").is_none());
+        assert_eq!(Some(String::from("field2 field3")), env.unexported_var("var2"));
+        assert!(env.exported_var("var2").is_none());
+    }    
 }

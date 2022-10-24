@@ -80,28 +80,6 @@ pub fn xsfprintln_args(exec: &Executor, vfd: i32, args: Arguments<'_>)
 }
 
 #[macro_export]
-macro_rules! fprint
-{
-    ($w: expr) => ({
-        $crate::fprint_args($w, std::format_args!());
-    });
-    ($w: expr, $($arg: tt)*) => ({
-        $crate::fprint_args($w, std::format_args!($($arg)*));
-    });
-}
-
-#[macro_export]
-macro_rules! fprintln
-{
-    ($w: expr) => ({
-        $crate::macros::fprintln_args($w, std::format_args!());
-    });
-    ($w: expr, $($arg: tt)*) => ({
-        $crate::macros::fprintln_args($w, std::format_args!($($arg)*));
-    });
-}
-
-#[macro_export]
 macro_rules! xcfprint
 {
     ($exec: expr, $vfd: expr) => ({

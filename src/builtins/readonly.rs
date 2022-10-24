@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-use std::io::*;
 use getopt;
 use getopt::Opt;
 use crate::env::*;
@@ -23,7 +22,7 @@ use crate::exec::*;
 use crate::interp::*;
 use crate::settings::*;
 use crate::utils::*;
-use crate::fprintln;
+use crate::xcfprintln;
 use crate::xsfprintln;
 
 struct Options
@@ -76,21 +75,11 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
         }
     }
     if args.is_empty() || opts.print_flag {
-        match exec.current_file(1) {
-            Some(stdout_file) => {
-                let mut stdout_file_r = stdout_file.borrow_mut();
-                let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                for name in env.read_only_var_attrs().iter() {
-                    match env.var(name.as_str()) {
-                        Some(value) => fprintln!(&mut line_stdout, "readonly {}={}", name, singly_quote_str(value.as_str())),
-                        None => fprintln!(&mut line_stdout, "readonly {}", name),
-                    }
-                }
-            },
-            None => {
-                xsfprintln!(exec, 2, "No standard output");
-                return interp.exit(1, false);
-            },
+        for name in env.read_only_var_attrs().iter() {
+            match env.var(name.as_str()) {
+                Some(value) => xcfprintln!(exec, 1, "readonly {}={}", name, singly_quote_str(value.as_str())),
+                None => xcfprintln!(exec, 1, "readonly {}", name),
+            }
         }
     }
     0

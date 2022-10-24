@@ -15,25 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-use std::io::*;
 use crate::env::*;
 use crate::exec::*;
-use crate::exec_utils::*;
 use crate::interp::*;
 use crate::settings::*;
-use crate::fprintln;
+use crate::xcfprintln;
 
 pub fn main(vars: &[(String, String)], args: &[String], _interp: &mut Interpreter, exec: &mut Executor, _env: &mut Environment, _settings: &mut Settings) -> i32
 {
-    with_std_files(exec, |_, stdout, stderr| {
-            let mut line_stdout = LineWriter::new(stdout);
-            if args.len() < 1 {
-                fprintln!(stderr, "No built-in function name");
-                return 1;
-            }
-            for (name, value) in vars.iter() {
-                fprintln!(&mut line_stdout, "{}={}", name, value);
-            }
-            0
-    }).unwrap_or(1)
+    if args.len() < 1 {
+        xcfprintln!(exec, 2, "No built-in function name");
+        return 1;
+    }
+    for (name, value) in vars.iter() {
+        xcfprintln!(exec, 1, "{}={}", name, value);
+    }
+    0
 }

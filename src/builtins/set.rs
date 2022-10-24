@@ -15,13 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-use std::io::*;
 use crate::env::*;
 use crate::exec::*;
 use crate::interp::*;
 use crate::settings::*;
 use crate::utils::*;
-use crate::fprintln;
+use crate::xcfprintln;
 use crate::xsfprintln;
 
 fn on_or_off(b: bool) -> &'static str
@@ -47,55 +46,41 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
     let res = settings.parse_options(args, |opt_type, c, settings| {
             match (opt_type, c) {
                 (OptionType::Minus, 'o') => {
-                    match exec.current_file(1) {
-                        Some(stdout_file) => {
-                            let mut stdout_file_r = stdout_file.borrow_mut();
-                            let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                            fprintln!(&mut line_stdout, "allexport       {}", on_or_off(settings.allexport_flag));
-                            fprintln!(&mut line_stdout, "errexit         {}", on_or_off(settings.errexit_flag));
-                            fprintln!(&mut line_stdout, "ignoreeof       {}", on_or_off(settings.ignoreeof_flag));
-                            fprintln!(&mut line_stdout, "monitor         {}", on_or_off(settings.monitor_flag));
-                            fprintln!(&mut line_stdout, "noclobber       {}", on_or_off(settings.noclobber_flag));
-                            fprintln!(&mut line_stdout, "noglob          {}", on_or_off(settings.noglob_flag));
-                            fprintln!(&mut line_stdout, "noexec          {}", on_or_off(settings.noexec_flag));
-                            fprintln!(&mut line_stdout, "nolog           {}", on_or_off(settings.nolog_flag));
-                            fprintln!(&mut line_stdout, "notify          {}", on_or_off(settings.notify_flag));
-                            fprintln!(&mut line_stdout, "nounset         {}", on_or_off(settings.nounset_flag));
-                            fprintln!(&mut line_stdout, "verbose         {}", on_or_off(settings.verbose_flag));
-                            fprintln!(&mut line_stdout, "vi              {}", on_or_off(settings.vi_flag));
-                            fprintln!(&mut line_stdout, "emacs           {}", on_or_off(settings.emacs_flag));
-                            fprintln!(&mut line_stdout, "xtrace          {}", on_or_off(settings.xtrace_flag));
-                            fprintln!(&mut line_stdout, "strlossy        {}", on_or_off(settings.strlossy_flag));
-                            fprintln!(&mut line_stdout, "extxtrace       {}", on_or_off(settings.extxtrace_flag));
-                        },
-                        None => xsfprintln!(exec, 2, "No standard output"),
-                    }
+                    xcfprintln!(exec, 1, "allexport       {}", on_or_off(settings.allexport_flag));
+                    xcfprintln!(exec, 1, "errexit         {}", on_or_off(settings.errexit_flag));
+                    xcfprintln!(exec, 1, "ignoreeof       {}", on_or_off(settings.ignoreeof_flag));
+                    xcfprintln!(exec, 1, "monitor         {}", on_or_off(settings.monitor_flag));
+                    xcfprintln!(exec, 1, "noclobber       {}", on_or_off(settings.noclobber_flag));
+                    xcfprintln!(exec, 1, "noglob          {}", on_or_off(settings.noglob_flag));
+                    xcfprintln!(exec, 1, "noexec          {}", on_or_off(settings.noexec_flag));
+                    xcfprintln!(exec, 1, "nolog           {}", on_or_off(settings.nolog_flag));
+                    xcfprintln!(exec, 1, "notify          {}", on_or_off(settings.notify_flag));
+                    xcfprintln!(exec, 1, "nounset         {}", on_or_off(settings.nounset_flag));
+                    xcfprintln!(exec, 1, "verbose         {}", on_or_off(settings.verbose_flag));
+                    xcfprintln!(exec, 1, "vi              {}", on_or_off(settings.vi_flag));
+                    xcfprintln!(exec, 1, "emacs           {}", on_or_off(settings.emacs_flag));
+                    xcfprintln!(exec, 1, "xtrace          {}", on_or_off(settings.xtrace_flag));
+                    xcfprintln!(exec, 1, "strlossy        {}", on_or_off(settings.strlossy_flag));
+                    xcfprintln!(exec, 1, "extxtrace       {}", on_or_off(settings.extxtrace_flag));
                     true
                 },
                 (OptionType::Plus, 'o') => {
-                    match exec.current_file(1) {
-                        Some(stdout_file) => {
-                            let mut stdout_file_r = stdout_file.borrow_mut();
-                            let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                            fprintln!(&mut line_stdout, "set {}o allexport", minus_or_plus(settings.allexport_flag));
-                            fprintln!(&mut line_stdout, "set {}o errexit", minus_or_plus(settings.errexit_flag));
-                            fprintln!(&mut line_stdout, "set {}o ignoreeof", minus_or_plus(settings.ignoreeof_flag));
-                            fprintln!(&mut line_stdout, "set {}o monitor", minus_or_plus(settings.monitor_flag));
-                            fprintln!(&mut line_stdout, "set {}o noclobber", minus_or_plus(settings.noclobber_flag));
-                            fprintln!(&mut line_stdout, "set {}o noglob", minus_or_plus(settings.noglob_flag));
-                            fprintln!(&mut line_stdout, "set {}o noexec", minus_or_plus(settings.noexec_flag));
-                            fprintln!(&mut line_stdout, "set {}o nolog", minus_or_plus(settings.nolog_flag));
-                            fprintln!(&mut line_stdout, "set {}o notify", minus_or_plus(settings.notify_flag));
-                            fprintln!(&mut line_stdout, "set {}o nounset", minus_or_plus(settings.nounset_flag));
-                            fprintln!(&mut line_stdout, "set {}o verbose", minus_or_plus(settings.verbose_flag));
-                            fprintln!(&mut line_stdout, "set {}o vi", minus_or_plus(settings.vi_flag));
-                            fprintln!(&mut line_stdout, "set {}o emacs", minus_or_plus(settings.emacs_flag));
-                            fprintln!(&mut line_stdout, "set {}o xtrace", minus_or_plus(settings.xtrace_flag));
-                            fprintln!(&mut line_stdout, "set {}o strlossy", minus_or_plus(settings.strlossy_flag));
-                            fprintln!(&mut line_stdout, "set {}o extxtrace", minus_or_plus(settings.extxtrace_flag));
-                        },
-                        None => xsfprintln!(exec, 2, "No standard output"),
-                    }
+                    xcfprintln!(exec, 1, "set {}o allexport", minus_or_plus(settings.allexport_flag));
+                    xcfprintln!(exec, 1, "set {}o errexit", minus_or_plus(settings.errexit_flag));
+                    xcfprintln!(exec, 1, "set {}o ignoreeof", minus_or_plus(settings.ignoreeof_flag));
+                    xcfprintln!(exec, 1, "set {}o monitor", minus_or_plus(settings.monitor_flag));
+                    xcfprintln!(exec, 1, "set {}o noclobber", minus_or_plus(settings.noclobber_flag));
+                    xcfprintln!(exec, 1, "set {}o noglob", minus_or_plus(settings.noglob_flag));
+                    xcfprintln!(exec, 1, "set {}o noexec", minus_or_plus(settings.noexec_flag));
+                    xcfprintln!(exec, 1, "set {}o nolog", minus_or_plus(settings.nolog_flag));
+                    xcfprintln!(exec, 1, "set {}o notify", minus_or_plus(settings.notify_flag));
+                    xcfprintln!(exec, 1, "set {}o nounset", minus_or_plus(settings.nounset_flag));
+                    xcfprintln!(exec, 1, "set {}o verbose", minus_or_plus(settings.verbose_flag));
+                    xcfprintln!(exec, 1, "set {}o vi", minus_or_plus(settings.vi_flag));
+                    xcfprintln!(exec, 1, "set {}o emacs", minus_or_plus(settings.emacs_flag));
+                    xcfprintln!(exec, 1, "set {}o xtrace", minus_or_plus(settings.xtrace_flag));
+                    xcfprintln!(exec, 1, "set {}o strlossy", minus_or_plus(settings.strlossy_flag));
+                    xcfprintln!(exec, 1, "set {}o extxtrace", minus_or_plus(settings.extxtrace_flag));
                     true
                 },
                 _ => false,
@@ -104,23 +89,13 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
     match res {
         Ok((i, is_minus_minus)) => {
             if args.len() <= 1 {
-                match exec.current_file(1) {
-                    Some(stdout_file) => {
-                        let mut stdout_file_r = stdout_file.borrow_mut();
-                        let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                        for (name, value) in env.unexported_vars().iter() {
-                            fprintln!(&mut line_stdout, "{}={}", name, singly_quote_str(value.as_str()));
-                        }
-                        for (name, value) in env.exported_vars() {
-                            fprintln!(&mut line_stdout, "{}={}", name, singly_quote_str(value.as_str()));
-                        }
-                        0
-                    },
-                    None => {
-                        xsfprintln!(exec, 2, "No standard output");
-                        interp.exit(1, false)
-                    },
+                for (name, value) in env.unexported_vars().iter() {
+                    xcfprintln!(exec, 1, "{}={}", name, singly_quote_str(value.as_str()));
                 }
+                for (name, value) in env.exported_vars() {
+                    xcfprintln!(exec, 1, "{}={}", name, singly_quote_str(value.as_str()));
+                }
+                0
             } else {
                 if i < args.len() || is_minus_minus {
                     let args: Vec<String> = args.iter().skip(i).map(|a| a.clone()).collect();

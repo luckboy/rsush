@@ -15,13 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-use std::io::*;
 use crate::env::*;
 use crate::exec::*;
 use crate::interp::*;
 use crate::settings::*;
 use crate::utils::*;
-use crate::fprintln;
+use crate::xcfprintln;
 use crate::xsfprintln;
 
 fn minutes_and_seconds_and_mseconds(clk: i64, clk_tck: i64) -> (i64, i64, i64)
@@ -42,23 +41,13 @@ pub fn main(_vars: &[(String, String)], _args: &[String], interp: &mut Interpret
     };
     match times() {
         Ok(tms) => {
-            match exec.current_file(1) {
-                Some(stdout_file) => {
-                    let mut stdout_file_r = stdout_file.borrow_mut();
-                    let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                    let (utime_min, utime_sec, utime_msec) = minutes_and_seconds_and_mseconds(tms.utime, tmp_clk_tck);
-                    let (stime_min, stime_sec, stime_msec) = minutes_and_seconds_and_mseconds(tms.stime, tmp_clk_tck);
-                    fprintln!(&mut line_stdout, "{}m{}.{:03}s {}m{}.{:03}s", utime_min, utime_sec, utime_msec, stime_min, stime_sec, stime_msec);
-                    let (cutime_min, cutime_sec, cutime_msec) = minutes_and_seconds_and_mseconds(tms.cutime, tmp_clk_tck);
-                    let (cstime_min, cstime_sec, cstime_msec) = minutes_and_seconds_and_mseconds(tms.cstime, tmp_clk_tck);
-                    fprintln!(&mut line_stdout, "{}m{}.{:03}s {}m{}.{:03}s", cutime_min, cutime_sec, cutime_msec, cstime_min, cstime_sec, cstime_msec);
-                    0
-                },
-                None => {
-                    xsfprintln!(exec, 2, "No standard output");
-                    interp.exit(1, false)
-                },
-            }
+            let (utime_min, utime_sec, utime_msec) = minutes_and_seconds_and_mseconds(tms.utime, tmp_clk_tck);
+            let (stime_min, stime_sec, stime_msec) = minutes_and_seconds_and_mseconds(tms.stime, tmp_clk_tck);
+            xcfprintln!(exec, 1, "{}m{}.{:03}s {}m{}.{:03}s", utime_min, utime_sec, utime_msec, stime_min, stime_sec, stime_msec);
+            let (cutime_min, cutime_sec, cutime_msec) = minutes_and_seconds_and_mseconds(tms.cutime, tmp_clk_tck);
+            let (cstime_min, cstime_sec, cstime_msec) = minutes_and_seconds_and_mseconds(tms.cstime, tmp_clk_tck);
+            xcfprintln!(exec, 1, "{}m{}.{:03}s {}m{}.{:03}s", cutime_min, cutime_sec, cutime_msec, cstime_min, cstime_sec, cstime_msec);
+            0
         },
         Err(err) => {
             xsfprintln!(exec, 2, "{}", err);
