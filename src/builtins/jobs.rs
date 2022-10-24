@@ -15,30 +15,27 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-use std::io::*;
 use getopt;
 use getopt::Opt;
 use crate::env::*;
 use crate::exec::*;
 use crate::interp::*;
 use crate::settings::*;
-use crate::fprintln;
 use crate::xcfprintln;
-use crate::xsfprintln;
 
 struct Options
 {
     job_format_flag: JobFormatFlag,
 }
 
-fn print_job<W: Write>(w: &mut W, job_id: u32, job: &Job, opts: &Options, interp: &Interpreter, exec: &Executor)
-{ fprintln!(w, "{}", interp.job_to_string(exec, job_id, job, None, opts.job_format_flag)); }
+fn print_job(job_id: u32, job: &Job, opts: &Options, interp: &Interpreter, exec: &Executor)
+{ xcfprintln!(exec, 1, "{}", interp.job_to_string(exec, job_id, job, None, opts.job_format_flag)); }
 
-fn print_job_for_job_id<W: Write>(w: &mut W, job_id: u32, opts: &Options, interp: &Interpreter, exec: &Executor) -> bool
+fn print_job_for_job_id(job_id: u32, opts: &Options, interp: &Interpreter, exec: &Executor) -> bool
 {
     match exec.jobs().get(&job_id) {
         Some(job) => {
-            fprintln!(w, "{}", interp.job_to_string(exec, job_id, job, None, opts.job_format_flag));
+            xcfprintln!(exec, 1, "{}", interp.job_to_string(exec, job_id, job, None, opts.job_format_flag));
             true
         },
         None => {
@@ -71,47 +68,37 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
     }
     let mut status = 0;
     let args: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
-    match exec.current_file(1) {
-        Some(stdout_file) => {
-            let mut stdout_file_r = stdout_file.borrow_mut();
-            let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-            if !args.is_empty() {
-                for arg in &args {
-                    match exec.parse_job_id(arg.as_str()) {
+    if !args.is_empty() {
+        for arg in &args {
+            match exec.parse_job_id(arg.as_str()) {
+                Ok(job_id) => {
+                    if !print_job_for_job_id(job_id, &opts, interp, exec) {
+                        status = 1;
+                    }
+                },
+                Err(JobIdError::NoPercent) => {
+                    match arg.parse::<u32>() {
                         Ok(job_id) => {
-                            if !print_job_for_job_id(&mut line_stdout, job_id, &opts, interp, exec) {
+                            if !print_job_for_job_id(job_id, &opts, interp, exec) {
                                 status = 1;
                             }
                         },
-                        Err(JobIdError::NoPercent) => {
-                            match arg.parse::<u32>() {
-                                Ok(job_id) => {
-                                    if !print_job_for_job_id(&mut line_stdout, job_id, &opts, interp, exec) {
-                                        status = 1;
-                                    }
-                                },
-                                Err(_) => {
-                                    xcfprintln!(exec, 2, "Invalid number");
-                                    status = 1;
-                                },
-                            }
-                        },
-                        Err(err) => {
-                            xcfprintln!(exec, 2, "{}", err);
+                        Err(_) => {
+                            xcfprintln!(exec, 2, "Invalid number");
                             status = 1;
                         },
                     }
-                }
-            } else {
-                for (job_id, job) in exec.jobs() {
-                    print_job(&mut line_stdout, *job_id, job, &opts, interp, exec);
-                }
+                },
+                Err(err) => {
+                    xcfprintln!(exec, 2, "{}", err);
+                    status = 1;
+                },
             }
-        },
-        None => {
-            xsfprintln!(exec, 2, "No standard output");
-            status = 1;
-        },
+        }
+    } else {
+        for (job_id, job) in exec.jobs() {
+            print_job(*job_id, job, &opts, interp, exec);
+        }
     }
     status
 }

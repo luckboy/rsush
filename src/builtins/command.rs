@@ -27,9 +27,7 @@ use crate::exec::*;
 use crate::interp::*;
 use crate::settings::*;
 use crate::utils::*;
-use crate::fprintln;
 use crate::xcfprintln;
-use crate::xsfprintln;
 
 #[derive(Copy, Clone)] 
 enum VerboseFlag
@@ -104,83 +102,73 @@ pub fn main(vars: &[(String, String)], args: &[String], interp: &mut Interpreter
             }
         },
         _ => {
-            match exec.current_file(1) {
-                Some(stdout_file) => {
-                    let mut stdout_file_r = stdout_file.borrow_mut();
-                    let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                    let mut status = 0;
-                    let names: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
-                    for name in &names {
-                        match env.builtin_fun(name.as_str()) {
+            let mut status = 0;
+            let names: Vec<&String> = args.iter().skip(opt_parser.index()).collect();
+            for name in &names {
+                match env.builtin_fun(name.as_str()) {
+                    Some(_) => {
+                        match opts.verbose_flag {
+                            VerboseFlag::Name => xcfprintln!(exec, 1, "{}", name),
+                            _ => xcfprintln!(exec, 1, "{} is built-in command", name),
+                        }
+                    },
+                    None => {
+                        match env.fun(name.as_str()) {
                             Some(_) => {
                                 match opts.verbose_flag {
-                                    VerboseFlag::Name => fprintln!(&mut line_stdout, "{}", name),
-                                    _ => fprintln!(&mut line_stdout, "{} is built-in command", name),
+                                    VerboseFlag::Name => xcfprintln!(exec, 1, "{}", name),
+                                    _ => xcfprintln!(exec, 1, "{} is function", name),
                                 }
                             },
                             None => {
-                                match env.fun(name.as_str()) {
-                                    Some(_) => {
+                                match env.alias(name.as_str()) {
+                                    Some(value) => {
                                         match opts.verbose_flag {
-                                            VerboseFlag::Name => fprintln!(&mut line_stdout, "{}", name),
-                                            _ => fprintln!(&mut line_stdout, "{} is function", name),
+                                            VerboseFlag::Name => xcfprintln!(exec, 1, "alias {}={}", name, singly_quote_str(value.as_str())),
+                                            _ => xcfprintln!(exec, 1, "{} is alias to {}", name, value),
                                         }
                                     },
                                     None => {
-                                        match env.alias(name.as_str()) {
-                                            Some(value) => {
+                                        let mut res: Result<PathBuf> = Err(Error::from_raw_os_error(libc::ENOENT));
+                                        if name.contains(path::MAIN_SEPARATOR) {
+                                            match check_prog(name) {
+                                                Ok(()) => res = Ok(PathBuf::from(name)),
+                                                Err(err) => res = Err(err),
+                                            }
+                                        } else {
+                                            let path = env.var("PATH").unwrap_or(String::from("/bin:/usr/bin"));
+                                            for dir_path in path.split(':') {
+                                                let mut prog_path_buf = PathBuf::from(dir_path);
+                                                prog_path_buf.push(name.as_str());
+                                                match check_prog(prog_path_buf.as_path()) {
+                                                    Ok(_) => {
+                                                        res = Ok(prog_path_buf);
+                                                        break;
+                                                    },
+                                                    Err(err) => res = Err(err),
+                                                }
+                                            }
+                                        }
+                                        match res {
+                                            Ok(prog_path_buf) => {
                                                 match opts.verbose_flag {
-                                                    VerboseFlag::Name => fprintln!(&mut line_stdout, "alias {}={}", name, singly_quote_str(value.as_str())),
-                                                    _ => fprintln!(&mut line_stdout, "{} is alias to {}", name, value),
+                                                    VerboseFlag::Name => xcfprintln!(exec, 1, "{}", prog_path_buf.as_path().to_string_lossy()),
+                                                    _ => xcfprintln!(exec, 1, "{} is {}", name, prog_path_buf.as_path().to_string_lossy()),
                                                 }
                                             },
-                                            None => {
-                                                let mut res: Result<PathBuf> = Err(Error::from_raw_os_error(libc::ENOENT));
-                                                if name.contains(path::MAIN_SEPARATOR) {
-                                                    match check_prog(name) {
-                                                        Ok(()) => res = Ok(PathBuf::from(name)),
-                                                        Err(err) => res = Err(err),
-                                                    }
-                                                } else {
-                                                    let path = env.var("PATH").unwrap_or(String::from("/bin:/usr/bin"));
-                                                    for dir_path in path.split(':') {
-                                                        let mut prog_path_buf = PathBuf::from(dir_path);
-                                                        prog_path_buf.push(name.as_str());
-                                                        match check_prog(prog_path_buf.as_path()) {
-                                                            Ok(_) => {
-                                                                res = Ok(prog_path_buf);
-                                                                break;
-                                                            },
-                                                            Err(err) => res = Err(err),
-                                                        }
-                                                    }
-                                                }
-                                                match res {
-                                                    Ok(prog_path_buf) => {
-                                                        match opts.verbose_flag {
-                                                            VerboseFlag::Name => fprintln!(&mut line_stdout, "{}", prog_path_buf.as_path().to_string_lossy()),
-                                                            _ => fprintln!(&mut line_stdout, "{} is {}", name, prog_path_buf.as_path().to_string_lossy()),
-                                                        }
-                                                    },
-                                                    Err(err) => {
-                                                        xcfprintln!(exec, 2, "{}: {}", name, err);
-                                                        status = 1;
-                                                    },
-                                                }
+                                            Err(err) => {
+                                                xcfprintln!(exec, 2, "{}: {}", name, err);
+                                                status = 1;
                                             },
                                         }
                                     },
                                 }
                             },
                         }
-                    }
-                    status
-                },
-                None => {
-                    xsfprintln!(exec, 2, "No standard output");
-                    1
-                },
+                    },
+                }
             }
+            status
         },
     }
 }

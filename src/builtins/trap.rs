@@ -16,7 +16,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 use std::collections::HashMap;
-use std::io::*;
 use libc;
 use crate::env::*;
 use crate::exec::*;
@@ -25,7 +24,7 @@ use crate::iter::*;
 use crate::settings::*;
 use crate::signals::*;
 use crate::utils::*;
-use crate::fprintln;
+use crate::xcfprintln;
 use crate::xsfprintln;
 
 pub fn initialize_signals(sigs: &mut HashMap<String, i32>)
@@ -125,27 +124,17 @@ pub fn main(_vars: &[(String, String)], args: &[String], interp: &mut Interprete
             0
         },
         None => {
-            match exec.current_file(1) {
-                Some(stdout_file) => {
-                    let mut sig_names: HashMap<i32, String> = HashMap::new();
-                    initialize_signal_names(&sigs, &mut sig_names);
-                    let mut stdout_file_r = stdout_file.borrow_mut();
-                    let mut line_stdout = LineWriter::new(&mut *stdout_file_r);
-                    for (sig, action) in interp.actions().iter() {
-                        let mut sig_name = format!("{}", sig);
-                        match sig_names.get(sig) {
-                            Some(tmp_sig_name) => sig_name = tmp_sig_name.clone(),
-                            None => (),
-                        }
-                        fprintln!(&mut line_stdout, "trap -- {} {}", singly_quote_str(action.as_str()), sig_name);
-                    }
-                    0
-                },
-                None => {
-                    xsfprintln!(exec, 2, "No standard output");
-                    return interp.exit(1, false);
-                },
+            let mut sig_names: HashMap<i32, String> = HashMap::new();
+            initialize_signal_names(&sigs, &mut sig_names);
+            for (sig, action) in interp.actions().iter() {
+                let mut sig_name = format!("{}", sig);
+                match sig_names.get(sig) {
+                    Some(tmp_sig_name) => sig_name = tmp_sig_name.clone(),
+                    None => (),
+                }
+                xcfprintln!(exec, 1, "trap -- {} {}", singly_quote_str(action.as_str()), sig_name);
             }
+            0
         },
     }
 }
