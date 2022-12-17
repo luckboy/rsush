@@ -213,9 +213,11 @@ fn intepret_str(s: &str, interp: &mut Interpreter, exec: &mut Executor, env: &mu
     }
 }
 
-fn interpret_stream(path: &str, cr: &mut dyn CharRead, interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings, is_ignored_eof: bool) -> (i32, bool)
+fn interpret_stream(path: &str, cr: &mut dyn CharRead, interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings, is_ignored_eof: bool, is_signal_initializing: bool) -> (i32, bool)
 {
-    initialize_signals(false);
+    if is_signal_initializing {
+        initialize_signals(false);
+    }
     interp.set_action_flag();
     let mut lexer = Lexer::new(path, &Position::new(1, 1), cr, 0, is_ignored_eof);
     let mut parser = Parser::new();
@@ -247,12 +249,12 @@ fn interpret_stream(path: &str, cr: &mut dyn CharRead, interp: &mut Interpreter,
     }
 }
 
-fn interpret_file(path: &str, interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings, is_ignored_eof: bool) -> Result<(i32, bool)>
+fn interpret_file(path: &str, interp: &mut Interpreter, exec: &mut Executor, env: &mut Environment, settings: &mut Settings, is_ignored_eof: bool, is_signal_initializing: bool) -> Result<(i32, bool)>
 {
     let mut file = File::open(path)?;
     let mut br = BufReader::new(&mut file);
     let mut cr = CharReader::new(&mut br);
-    Ok(interpret_stream(path, &mut cr, interp, exec, env, settings, is_ignored_eof))
+    Ok(interpret_stream(path, &mut cr, interp, exec, env, settings, is_ignored_eof, is_signal_initializing))
 }
 
 fn new_rustyline_editor(settings: &Settings) -> rustyline::Result<Editor<()>>
@@ -317,7 +319,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
     exec.set_foreground();
     let _res = setpgid(exec.shell_pid(), exec.shell_pid());
     exec.set_foreground_for_shell(settings);
-    match interpret_file("/etc/rsushrc", interp, exec, env, settings, false) {
+    match interpret_file("/etc/rsushrc", interp, exec, env, settings, false, false) {
         Ok((status, is_exit)) => {
             if is_exit { return status; }
         }
@@ -326,7 +328,7 @@ fn interactively_interpret(interp: &mut Interpreter, exec: &mut Executor, env: &
     }
     let home = env.var("HOME").unwrap_or(String::from("/"));
     let path = format!("{}/.rsushrc", home);
-    match interpret_file(path.as_str(), interp, exec, env, settings, false) {
+    match interpret_file(path.as_str(), interp, exec, env, settings, false, false) {
         Ok((status, is_exit)) => {
             if is_exit { return status; }
         }
@@ -533,11 +535,11 @@ fn interpret(shell_commands: ShellCommands, interp: &mut Interpreter, exec: &mut
             } else {
                 let mut br = BufReader::new(stdin());
                 let mut cr = CharReader::new(&mut br);
-                interpret_stream("(standard input)", &mut cr, interp, exec, env, settings, true).0
+                interpret_stream("(standard input)", &mut cr, interp, exec, env, settings, true, true).0
             }
         },
         ShellCommands::FromFile(Some(path)) => {
-            match interpret_file(path.as_str(), interp, exec, env, settings, true) {
+            match interpret_file(path.as_str(), interp, exec, env, settings, true, true) {
                 Ok((tmp_status, _)) => tmp_status,
                 Err(err) => {
                     xsfprintln!(exec, 2, "{}: {}", path, err);
