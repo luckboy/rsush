@@ -1,6 +1,6 @@
 //
 // Rsush - Rust single unix shell.
-// Copyright (C) 2022 Łukasz Szpakowski
+// Copyright (C) 2022-2023 Łukasz Szpakowski
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ pub const MAX_SIGNAL_COUNT: i32 = 257;
 #[derive(Copy, Clone)]
 pub struct SigAction
 {
-    libc_sigaction: libc::sigaction,
+    libc_sigaction: MaybeUninit<libc::sigaction>,
 }
 
 static mut SIGNAL_FLAGS: [bool; MAX_SIGNAL_COUNT as usize] = [false; MAX_SIGNAL_COUNT as usize];
@@ -63,19 +63,19 @@ pub fn unset_signal_flag(sig: i32)
 
 pub fn set_signal(sig: i32, is_handler: bool, is_interactive: bool) -> Result<()>
 {
-    let mut sigact: libc::sigaction = unsafe { MaybeUninit::uninit().assume_init() };
+    let mut sigact: MaybeUninit<libc::sigaction> = MaybeUninit::uninit();
     if is_handler {
-        sigact.sa_sigaction = signal_handler as libc::sighandler_t;
+        unsafe { sigact.assume_init_mut() }.sa_sigaction = signal_handler as libc::sighandler_t;
     } else {
         if is_interactive && (sig == libc::SIGINT || sig == libc::SIGTTIN || sig == libc::SIGTTOU) {
-            sigact.sa_sigaction = libc::SIG_IGN;
+            unsafe { sigact.assume_init_mut() }.sa_sigaction = libc::SIG_IGN;
         } else {
-            sigact.sa_sigaction = libc::SIG_DFL;
+            unsafe { sigact.assume_init_mut() }.sa_sigaction = libc::SIG_DFL;
         }
     }
-    unsafe { libc::sigfillset(&mut sigact.sa_mask as *mut libc::sigset_t); }
-    sigact.sa_flags = libc::SA_RESTART;
-    let res = unsafe { libc::sigaction(sig, &sigact as *const libc::sigaction, null_mut()) };
+    unsafe { libc::sigfillset(&mut sigact.assume_init_mut().sa_mask as *mut libc::sigset_t); }
+    unsafe { sigact.assume_init_mut() }.sa_flags = libc::SA_RESTART;
+    let res = unsafe { libc::sigaction(sig, sigact.assume_init_ref() as *const libc::sigaction, null_mut()) };
     if res != -1 {
         Ok(())
     } else {
@@ -85,8 +85,8 @@ pub fn set_signal(sig: i32, is_handler: bool, is_interactive: bool) -> Result<()
 
 pub fn get_sigaction(sig: i32) -> Result<SigAction>
 {
-    let mut sigact: SigAction = unsafe { MaybeUninit::uninit().assume_init() };
-    let res = unsafe { libc::sigaction(sig, null(), &mut sigact.libc_sigaction as *mut libc::sigaction) };
+    let mut sigact: SigAction = SigAction { libc_sigaction: MaybeUninit::uninit(), };
+    let res = unsafe { libc::sigaction(sig, null(), sigact.libc_sigaction.assume_init_mut() as *mut libc::sigaction) };
     if res != -1 {
         Ok(sigact)
     } else {
@@ -96,7 +96,7 @@ pub fn get_sigaction(sig: i32) -> Result<SigAction>
 
 pub fn set_sigaction(sig: i32, sigact: &SigAction) -> Result<()>
 {
-    let res = unsafe { libc::sigaction(sig, &sigact.libc_sigaction as *const libc::sigaction, null_mut()) };
+    let res = unsafe { libc::sigaction(sig, sigact.libc_sigaction.assume_init_ref() as *const libc::sigaction, null_mut()) };
     if res != -1 {
         Ok(())
     } else {

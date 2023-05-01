@@ -1,6 +1,6 @@
 //
 // Rsush - Rust single unix shell.
-// Copyright (C) 2022 Łukasz Szpakowski
+// Copyright (C) 2022-2023 Łukasz Szpakowski
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -455,15 +455,15 @@ pub fn pipe() -> Result<PipeFds>
 
 pub fn times() -> Result<Tms>
 {
-    let mut libc_tms: libc::tms = unsafe { MaybeUninit::uninit().assume_init() };
-    let res = unsafe { libc::times(&mut libc_tms as *mut libc::tms) };
+    let mut libc_tms: MaybeUninit<libc::tms> = MaybeUninit::uninit();
+    let res = unsafe { libc::times(libc_tms.assume_init_mut() as *mut libc::tms) };
     let fail: libc::clock_t = (-1 as i64) as libc::clock_t;
     if res != fail {
         let tms = Tms {
-            utime: libc_tms.tms_utime as i64,
-            stime: libc_tms.tms_stime as i64,
-            cutime: libc_tms.tms_cutime as i64,
-            cstime: libc_tms.tms_cstime as i64,
+            utime: unsafe { libc_tms.assume_init_ref() }.tms_utime as i64,
+            stime: unsafe { libc_tms.assume_init_ref() }.tms_stime as i64,
+            cutime: unsafe { libc_tms.assume_init_ref() }.tms_cutime as i64,
+            cstime: unsafe { libc_tms.assume_init_ref() }.tms_cstime as i64,
         };
         Ok(tms)
     } else {
@@ -569,24 +569,24 @@ pub fn is_fd(fd: i32) -> bool
 
 pub fn glob<S: AsRef<OsStr>>(pattern: S, flags: i32, err_f: Option<extern "C" fn(*const libc::c_char, i32) -> i32>) -> GlobResult
 {
-    let mut tmp_glob: libc::glob_t = unsafe { MaybeUninit::uninit().assume_init() };
-    tmp_glob.gl_pathv = null_mut();
-    tmp_glob.gl_pathc = 0;
-    tmp_glob.gl_offs = 0;
+    let mut tmp_glob: MaybeUninit<libc::glob_t> = MaybeUninit::uninit();
+    unsafe { tmp_glob.assume_init_mut() }.gl_pathv = null_mut();
+    unsafe { tmp_glob.assume_init_mut() }.gl_pathc = 0;
+    unsafe { tmp_glob.assume_init_mut() }.gl_offs = 0;
     let pattern_cstring = CString::new(pattern.as_ref().as_bytes()).unwrap();
-    let res = unsafe { libc::glob(pattern_cstring.as_ptr(), flags, err_f, &mut tmp_glob as *mut libc::glob_t) };
+    let res = unsafe { libc::glob(pattern_cstring.as_ptr(), flags, err_f, tmp_glob.assume_init_mut() as *mut libc::glob_t) };
     match res {
         0 => {
             let mut path_bufs: Vec<PathBuf> = Vec::new();
-            let tmp_paths: &[*mut libc::c_char] = unsafe { from_raw_parts_mut(tmp_glob.gl_pathv, tmp_glob.gl_pathc) };
-            for i in 0..tmp_glob.gl_pathc {
+            let tmp_paths: &[*mut libc::c_char] = unsafe { from_raw_parts_mut(tmp_glob.assume_init_ref().gl_pathv, tmp_glob.assume_init_ref().gl_pathc) };
+            for i in 0..(unsafe { tmp_glob.assume_init() }).gl_pathc {
                 let path_len = unsafe { libc::strlen(tmp_paths[i] as *const libc::c_char) };
                 let path_osstring = OsString::from(&OsStr::from_bytes(unsafe { from_raw_parts(tmp_paths[i] as *const u8, path_len) }));
                 let mut path_buf = PathBuf::new();
                 path_buf.push(path_osstring);
                 path_bufs.push(path_buf);
             }
-            unsafe { libc::globfree(&mut tmp_glob as *mut libc::glob_t); };
+            unsafe { libc::globfree(tmp_glob.assume_init_mut() as *mut libc::glob_t); };
             GlobResult::Ok(path_bufs)
         },
         libc::GLOB_ABORTED => GlobResult::Aborted,
