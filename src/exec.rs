@@ -1,6 +1,6 @@
 //
 // Rsush - Rust single unix shell.
-// Copyright (C) 2022 Łukasz Szpakowski
+// Copyright (C) 2022-2023 Łukasz Szpakowski
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -417,9 +417,17 @@ impl Executor
             Some(None) => self.has_foreground = false,
             Some(Some(pid)) => {
                 if settings.monitor_flag {
-                    let _res = setpgid(pid, pid);
-                    if self.has_foreground && !is_in_background {
-                        let _res = tcsetpgrp(0, pid); 
+                    if self.has_foreground {
+                        let _res = setpgid(pid, pid);
+                        if !is_in_background {
+                            let _res = tcsetpgrp(0, pid); 
+                        }
+                    } else {
+                        if !is_in_background {
+                            let _res = setpgid(0, 0);
+                        } else {
+                            let _res = setpgid(pid, pid);
+                        }
                     }
                 }
             },
@@ -535,6 +543,15 @@ impl Executor
         }
     }
     
+    pub fn set_process_group(&self, pid: i32, pgid: i32, settings: &Settings)
+    {
+        if settings.monitor_flag {
+            if self.has_foreground {
+                let _res = setpgid(pid, pgid);
+            }
+        }
+    }
+
     pub fn close_and_move_files_for_execute(&mut self) -> Result<()>
     {
         for (_, virtual_file) in self.virtual_files.iter_mut() {
@@ -718,13 +735,6 @@ impl Executor
         } else {
             Err(JobIdError::NoPercent)
         }
-    }
-}
-
-pub fn set_process_group(pid: i32, pgid: i32, settings: &Settings)
-{
-    if settings.monitor_flag {
-        let _res = setpgid(pid, pgid);
     }
 }
 

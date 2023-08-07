@@ -1,6 +1,6 @@
 //
 // Rsush - Rust single unix shell.
-// Copyright (C) 2022 Łukasz Szpakowski
+// Copyright (C) 2022-2023 Łukasz Szpakowski
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -190,7 +190,7 @@ fn set_process_group_and_foreground_for_processes(exec: &Executor, pids: &[Optio
         Some(pgid) => {
             for pid in pids.iter() {
                 match pid {
-                    Some(pid) => set_process_group(*pid, pgid, settings),
+                    Some(pid) => exec.set_process_group(*pid, pgid, settings),
                     None => (),
                 }
             }
