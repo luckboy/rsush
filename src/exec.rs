@@ -423,9 +423,7 @@ impl Executor
                             let _res = tcsetpgrp(0, pid); 
                         }
                     } else {
-                        if !is_in_background {
-                            let _res = setpgid(0, 0);
-                        } else {
+                        if is_in_background {
                             let _res = setpgid(pid, pid);
                         }
                     }
