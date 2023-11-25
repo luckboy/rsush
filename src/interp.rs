@@ -1175,7 +1175,7 @@ impl Interpreter
                     },
                 }
             },
-            ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Substract, expr2) => {
+            ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::Subtract, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 match x.checked_sub(y) {
@@ -1350,7 +1350,7 @@ impl Interpreter
                     },
                 }
             },
-            ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::SubstractAssign, expr2) => {
+            ArithmeticExpression::Binary(_, _, expr1, BinaryOperator::SubtractAssign, expr2) => {
                 let x = self.evaluate_arith_expr(exec, &(*expr1), param_expr_count, env, settings)?;
                 let y = self.evaluate_arith_expr(exec, &(*expr2), param_expr_count, env, settings)?;
                 match x.checked_sub(y) {
@@ -2784,7 +2784,7 @@ impl Interpreter
                         for tmp_command in commands {
                             process_names.push(format!("{} |", tmp_command));
                         }
-                        let last_process_name = format!("{}", command.commands[(command.commands.len() - 1)]);
+                        let last_process_name = format!("{}", command.commands[command.commands.len() - 1]);
                         (process_names, last_process_name, format!("{}", command))
                     };
                     match self.wait_for_processes(exec, pids.as_slice(), pgid, pids.len(), true, false, settings, name_f) {

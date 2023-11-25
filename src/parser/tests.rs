@@ -1,6 +1,6 @@
 //
 // Rsush - Rust single unix shell.
-// Copyright (C) 2022 Łukasz Szpakowski
+// Copyright (C) 2022-2023 Łukasz Szpakowski
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -8709,7 +8709,7 @@ fn test_parser_parse_arith_expr_parses_expression_with_nested_expressions_which_
                     assert_eq!(&String::from("test.sh"), path2);
                     assert_eq!(1, pos2.line);
                     assert_eq!(12, pos2.column);
-                    assert_eq!(BinaryOperator::Substract, *op2);
+                    assert_eq!(BinaryOperator::Subtract, *op2);
                     match &(**expr5) {
                         ArithmeticExpression::Number(path5, pos5, n5) => {
                             assert_eq!(&String::from("test.sh"), path5);
@@ -8916,7 +8916,7 @@ fn test_parser_parse_arith_expr_parses_expression10()
             assert_eq!(String::from("test.sh"), path);
             assert_eq!(1, pos.line);
             assert_eq!(1, pos.column);
-            assert_eq!(BinaryOperator::Substract, op);
+            assert_eq!(BinaryOperator::Subtract, op);
             match &(*expr1) {
                 ArithmeticExpression::Binary(path1, pos1, expr3, op1, expr4) => {
                     assert_eq!(&String::from("test.sh"), path1);

@@ -1,6 +1,6 @@
 //
 // Rsush - Rust single unix shell.
-// Copyright (C) 2022 Łukasz Szpakowski
+// Copyright (C) 2022-2023 Łukasz Szpakowski
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -742,7 +742,7 @@ pub enum BinaryOperator
     Divide,
     Module,
     Add,
-    Substract,
+    Subtract,
     ShiftLeft,
     ShiftRight,
     LessThan,
@@ -761,7 +761,7 @@ pub enum BinaryOperator
     DivideAssign,
     ModuleAssign,
     AddAssign,
-    SubstractAssign,
+    SubtractAssign,
     ShiftLeftAssign,
     ShiftRightAssign,
     AndAssign,
@@ -778,7 +778,7 @@ impl fmt::Display for BinaryOperator
             BinaryOperator::Divide => write!(f, "/"),
             BinaryOperator::Module => write!(f, "%"),
             BinaryOperator::Add => write!(f, "+"),
-            BinaryOperator::Substract => write!(f, "-"),
+            BinaryOperator::Subtract => write!(f, "-"),
             BinaryOperator::ShiftLeft => write!(f, "<<"),
             BinaryOperator::ShiftRight => write!(f, ">>"),
             BinaryOperator::LessThan => write!(f, "<"),
@@ -797,7 +797,7 @@ impl fmt::Display for BinaryOperator
             BinaryOperator::DivideAssign => write!(f, "/="),
             BinaryOperator::ModuleAssign => write!(f, "%="),
             BinaryOperator::AddAssign => write!(f, "+="),
-            BinaryOperator::SubstractAssign => write!(f, "-="),
+            BinaryOperator::SubtractAssign => write!(f, "-="),
             BinaryOperator::ShiftLeftAssign => write!(f, "<<="),
             BinaryOperator::ShiftRightAssign => write!(f, ">>="),
             BinaryOperator::AndAssign => write!(f, "&="),
@@ -853,7 +853,7 @@ impl ArithmeticExpression
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::Divide, _) => (2, true),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::Module, _) => (2, true),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::Add, _) => (3, true),
-            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Substract, _) => (3, true),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::Subtract, _) => (3, true),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::ShiftLeft, _) => (4, true),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::ShiftRight, _) => (4, true),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::LessThan, _) => (5, true),
@@ -872,7 +872,7 @@ impl ArithmeticExpression
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::DivideAssign, _) => (12, false),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::ModuleAssign, _) => (12, false),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::AddAssign, _) => (12, false),
-            ArithmeticExpression::Binary(_, _, _, BinaryOperator::SubstractAssign, _) => (12, false),
+            ArithmeticExpression::Binary(_, _, _, BinaryOperator::SubtractAssign, _) => (12, false),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::ShiftLeftAssign, _) => (12, false),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::ShiftRightAssign, _) => (12, false),
             ArithmeticExpression::Binary(_, _, _, BinaryOperator::AndAssign, _) => (12, false),
@@ -2052,7 +2052,7 @@ impl Parser
                 },
                 (ArithmeticToken::Minus, _) => {
                     let expr2 = self.parse_arith_expr11(lexer, settings)?;
-                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::Substract, Rc::new(expr2))
+                    expr1 = ArithmeticExpression::Binary(lexer.path().clone(), first_pos, Rc::new(expr1), BinaryOperator::Subtract, Rc::new(expr2))
                 },
                 (token, pos) => {
                     lexer.undo_arith_token(&token, &pos);
@@ -2261,7 +2261,7 @@ impl Parser
             },
             (ArithmeticToken::MinusEqual, _) => {
                 let expr2 = self.parse_arith_expr1(lexer, settings)?;
-                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::SubstractAssign, Rc::new(expr2)))
+                Ok(ArithmeticExpression::Binary(lexer.path().clone(), expr1.pos(), Rc::new(expr1), BinaryOperator::SubtractAssign, Rc::new(expr2)))
             },
             (ArithmeticToken::LessLessEqual, _) => {
                 let expr2 = self.parse_arith_expr1(lexer, settings)?;
